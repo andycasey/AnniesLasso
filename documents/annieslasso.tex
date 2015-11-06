@@ -1,0 +1,40 @@
+%% This file is part of the Annie's Lasso project.
+%% Copyright 2015 the authors.  All rights reserved.
+
+\documentclass[12pt]{aastex}
+
+\begin{document}
+
+\title{The Cannon 2: A data-driven model for detailed chemical abunance analysis}
+\author{AC, DWH, MKN, others}
+
+\begin{abstract}
+% context
+In previous work, we have shown that it is possible to train a generative
+probabilistic model for stellar spectra using a training set of stars, each with known
+parameters ($\logg$ and $\Teff$) and chemical abundance, and then use that model to infer labels for
+unlabeled stars, even stars with lower signal-to-noise observations.
+% aims
+Here we ask whether this is possible when the dimensionality of the chemical
+abundance space is large (15 abundances: Mg, Fe, etc, etc, Al)
+and the model is non-linear in its response to abundance and parameter changes.
+% method
+We adopt ideas from compressed sensing to limit overall model complexity (number
+of non-zero parameters) while retaining model freedom.
+The training set is a set of YYY red-giant stars with high signal-to-noise
+spectroscopic observations and stellar parameters and abundances taken from the
+\apogee\ Survey.
+% results
+We find that we can successfully train and use a model with 17 stellar labels.
+Cross-validation shows that the model does a good job of inferring all 17 labels
+(with the exception of XXX), even when we degrade the signal-to-noise of the
+validation set by discarding some of the spectroscopic observing time.
+The model dependencies make sense; the derivatives of the spectral mean model
+with respect to abundances correlate well with known atomic lines.
+We deliver open-source code and also stellar parameters and 15 abundances for a
+set of ZZZ stars.
+\end{abstract}
+
+Hello World!
+
+\end{document}
