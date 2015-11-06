@@ -4,7 +4,7 @@
 ## Authors
 - Andy Casey (Cambridge)
 - David W. Hogg (NYU) (MPIA) (SCDA)
-- Melissa K. Ness
+- Melissa K. Ness (MPIA)
 
 ## License
 **Copyright 2015 the authors**.
