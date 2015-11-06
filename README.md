@@ -2,13 +2,13 @@
 *The Cannon* part 2: Compressed sensing edition
 
 ## Authors
-- Andy Casey (Cambridge)
-- David W. Hogg (NYU) (MPIA) (SCDA)
-- Melissa K. Ness (MPIA)
+- **Andy Casey** (Cambridge)
+- **David W. Hogg** (NYU) (MPIA) (SCDA)
+- **Melissa K. Ness** (MPIA)
 
 ## License
 **Copyright 2015 the authors**.
-The code in this repository is released under the open-source *MIT License*.
+The code in this repository is released under the open-source **MIT License**.
 See the file `LICENSE` for more details.
 
 ## Comments
