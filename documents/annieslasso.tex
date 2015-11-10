@@ -2,11 +2,13 @@
 %% Copyright 2015 the authors.  All rights reserved.
 
 \documentclass[12pt,preprint]{aastex}
+\usepackage{amsmath,amssymb}
 
 \newcommand{\project}[1]{\textsl{#1}}
 \newcommand{\apogee}{\project{\textsc{apogee}}}
 \newcommand{\logg}{\log g}
 \newcommand{\Teff}{T_{\mathrm{eff}}}
+\newcommand{\argmin}[1]{\underset{#1}{\operatorname{argmin}}\,}
 
 \begin{document}
 
@@ -40,6 +42,67 @@ We deliver open-source code and also stellar parameters and 15 abundances for a
 set of ZZZ stars.
 \end{abstract}
 
+\section{Introduction}
+
 Hello World!
+
+\section{Method}
+
+The model is
+\begin{eqnarray}
+  y_{jn} &=& v(\ell_n)\cdot\theta_j + e_{jn}
+  \label{eq:model}\quad ,
+\end{eqnarray}
+where $y_{jm}$ is the data for star $n$ at wavelength pixel $j$,
+$v(\ell_n)$ is a function that takes as input
+the label vector $\ell_n$ of length $K$ for star $n$
+and outputs a vector of length $D>K$,
+$\theta_j$ is a vector of length $D$ of parameters controlling the model at wavelength pixel $j$,
+and $e_{jn}$ is a noise draw or residual.
+Inasmuch as the model is good, the noise values $e_{jn}$ can be taken to be
+drawn from a Gaussian with zero mean and variance $\sigma^2_{jn}+s^2_j$,
+where $\sigma^2_{jn}$ is the pipeline-reported uncertainty variance on datum
+$y_{jn}$ and $s^2_j$ is a parameter describing excess variance at wavelength pixel $j$.
+
+Two comments about the model (\ref{eq:model}).
+The first is that, because the $e_{jn}$ are thought of as being drawn from a 
+probability density function (pdf), it is a probabilistic model for the spectral
+data $y_{jn}$.
+The second is that the output of the function $v(\ell)$ can be thought
+of as a row of the ``design matrix'' that defines the possible freedom
+given to the spectrum expectation model.
+
+In the \emph{training step}, we fix the $K$-vectors of labels $\ell_n$
+for all training-set stars $n$.
+We seek, at each wavelength pixel $j$, the $[D+1]$ parameters
+$\theta_j,s^2_j$ that optimize a penalized likelihood:
+\begin{eqnarray}
+  \theta_j,s^2_j &\leftarrow& \argmin{\theta,s^2}\left[
+    \sum_{n=1}^N \frac{y_{jn}-v(\ell_n)\cdot\theta}{\sigma^2_{jn}+s^2}
+    + \sum_{n=1}^N \ln(\sigma^2_{jn}+s^2)
+    + \Lambda\,||\theta||_1^1
+    \right]
+  \\
+  ||\theta||_1^1 &\equiv& \sum_{d=1}^D |\theta_d|
+  \quad ,
+\end{eqnarray}
+where $\Lambda$ is a regularization parameter, and $||\theta||_1^1$ is
+the L1-norm of $\theta$ or the sum of the absolute values of the
+components $\theta_d$ of the $D$-vector $\theta$.
+
+In the \emph{test step}, we fix the parameters $\theta_j,s^2_j$ at all
+wavelength pixels $j$.
+We seek, for each test-set star $m$, the $K$-vector of labels $\ell_m$
+that optimizes the likelihood:
+\begin{eqnarray}
+  \ell_m &\leftarrow& \argmin{\ell}\left[
+    \sum_{j=1}^J \frac{y_{jn}-v(\ell)\cdot\theta_j}{\sigma^2_{jn}+s^2_j}
+    \right]
+  \quad .
+\end{eqnarray}
+
+\section{Experiments}
+
+\section{Results}
 
 \end{document}
