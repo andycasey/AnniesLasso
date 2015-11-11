@@ -28,6 +28,113 @@ def short_hash(contents):
     return "".join([str(hash(str(item)))[:10] for item in contents])
 
 
+def is_structured_label_vector(label_vector):
+    """
+    Return whether the provided label vector is structured correctly.
+    """
+
+    if not isinstance(label_vector, (list, tuple)):
+        return False
+
+    for descriptor in label_vector:
+        if not isinstance(descriptor, (list, tuple)):
+            return False
+
+        for term in descriptor:
+            if not isinstance(term, (list, tuple)) \
+            or len(term) != 2 \
+            or not isinstance(term[-1], (int, float)):
+                return False
+    return True
+
+
+def parse_label_vector(label_vector_description, columns=None, **kwargs):
+    """
+    Return a structured form of a label vector from unstructured,
+    human-readable input.
+
+    :param label_vector_description:
+        A human-readable or structured form of a label vector.
+
+    :type label_vector_description:
+        str or list
+
+    :param columns: [optional]
+        If `columns` are provided, instead of text columns being provided as the
+        output parameter, the corresponding index location in `column` will be
+        given.
+
+    :returns:
+        A structured form of the label vector as a multi-level list.
+
+
+    :Example:
+
+    >>> parse_label_vector("Teff^4 + logg*Teff^3 + feh + feh^0*Teff")
+    [
+        [
+            ("Teff", 4),
+        ],
+        [
+            ("logg", 1),
+            ("Teff", 3)
+        ],
+        [
+            ("feh", 1),
+        ],
+        [
+            ("feh", 0),
+            ("Teff", 1)
+        ]
+    ]
+    """
+
+    if is_structured_label_vector(label_vector_description):
+        return label_vector_description
+
+    # Allow for custom characters, but don't advertise it.
+    # (Astronomers have bad enough habits already.)
+    kwds = dict(zip(("sep", "mul", "pow"), "+*^"))
+    kwds.update(kwargs)
+    sep, mul, pow = (kwds[k] for k in ("sep", "mul", "pow"))
+
+    if isinstance(label_vector_description, (str, unicode)):
+        label_vector_description = label_vector_description.split(sep)
+    label_vector_description = map(str.strip, label_vector_description)
+
+    # Functions to parse the parameter (or index) and order for each term.
+    order = lambda t: int(t.split(pow)[1].strip()) if pow in t else 1
+    if columns is None:
+        label = lambda d: d.split(pow)[0].strip()
+    else:
+        label = lambda d: list(columns).index(d.split(pow)[0].strip())
+
+    return [[(label(term), order(term)) for term in descriptor.split(mul)] \
+        for descriptor in label_vector_description]
+
+
+def human_readable_label_vector(label_vector, **kwargs):
+    """
+    Return a human-readable form of the label vector provided.
+    """
+
+    theta = ["1"]
+    if label_vector is None: return theta[0]
+    
+    for descriptor in label_vector:
+        cross_terms = []
+        for label, order in descriptor:
+            if order == 0: continue
+            cross_terms.append(
+                "".join([str(label), "^{}".format(order) if order > 1 else ""]))
+        
+        term = " * ".join(cross_terms)
+        format = "({0})" if len(cross_terms) > 1 else "{0}"
+        theta.append(format.format(term))
+
+    return " + ".join(theta)
+        
+
 def progressbar(iterable, message=None, size=100):
     """
     A progressbar.

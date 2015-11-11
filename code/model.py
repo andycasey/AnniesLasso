@@ -8,15 +8,18 @@ An abstract model class for The Cannon.
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
-__all__ = ["BaseCannonModel", "requires_training"]
+__all__ = ["BaseCannonModel", "requires_training_wheels"]
 
 import cPickle as pickle
 import numpy as np
 import multiprocessing as mp
+from collections import OrderedDict
 from os import path
 
+from . import utils
 
-def requires_training(f):
+
+def requires_training_wheels(f):
     """
     A decorator for model functions that require training before being run.
     """
@@ -69,11 +72,10 @@ class BaseCannonModel(object):
     def __init__(self, labels, fluxes, flux_uncertainties, dispersion=None,
         threads=1, pool=None, live_dangerously=False):
 
-        self.training_labels = labels
-        self.training_fluxes = np.atleast_2d(fluxes)
-        self.training_flux_uncertainties = np.atleast_2d(flux_uncertainties)
+        self._training_labels = labels
+        self._training_fluxes = np.atleast_2d(fluxes)
+        self._training_flux_uncertainties = np.atleast_2d(flux_uncertainties)
         
-        # These attributes are private because we assume behaviour about them.
         self._trained = False
         self._training_set_mask = np.zeros(len(labels), dtype=bool)
         self._dispersion = np.arange(self.number_of_pixels, dtype=int) \
@@ -116,6 +118,22 @@ class BaseCannonModel(object):
         self._dispersion = dispersion
 
 
+    # Attributes related to the training data.
+    @property
+    def training_labels(self):
+        return self._training_labels
+
+
+    @property
+    def training_fluxes(self):
+        return self._training_fluxes
+
+
+    @property
+    def training_flux_uncertainties(self):
+        return self._training_flux_uncertainties
+
+
     @property
     def number_of_pixels(self):
         """
@@ -125,69 +143,16 @@ class BaseCannonModel(object):
 
 
     @property
-    def is_trained(self):
-        return self._trained
-
-
-    @property
-    def label_names(self):
+    def training_set_size(self):
         """
-        All of the available labels for each star in the training set.
+        Return the number of unmasked objects in the training set.
         """
-        return self.training_labels.dtype.names
+        return self.get_training_set_size()
 
 
-    @property
-    def label_vector(self, pixel=None):
-        """
-        The label vector description (human-readable?).
-        # TODO: this needs thought if every pixel can have its own label vector
-        # in the regularised version.
-
-        # Maybe the regularised version should just yield
-        """
-        return getattr(self, "_label_vector", None)
-
-
-    @label_vector.setter
-    def label_vector(self, label_vector):
-        """
-        Set a label vector.
-        """
-        raise NotImplementedError
-
-
-    @property
-    def parameters(self):
-        """
-        The parameters that contribute to the label vector.
-        """
-
-        raise NotImplementedError
-
-
-    @property
-    def number_of_parameters(self):
-        """
-        The number of parameters in the model.
-        """
-        return len(self.parameters)
-
-
-    @property
-    def parameter_vector(self):
-        """
-        Return an array of parameters of all unmasked stars in the training set.
-        """
-        X = np.zeros((
-            self.get_training_set_size(include_masked=True),
-            self.number_of_parameters))
-
-        for i, parameter in enumerate(self.parameters):
-            X[:, i] = np.array(self.training_labels[parameter])
-
-        return X[~self.training_set_mask, :]
-
+    def get_training_set_size(self, include_masked=False):
+        return sum(~self.training_set_mask) if include_masked \
+                                            else self.training_fluxes.shape[0]
 
     @property
     def training_set_mask(self):
@@ -212,7 +177,7 @@ class BaseCannonModel(object):
 
 
     @property
-    @requires_training
+    @requires_training_wheels
     def training_data_hash(self):
         """
         A concatenated string of 10-length hashes for each item in the training
@@ -220,19 +185,89 @@ class BaseCannonModel(object):
         """
         return utils.short_hash(
             getattr(self, attr) for attr in self.__data_attributes)
-    
+
 
     @property
-    def training_set_size(self):
-        """
-        Return the number of unmasked objects in the training set.
-        """
-        return self.get_training_set_size()
+    def is_trained(self):
+        return self._trained
 
 
-    def get_training_set_size(self, include_masked=False):
-        return sum(~self.training_set_mask) if include_masked \
-                                            else self.training_fluxes.shape[0]
+    # Attributes related to the labels and the label vector description.
+    @property
+    def label_names(self):
+        """
+        All of the available labels for each star in the training set.
+        """
+        return self.training_labels.dtype.names
+
+
+    @property
+    def label_vector(self):
+        """ The label vector for all pixels. """
+        return getattr(self, "_label_vector", None)
+
+
+    @label_vector.setter
+    def label_vector(self, label_vector_description):
+        """
+        Set a label vector.
+
+        :param label_vector_description:
+            A structured or human-readable version of the label vector
+            description.
+        """
+
+        label_vector = utils.parse_label_vector(label_vector_description)
+
+        # Need to actually verify that the parameters listed in the label vector
+        # are actually present in the training labels.
+        for parameter in self.get_parameters(label_vector):
+            if parameter not in self.label_names:
+                raise ValueError("param '{0}' in the label vector description "
+                                 "is not present in the training set of labels")
+        self._label_vector = label_vector
+
+
+    @property
+    def human_readable_label_vector(self):
+        """ Return a human-readable form of the label vector. """
+        return utils.human_readable_label_vector(self.label_vector)
+
+
+    @property
+    def parameters(self):
+        """ The parameters that contribute to the label vector. """
+        return self.get_parameters(self.label_vector)
+    
+
+    def get_parameters(self, label_vector):
+        """
+        Return the parameters that contribute to the structured label vector
+        provided.
+        """
+        return () if label_vector is None else \
+            list(OrderedDict.fromkeys([label for term in label_vector \
+                for label, power in term if power != 0]))
+
+    @property
+    def number_of_parameters(self):
+        """ The number of parameters in the model. """
+        return len(self.parameters)
+
+
+    @property
+    def parameter_vector(self):
+        """
+        Return an array of parameters of all unmasked stars in the training set.
+        """
+        X = np.zeros((
+            self.get_training_set_size(include_masked=True),
+            self.number_of_parameters))
+
+        for i, parameter in enumerate(self.parameters):
+            X[:, i] = np.array(self.training_labels[parameter])
+
+        return X[~self.training_set_mask, :]
 
 
     # Trained attributes that subclasses are likely to use.
@@ -269,7 +304,7 @@ class BaseCannonModel(object):
         return self._training_label_residuals
 
 
-    @requires_training
+    @requires_training_wheels
     def get_training_label_residuals(self):
         """
         Return the residuals (model - true) between the parameters that the
@@ -313,7 +348,8 @@ class BaseCannonModel(object):
 
         for label in self.training_labels.dtype.names:
             if any(char in label for char in self.__forbidden_label_characters):
-                raise ValueError("forbidden character '{char}' is in potential "
+                raise ValueError(
+                    "forbidden character '{char}' is in potential "
                     "label '{label}' - you can disable this verification by "
                     "enabling live_dangerously".format(char=char, label=label))
         return None
@@ -324,7 +360,8 @@ class BaseCannonModel(object):
         Verify the training data for the appropriate shape and content.
         """
         if self.training_fluxes.shape != self.training_flux_uncertainties.shape:
-            raise ValueError("the training flux and uncertainty arrays should "
+            raise ValueError(
+                "the training flux and uncertainty arrays should "
                 "have the same shape")
 
         if len(self.training_labels) == 0 \
@@ -332,20 +369,22 @@ class BaseCannonModel(object):
             raise ValueError("no named labels provided for the training set")
 
         if len(self.training_labels) != self.training_fluxes.shape[0]:
-            raise ValueError("the first axes of the training flux array should "
+            raise ValueError(
+                "the first axes of the training flux array should "
                 "have the same shape as the nuber of rows in the label table "
                 "(N_stars, N_pixels)")
 
         if self.dispersion is not None:
             dispersion = np.atleast_1d(self.dispersion).flatten()
             if dispersion.size != self.number_of_pixels:
-                raise ValueError("mis-match between the number of wavelength "
+                raise ValueError(
+                    "mis-match between the number of wavelength "
                     "points ({N_wls}) and flux values ({N_pxs})".format(
                         N_pxs=self.number_of_pixels, N_wls=dispersion.size))
         return None
 
 
-    @requires_training
+    @requires_training_wheels
     def write(self, filename, with_training_data=False, overwrite=False):
         """
         Serialise the trained model and write it to disk. This will save all
@@ -407,8 +446,9 @@ class BaseCannonModel(object):
             if verify_training_data and expected_data_hash is not None:
                 actual_data_hash = utils.short_hash(data_contents)
                 if actual_data_hash != expected_data_hash:
-                    raise ValueError("expected hash for the training data ({0})"
-                        " is different to the actual data hash ({1})".format(
+                    raise ValueError(
+                        "expected hash for the training data ({0}) "
+                        "is different to the actual data hash ({1})".format(
                             expected_data_hash, actual_data_hash))
 
             # Set the data attributes.
@@ -438,25 +478,3 @@ class BaseCannonModel(object):
     def solve_labels(self, *args, **kwargs):
         raise NotImplementedError("The solve_labels method must be "
                                   "implemented by subclasses")
-
-
-
-
-
-if __name__ == "__main__":
-    print("#TODO REMOVE ME")
-
-    import numpy as np
-    from astropy.table import Table
-
-    N_stars = 15
-    N_labels = 4
-    N_pixels = 27
-
-    t = Table(data=np.random.uniform(size=(N_stars, N_labels)), names="abcdefghijklmnopqrstuv"[:N_labels])
-
-    f = BaseCannonModel(t, np.random.uniform(size=(N_stars, N_pixels)), np.random.uniform(size=(N_stars, N_pixels)))
-
-    raise a
-
-
