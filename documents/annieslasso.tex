@@ -1,18 +1,25 @@
 %% This file is part of the Annie's Lasso project.
 %% Copyright 2015 the authors.  All rights reserved.
 
+% To-Do
+% -----
+% - get to zeroth draft
+% - search for all occurrences of DWH, AC, or MKN in the text and fix them.
+
 \documentclass[12pt,preprint]{aastex}
 \usepackage{amsmath,amssymb}
 
 \newcommand{\project}[1]{\textsl{#1}}
+\newcommand{\thecannon}{\project{The~Cannon}}
 \newcommand{\apogee}{\project{\textsc{apogee}}}
+\newcommand{\aspcap}{\project{\textsc{aspcap}}}
 \newcommand{\logg}{\log g}
 \newcommand{\Teff}{T_{\mathrm{eff}}}
 \newcommand{\argmin}[1]{\underset{#1}{\operatorname{argmin}}\,}
 
 \begin{document}
 
-\title{The Cannon 2: A data-driven model \\ for detailed chemical abundance analyses}
+\title{\textsl{The Cannon 2:} A data-driven model \\ for detailed chemical abundance analyses}
 \author{AC, DWH, MKN, others}
 
 \begin{abstract}
@@ -44,9 +51,60 @@ set of ZZZ stars.
 
 \section{Introduction}
 
-Hello World!
+We built \thecannon, and it rocked.
+DWH: Summarize what it does and what it can be used for.
+Cite some relevant literature.
+
+DWH: Define the word ``label''.
+
+DWH: Define the words ``train'', ``validate'', and ``test''.
+
+DWH: Labels for data at wavelengths where there are no good labels.
+
+DWH: Labels that are consistent across surveys and wavelengths.
+
+\thecannon\ is a data-driven model, but it differs from standard machine-learning
+approaches because it contains an explicit noise model.
+This means that it can transfer labels from high signal-to-noise training-set
+stars to low signal-to-noise test-set stars; that is, the training set and 
+the test set do not need to be statistically identical.
+This is related to the fact that \thecannon\ is an interpretable model;
+the internals of the model are the dependencies of the spectral expetation
+and variance on wavelength and physical parameters of the star.
+
+DWH: Should we be saying things about the fact that the model is probabilistic?
+It takes as input stellar labels and gives as output a pdf for stellar spectra?
+
+DWH: In the first work we did with \thecannon, we only used a small
+number of labels (three in the original work, and four or five in late
+work; CITE).
+Here we were guided by thoughts related to density estimation:
+Sampling well a $K$-dimensional label space takes a training set the
+size of which scales exponentially (or worse) with $K$.
+Subsequent experiments, however, did not bear this out:
+We found that we can transfer many labels from the training set to
+the test set, with training sets of thousands of stars.
+The fundamental reason is that \thecannon\ is \emph{not} a density estimator!
+It is more like an \emph{interpolator}, which effectively finds stars in
+the training set that are close to the test star, and transfers labels,
+using the smooth polynomial model as a kind of regularizer.
+
+DWH: Here we exploit this to the fullest.
+We consider the \emph{entire} 17-dimensional label spece produced by
+the \apogee\ \aspcap\ pipeline.
+We (for very good reasons) believe the \aspcap\ labels for the highest
+signal-to-noise stars, and adopt these stars and their labels as the
+training set.
+We show, by very conservative cross-validation, that we can transfer these
+labels to much lower signal-to-noise stars, with reduced precision but no
+strong biases.
+We then use the system to label all of the stars in the \apogee\ DRXX data set.
+
+DWH: Etc!
 
 \section{Method}
+
+DWH: What are we going to assume?
 
 The model is
 \begin{eqnarray}
@@ -100,6 +158,16 @@ that optimizes the likelihood:
     \right]
   \quad .
 \end{eqnarray}
+
+\section{Training, validation, and test data}
+
+MKN: Describe \apogee\ data here.
+
+MKN: What is different about our continuum normalization from everyone else's?
+
+DWH: Describe the random integer system here.
+
+DWH: How do integers map on to train, validate, and test?
 
 \section{Experiments}
 
