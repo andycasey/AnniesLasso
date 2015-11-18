@@ -10,16 +10,16 @@ from __future__ import (division, print_function, absolute_import,
 
 __all__ = ["BaseCannonModel", "requires_training_wheels"]
 
-import cPickle as pickle
 import numpy as np
 import multiprocessing as mp
 from collections import OrderedDict
 from os import path
+from six.moves import cPickle as pickle
 
 from . import utils
 
 
-def requires_training_wheels(f):
+def requires_training_wheels(method):
     """
     A decorator for model functions that require training before being run.
     """
@@ -27,7 +27,7 @@ def requires_training_wheels(f):
     def wrapper(model, *args, **kwargs):
         if not model.is_trained:
             raise TypeError("the model needs training first")
-        return f(model, *args, **kwargs)
+        return method(model, *args, **kwargs)
     return wrapper
 
 
@@ -65,8 +65,8 @@ class BaseCannonModel(object):
         the user to input human-readable forms of the label vector.
     """
 
-    __data_attributes = ()
-    __trained_attributes = ()
+    __data_attributes = []
+    __trained_attributes = []
     __forbidden_label_characters = None
     
     def __init__(self, labels, fluxes, flux_uncertainties, dispersion=None,
@@ -325,7 +325,9 @@ class BaseCannonModel(object):
 
 
     def reset(self):
-        # Clear any attributes that were trained upon.
+        """
+        Clear any attributes that have been trained upon.
+        """
 
         self._trained = False
         for attr in self.__trained_attributes:
@@ -464,7 +466,19 @@ class BaseCannonModel(object):
         return None
 
 
-    # Methods which must be implemented by the subclasses.
+    # Methods which must be implemented or updated by the subclasses.
+    @property
+    def pixel_label_vector(self, pixel_index):
+        """ The label vector for a given pixel. """
+        return self.label_vector
+
+
+    @pixel_label_vector.setter
+    def pixel_label_vector(self, pixel_index):
+        raise NotImplementedError("Pixel-to-pixel label vectors must be "
+                                  "implemented by subclasses")
+
+
     def train(self, *args, **kwargs):
         raise NotImplementedError("The train method must be "
                                   "implemented by subclasses")
