@@ -93,6 +93,22 @@ class BaseCannonModel(object):
         self.pool = pool or mp.Pool(threads) if threads > 1 else None
 
 
+    def __str__(self):
+        return "<{module}.{name} {trained}with {N} stars of {K} labels and {M}"\
+               " pixels each>".format(
+                    module=self.__module__,
+                    name=type(self).__name__,
+                    trained="trained " if self.is_trained else "",
+                    N=self.training_set_size,
+                    K=self.number_of_labels,
+                    M=self.number_of_pixels)
+
+
+    def __repr__(self):
+        return "<{0}.{1} object at {2}>".format(
+            self.__module__, type(self).__name__, hex(id(self)))
+
+
     @property
     def dispersion(self):
         """
@@ -116,6 +132,7 @@ class BaseCannonModel(object):
                              "of pixels per star ({0} != {1})".format(
                                 len(dispersion), self.number_of_pixels))
         self._dispersion = dispersion
+        return None
 
 
     # Attributes related to the training data.
@@ -174,6 +191,7 @@ class BaseCannonModel(object):
             raise ValueError("mask must be an array of the same length as the "
                              "stars in the training set")
         self._training_set_mask = mask
+        return None
 
 
     @property
@@ -202,6 +220,12 @@ class BaseCannonModel(object):
 
 
     @property
+    def number_of_labels(self):
+        """ The number of available labels for each star. """
+        return len(self.label_names)
+
+
+    @property
     def label_vector(self):
         """ The label vector for all pixels. """
         return getattr(self, "_label_vector", None)
@@ -226,6 +250,7 @@ class BaseCannonModel(object):
                 raise ValueError("param '{0}' in the label vector description "
                                  "is not present in the training set of labels")
         self._label_vector = label_vector
+        return None
 
 
     @property
@@ -271,27 +296,85 @@ class BaseCannonModel(object):
 
 
     # Trained attributes that subclasses are likely to use.
-    # TODO: these require setters that check the entries of the data.
     @property
     def coefficients(self):
-        return self._coefficients
+        return getattr(self, "_coefficients", None)
+
 
     @coefficients.setter
     def coefficients(self, coefficients):
-        if coefficients is None:
-            self._coefficients = None
-            return
+        """
+        Set the label vector coefficients for each pixel. This assumes a
+        'standard' model where the label vector is common to all pixels.
 
-        raise NotImplementedError
+        :param coefficients:
+            A 2-D array of coefficients of shape 
+            (`N_pixels`, `N_label_vector_terms`).
+        """
+
+        coefficients = np.atleast_2d(coefficients)
+        if len(coefficients.shape) > 2:
+            raise ValueError("coefficients must be a 2D array")
+
+        P, Q = coefficients.shape
+        if P != self.number_of_pixels:
+            raise ValueError("axis 0 of coefficients array does not match the "
+                             "number of pixels ({0} != {1})".format(
+                                P, self.number_of_pixels))
+        if Q != len(self.label_vector):
+            raise ValueError("axis 1 of coefficients array does not match the "
+                             "number of label vector terms ({0} != {1})".format(
+                                Q, len(self.label_vector)))
+        self._coefficients = coefficients
+        return None
 
 
     @property
     def scatter(self):
-        return self._scatter
+        return getattr(self, "_scatter", None)
+
+
+    @scatter.setter
+    def scatter(self, scatter):
+        """
+        Set the scatter values for each pixel.
+
+        :param scatter:
+            A 1-D array of scatter terms.
+        """
+        
+        scatter = np.array(scatter).flatten()
+        if scatter.size != self.number_of_pixels:
+            raise ValueError("number of scatter values does not match "
+                             "the number of pixels ({0} != {1})".format(
+                                scatter.size, self.number_of_pixels))
+        if np.any(scatter < 0):
+            raise ValueError("scatter terms must be positive")
+        self._scatter = scatter
+        return None
+
 
     @property
     def pivot_offsets(self):
-        return self._pivot_offsets
+        return getattr(self, "_pivot_offsets", None)
+
+
+    @pivot_offsets.setter
+    def pivot_offsets(self, pivot_offsets):
+        """
+        Set the pivot offsets for each parameter.
+
+        :param pivot_offsets:
+            A 1-D array of positive offsets to apply.
+        """
+
+        pivot_offsets = np.array(pivot_offsets).flatten()
+        if pivot_offsets.size != self.number_of_parameters:
+            raise ValueError("number of pivot terms does not match "
+                             "the number of parameters ({0} != {1})".format(
+                                pivot_offsets.size, self.number_of_parameters))
+        self._pivot_offsets = pivot_offsets
+        return None
 
 
     @property
