@@ -21,12 +21,24 @@ from . import utils
 
 def requires_training_wheels(method):
     """
-    A decorator for model functions that require training before being run.
+    A decorator for model methods that require training before being run.
     """
 
     def wrapper(model, *args, **kwargs):
         if not model.is_trained:
             raise TypeError("the model needs training first")
+        return method(model, *args, **kwargs)
+    return wrapper
+
+
+def requires_label_vector(method):
+    """
+    A decorator for model methods that require a label vector description.
+    """
+
+    def wrapper(model, *args, **kwargs):
+        if model.label_vector is None:
+            raise TypeError("the model requires a label vector description")
         return method(model, *args, **kwargs)
     return wrapper
 
@@ -76,8 +88,10 @@ class BaseCannonModel(object):
         self._training_fluxes = np.atleast_2d(fluxes)
         self._training_flux_uncertainties = np.atleast_2d(flux_uncertainties)
         
+        self._pivot = False
         self._trained = False
         self._training_set_mask = np.zeros(len(labels), dtype=bool)
+        self._pixel_mask = np.zeros(self.number_of_pixels, dtype=bool)
         self._dispersion = np.arange(self.number_of_pixels, dtype=int) \
             if dispersion is None else dispersion
         
@@ -195,6 +209,14 @@ class BaseCannonModel(object):
 
 
     @property
+    def pixel_mask(self):
+        return self._pixel_mask
+
+
+
+
+
+    @property
     @requires_training_wheels
     def training_data_hash(self):
         """
@@ -249,7 +271,13 @@ class BaseCannonModel(object):
             if parameter not in self.label_names:
                 raise ValueError("param '{0}' in the label vector description "
                                  "is not present in the training set of labels")
-        self._label_vector = label_vector
+
+        # If this is really a new label vector description,
+        # then we are no longer trained.
+        if label_vector != self._label_vector:
+            self._label_vector = label_vector
+            self.reset()
+
         return None
 
 
@@ -257,6 +285,41 @@ class BaseCannonModel(object):
     def human_readable_label_vector(self):
         """ Return a human-readable form of the label vector. """
         return utils.human_readable_label_vector(self.label_vector)
+
+
+    @property
+    def pivot(self):
+        return self._pivot
+
+    @pivot.setter
+    def pivot(self, pivot):
+        self._pivot = bool(pivot)
+        return None
+
+
+    @property
+    def label_vector_array(self):
+        if not hasattr(self, "_label_vector_array"):
+            self._label_vector_array, self.pivot_offsets \
+                = self.get_label_vector_array()
+        return self._label_vector_array
+
+
+    @requires_label_vector
+    def get_label_vector_array(self):
+        """
+        Build the label vector array.
+        """
+
+        offsets = np.zeros(len(self.number_of_parameters))
+        lva = _build_label_vector_rows(self.label_vector, self.labels)
+
+        if not np.all(np.isfinite(lva)):
+            print("Non-finite labels identified in the label vector array!")
+
+        return (lva, offsets)
+
+
 
 
     @property
@@ -575,3 +638,38 @@ class BaseCannonModel(object):
     def solve_labels(self, *args, **kwargs):
         raise NotImplementedError("The solve_labels method must be "
                                   "implemented by subclasses")
+
+
+def _build_label_vector_rows(label_vector, labels):
+    """
+    Build a label vector row from a description of the label vector (as indices
+    and orders to the power of) and the label values themselves.
+
+    For example: if the first item of `labels` is `A`, and the label vector
+    description is `A^3` then the first item of `label_vector` would be:
+
+    `[[(0, 3)], ...`
+
+    This indicates the first label item (index `0`) to the power `3`.
+
+    :param label_vector:
+        An `(index, order)` description of the label vector. 
+
+    :param labels:
+        The values of the corresponding labels.
+
+    :returns:
+        The corresponding label vector row.
+    """
+
+    columns = [np.ones(len(labels))]
+    for term in label_vector:
+        columns.append(np.product(
+            [np.array(labels[label]).flatten()**order for label, order in term]))
+
+    try:
+        return np.vstack(columns)
+
+    except ValueError:
+        columns[0] = np.ones(1)
+        return np.vstack(columns)
