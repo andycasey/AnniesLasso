@@ -10,7 +10,7 @@ __all__ = ["label_vector", "progressbar", "short_hash"]
 import sys
 import numpy as np
 from time import time
-from collections import Counter
+from collections import Counter, OrderedDict
 from itertools import combinations_with_replacement
 
 
@@ -103,14 +103,26 @@ def parse_label_vector(label_vector_description, columns=None, **kwargs):
     label_vector_description = map(str.strip, label_vector_description)
 
     # Functions to parse the parameter (or index) and order for each term.
-    order = lambda t: int(t.split(pow)[1].strip()) if pow in t else 1
+    get_power = lambda t: int(t.split(pow)[1].strip()) if pow in t else 1
     if columns is None:
-        label = lambda d: d.split(pow)[0].strip()
+        get_label = lambda d: d.split(pow)[0].strip()
     else:
-        label = lambda d: list(columns).index(d.split(pow)[0].strip())
+        get_label = lambda d: list(columns).index(d.split(pow)[0].strip())
 
-    return [[(label(term), order(term)) for term in descriptor.split(mul)] \
-        for descriptor in label_vector_description]
+    label_vector = []
+    for descriptor in (item.split(mul) for item in label_vector_description):
+
+        labels = map(get_label, descriptor)
+        orders = map(get_power, descriptor)
+
+        term = OrderedDict()
+        for label, order in zip(labels, orders):
+            term[label] = term.get(label, 0) + order # Sum repeat term powers.
+
+        # Prevent uses of x^0 etc clogging up the label vector.
+        label_vector.append([(l, o) for l, o in term.items() if o != 0])
+    
+    return label_vector
 
 
 def human_readable_label_vector(label_vector, **kwargs):
