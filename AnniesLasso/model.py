@@ -267,14 +267,16 @@ class BaseCannonModel(object):
 
         # Need to actually verify that the parameters listed in the label vector
         # are actually present in the training labels.
-        for parameter in self.get_parameters(label_vector):
-            if parameter not in self.label_names:
-                raise ValueError("param '{0}' in the label vector description "
-                                 "is not present in the training set of labels")
+        missing = set(self.get_labels(label_vector)).difference(self.label_names)
+        if missing:
+            raise ValueError("the following labels parsed from the label vector "
+                             "description are missing in the training set of "
+                             "labels: {0}".format(", ".join(missing)))
 
         # If this is really a new label vector description,
         # then we are no longer trained.
-        if label_vector != self._label_vector:
+        if not hasattr(self, "_label_vector") \
+        or label_vector != self._label_vector:
             self._label_vector = label_vector
             self.reset()
 
@@ -311,8 +313,8 @@ class BaseCannonModel(object):
         Build the label vector array.
         """
 
-        offsets = np.zeros(len(self.number_of_parameters))
-        lva = _build_label_vector_rows(self.label_vector, self.labels)
+        offsets = np.zeros(self.number_of_labels)
+        lva = _build_label_vector_rows(self.label_vector, self.training_labels)
 
         if not np.all(np.isfinite(lva)):
             print("Non-finite labels identified in the label vector array!")
@@ -323,14 +325,14 @@ class BaseCannonModel(object):
 
 
     @property
-    def parameters(self):
-        """ The parameters that contribute to the label vector. """
-        return self.get_parameters(self.label_vector)
+    def labels(self):
+        """ The labels that contribute to the label vector. """
+        return self.get_labels(self.label_vector)
     
 
-    def get_parameters(self, label_vector):
+    def get_labels(self, label_vector):
         """
-        Return the parameters that contribute to the structured label vector
+        Return the labels that contribute to the structured label vector
         provided.
         """
         return () if label_vector is None else \
@@ -338,19 +340,19 @@ class BaseCannonModel(object):
                 for label, power in term if power != 0]))
 
     @property
-    def number_of_parameters(self):
-        """ The number of parameters in the model. """
-        return len(self.parameters)
+    def number_of_labels(self):
+        """ The number of labels in the model. """
+        return len(self.labels)
 
 
     @property
-    def parameter_vector(self):
+    def training_label_vector(self):
         """
-        Return an array of parameters of all unmasked stars in the training set.
+        Return an array of labels of all unmasked stars in the training set.
         """
         X = np.zeros((
             self.get_training_set_size(include_masked=True),
-            self.number_of_parameters))
+            self.number_of_labels))
 
         for i, parameter in enumerate(self.parameters):
             X[:, i] = np.array(self.training_labels[parameter])
@@ -384,10 +386,10 @@ class BaseCannonModel(object):
             raise ValueError("axis 0 of coefficients array does not match the "
                              "number of pixels ({0} != {1})".format(
                                 P, self.number_of_pixels))
-        if Q != len(self.label_vector):
+        if Q != 1 + len(self.label_vector):
             raise ValueError("axis 1 of coefficients array does not match the "
                              "number of label vector terms ({0} != {1})".format(
-                                Q, len(self.label_vector)))
+                                Q, 1 + len(self.label_vector)))
         self._coefficients = coefficients
         return None
 
@@ -432,10 +434,10 @@ class BaseCannonModel(object):
         """
 
         pivot_offsets = np.array(pivot_offsets).flatten()
-        if pivot_offsets.size != self.number_of_parameters:
+        if pivot_offsets.size != self.number_of_labels:
             raise ValueError("number of pivot terms does not match "
                              "the number of parameters ({0} != {1})".format(
-                                pivot_offsets.size, self.number_of_parameters))
+                                pivot_offsets.size, self.number_of_labels))
         self._pivot_offsets = pivot_offsets
         return None
 
@@ -458,7 +460,7 @@ class BaseCannonModel(object):
         """
         inferred_parameter_vector = np.zeros((
             self.get_training_set_size(include_masked=True),
-            self.number_of_parameters))
+            self.number_of_labels))
 
         for i, data in \
         enumerate(zip(self.training_fluxes, self.training_flux_uncertainties)):
@@ -466,7 +468,7 @@ class BaseCannonModel(object):
                 inferred_parameter_vector[i, :] = self.solve_labels(*data)
 
         label_residuals = inferred_parameter_vector[self.training_set_mask] \
-            - self.parameter_vector
+            - self.training_label_vector
         return label_residuals
 
 
@@ -640,7 +642,7 @@ class BaseCannonModel(object):
                                   "implemented by subclasses")
 
 
-def _build_label_vector_rows(label_vector, labels):
+def _build_label_vector_rows(label_vector, training_labels):
     """
     Build a label vector row from a description of the label vector (as indices
     and orders to the power of) and the label values themselves.
@@ -655,17 +657,18 @@ def _build_label_vector_rows(label_vector, labels):
     :param label_vector:
         An `(index, order)` description of the label vector. 
 
-    :param labels:
-        The values of the corresponding labels.
+    :param training_labels:
+        The values of the corresponding training labels.
 
     :returns:
         The corresponding label vector row.
     """
 
-    columns = [np.ones(len(labels))]
+    columns = [np.ones(len(training_labels))]
     for term in label_vector:
-        columns.append(np.product(
-            [np.array(labels[label]).flatten()**order for label, order in term]))
+        columns.append(np.multiply(*([1.0] + \
+            [np.array(training_labels[label]).flatten()**order \
+                for label, order in term])))
 
     try:
         return np.vstack(columns)

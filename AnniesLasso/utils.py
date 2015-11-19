@@ -178,7 +178,8 @@ def progressbar(iterable, message=None, size=100):
 
     # Initialise.
     if size > 0:
-        logger.info((message or "").rstrip())
+        #logger.info((message or "").rstrip())
+        if message is not None: print(message)
         sys.stdout.flush()
 
     # Updaterise.

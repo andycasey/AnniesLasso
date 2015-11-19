@@ -11,8 +11,9 @@ from __future__ import (division, print_function, absolute_import,
 __all__ = ["CannonModel"]
 
 import numpy as np
+import scipy.optimize as op
 
-from . import model
+from . import (model, utils)
 
 
 class CannonModel(model.BaseCannonModel):
@@ -71,7 +72,7 @@ class CannonModel(model.BaseCannonModel):
         # Initialise the scatter and coefficient arrays.
         N_px = self.number_of_pixels
         scatter = np.nan * np.ones(N_px)
-        theta = np.nan * np.ones((N_px, len(self.label_vector)))
+        theta = np.nan * np.ones((N_px, self.label_vector_array.shape[0]))
 
         fluxes, flux_uncertainties = (
             self.training_fluxes[~self.training_set_mask], 
@@ -103,28 +104,81 @@ class CannonModel(model.BaseCannonModel):
             for pixel, process in utils.progressbar(processes, **pb_kwds):
                 theta[pixel, :], scatter[pixel] = process.get()
 
-        self.theta = theta
-        self.scatter = scatter
-        self.pivot_offsets = offsets
+        # TODO
+        offsets = np.zeros(self.number_of_labels, dtype=float)
 
+        self.coefficients, self.scatter, self.pivot_offsets = \
+            (theta, scatter, offsets)
         self._trained = True
 
         return (theta, scatter, offsets)
 
 
+    @model.requires_training_wheels
+    def predict(self, labels=None, **labels_as_kwargs):
+        """
+        Predict spectra from the trained model, given the labels.
+
+        :param labels: [optional]
+            The labels required for the trained model. This should be a N-length
+            list matching the number of unique terms in the model, in the order
+            given by `self.labels`. Alternatively, labels can be explicitly 
+            given as keyword arguments.
+        """
+
+        # We want labels in a dictionary.
+        labels = labels_as_kwargs if labels is None \
+            else dict(zip(self.labels, labels))
+
+        # Check all labels that we require are given.
+        missing_labels = set(self.labels).difference(labels)
+        if missing_labels:
+            raise ValueError("missing the following labels: {0}".format(
+                ", ".join(missing_labels)))
+
+        # TODO: Offsets
+
+        model_fluxes = np.dot(self.coefficients, model._build_label_vector_rows(
+            self.label_vector, labels)).flatten()
+        return model_fluxes
 
 
-    @model.requires_training
-    def predict(self, *args, **kwargs):
-        raise NotImplementedError("The predict method must be "
-                                  "implemented by subclasses")
+    @model.requires_training_wheels
+    def solve_labels(self, fluxes, flux_uncertainties, **kwargs):
+        """
+        Solve the labels for given fluxes (and uncertainties) using the trained
+        model.
 
-    @model.requires_training
-    def solve_labels(self, *args, **kwargs):
-        raise NotImplementedError("The solve_labels method must be "
-                                  "implemented by subclasses")
+        :param fluxes:
+            The normalised fluxes. These should be on the same wavelength scale
+            as the trained data.
 
-    @model.requires_training
+        :param flux_uncertainties:
+            The 1-sigma uncertainties in the fluxes. This should have the same
+            shape as `fluxes`.
+
+        :returns:
+            The labels for the given fluxes as an ordered dictionary.
+        """
+
+        fluxes, flux_uncertainties = map(np.array, (fluxes, flux_uncertainties))
+
+        # Do an initial estimate.
+
+        # Proper solve.
+
+        raise NotImplementedError
+
+
+
+
+
+
+
+
+
+
+    @model.requires_training_wheels
     def cross_validate(self, *args, **kwargs):
         """
         Perform leave-one-out cross-validation on the training set.
@@ -134,7 +188,7 @@ class CannonModel(model.BaseCannonModel):
         
         N_realisations = self.training_set_size
         N_training_set = self.get_training_set_size(include_masked=True)
-        inferred = np.nan * np.ones((N_training_set, self.number_of_parameters))
+        inferred = np.nan * np.ones((N_training_set, self.number_of_labels))
 
         for i in range(N_training_set):
             if self.training_set_mask[i]: continue
@@ -168,7 +222,7 @@ class CannonModel(model.BaseCannonModel):
         return inferred[~self.training_set_mask, :]
 
 
-    @model.requires_training
+    @model.requires_training_wheels
     def cross_validate_by_label(self, *args, **kwargs):
         raise NotImplementedError("not done yet")
 
@@ -191,6 +245,10 @@ def _fit_pixel(fluxes, flux_uncertainties, label_vector_array, **kwargs):
         The optimised label vector coefficients and scatter for this pixel.
     """
 
+    _ = kwargs.get("max_uncertainty", 1)
+    if np.all(flux_uncertainties > _):
+        return (np.nan * np.ones(label_vector_array.shape[0]), _)
+        
     # Get an initial guess of the scatter.
     scatter = np.var(fluxes) - np.median(flux_uncertainties)**2
     scatter = np.sqrt(scatter) if scatter >= 0 else np.std(fluxes)
