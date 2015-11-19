@@ -6,7 +6,9 @@ vc.tex
 
 .gitignore
 
+sandbox_*.py
 *.pyc
+
 build/
 dist/
 *.egg-info/
