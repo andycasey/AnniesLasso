@@ -85,7 +85,6 @@ class CannonModel(model.BaseCannonModel):
             "size": 100 if kwargs.pop("progressbar", True) else -1
         }
         
-        # TODO: Revisit this parallelism.
         if self.pool is None:
             for pixel in utils.progressbar(range(N_px), **pb_kwds):
                 theta[pixel, :], scatter[pixel] = _fit_pixel(
@@ -93,16 +92,14 @@ class CannonModel(model.BaseCannonModel):
                     self.label_vector_array, **kwargs)
 
         else:
-            processes = []
-            for pixel in range(N_px):
-                process = self.pool.apply_async(_fit_pixel,
+            # Not as nice as just mapping, but necessary for a progress bar.
+            process = { pixel: self.pool.apply_async(_fit_pixel,
                     args=(fluxes[:, pixel], flux_uncertainties[:, pixel],
-                        self.label_vector_array),
-                    kwds=kwargs)
-                processes.append((pixel, process))
+                    self.label_vector_array), kwds=kwargs) \
+                for pixel in range(N_px) }
 
-            for pixel, process in utils.progressbar(processes, **pb_kwds):
-                theta[pixel, :], scatter[pixel] = process.get()
+            for pixel, proc in utils.progressbar(process.items(), **pb_kwds):
+                theta[pixel, :], scatter[pixel] = proc.get()
 
         # TODO
         offsets = np.zeros(self.number_of_labels, dtype=float)
@@ -138,8 +135,8 @@ class CannonModel(model.BaseCannonModel):
 
         # TODO: Offsets
 
-        model_fluxes = np.dot(self.coefficients, model._build_label_vector_rows(
-            self.label_vector, labels)).flatten()
+        model_fluxes = np.dot(self.coefficients, 
+            model._build_label_vector_rows(self.label_vector, labels)).flatten()
         return model_fluxes
 
 
@@ -248,7 +245,7 @@ def _fit_pixel(fluxes, flux_uncertainties, label_vector_array, **kwargs):
     _ = kwargs.get("max_uncertainty", 1)
     if np.all(flux_uncertainties > _):
         return (np.nan * np.ones(label_vector_array.shape[0]), _)
-        
+
     # Get an initial guess of the scatter.
     scatter = np.var(fluxes) - np.median(flux_uncertainties)**2
     scatter = np.sqrt(scatter) if scatter >= 0 else np.std(fluxes)
