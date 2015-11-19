@@ -10,7 +10,9 @@ import logging
 from numpy import RankWarning
 from warnings import simplefilter
 
+from .atomic import *
 from .cannon import *
+from .compressed_sensing import *
 from .model import *
 from . import utils
 

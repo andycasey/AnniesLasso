@@ -62,6 +62,7 @@ class CannonModel(model.BaseCannonModel):
         super(CannonModel, self).__init__(*args, **kwargs)
 
 
+    @model.requires_label_vector
     def train(self, **kwargs):
         """
         Train the model based on the training set and the description of the
@@ -120,24 +121,14 @@ class CannonModel(model.BaseCannonModel):
             given as keyword arguments.
         """
 
-        # We want labels in a dictionary.
-        labels = labels_as_kwargs if labels is None \
-            else dict(zip(self.labels, labels))
-        labels = { k: [v] for k, v in labels.items() }
+        labels = self._format_input_labels(labels, labels_as_kwargs)
 
-        # Check all labels that we require are given.
-        missing_labels = set(self.labels).difference(labels)
-        if missing_labels:
-            raise ValueError("missing the following labels: {0}".format(
-                ", ".join(missing_labels)))
-
-        model_fluxes = np.dot(self.coefficients, 
+        return np.dot(self.coefficients, 
             model._build_label_vector_rows(self.label_vector, labels)).flatten()
-        return model_fluxes
 
 
     @model.requires_training_wheels
-    def solve_labels(self, fluxes, flux_uncertainties, **kwargs):
+    def fit(self, fluxes, flux_uncertainties, **kwargs):
         """
         Solve the labels for given pixel fluxes and uncertainties.
 
@@ -153,16 +144,17 @@ class CannonModel(model.BaseCannonModel):
             The labels and covariance matrix.
         """
 
+        label_indices = self._get_lowest_order_label_indices()
         fluxes, flux_uncertainties = map(np.array, (fluxes, flux_uncertainties))
 
         # TODO: Consider parallelising this, which would mean factoring
-        # _solve_labels out of the model class, which gets messy.
+        # _fit out of the model class, which gets messy.
         # Since solving for labels is not a big bottleneck (yet), let's leave
         # this.
 
         if fluxes.ndim == 1:
             labels, covariance = \
-                self._solve_labels(fluxes, flux_uncertainties, **kwargs)
+                self._fit(fluxes, flux_uncertainties, label_indices, **kwargs)
         else:
             N_stars, N_labels = (fluxes.shape[0], len(self.labels))
             labels = np.empty((N_stars, N_labels), dtype=float)
@@ -170,14 +162,14 @@ class CannonModel(model.BaseCannonModel):
 
             for i, (f, u) in enumerate(zip(fluxes, flux_uncertainties)):
                 labels[i, :], covariance[i, :] = \
-                    self._solve_labels(f, u, **kwargs)
+                    self._fit(f, u, label_indices, **kwargs)
 
         if kwargs.get("full_output", False):
             return (labels, covariance)
         return labels
 
 
-    def _solve_labels(self, fluxes, flux_uncertainties, **kwargs):
+    def _fit(self, fluxes, flux_uncertainties, label_indices, **kwargs):
         """
         Solve the labels for given pixel fluxes and uncertainties
         for a single star.
@@ -210,7 +202,7 @@ class CannonModel(model.BaseCannonModel):
         # Need to match the initial theta coefficients back to label values.
         # (Maybe this should use some general non-linear simultaneous solver?)
         initial = {}
-        for index in self._lowest_order_label_indices:
+        for index in label_indices:
             if index is None: continue
             label, order = self.label_vector[index][0]
             # The +1 index offset is because the first theta is a scaling.

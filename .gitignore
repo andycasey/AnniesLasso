@@ -8,6 +8,7 @@ vc.tex
 
 sandbox_*.py
 *.pyc
+*.pkl
 
 build/
 dist/

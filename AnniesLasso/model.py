@@ -91,11 +91,12 @@ class BaseCannonModel(object):
         self._training_labels = labels
         self._training_fluxes = np.atleast_2d(fluxes)
         self._training_flux_uncertainties = np.atleast_2d(flux_uncertainties)
-        
-        self._trained = False
-        self._label_vector = None
         self._dispersion = np.arange(fluxes.shape[1], dtype=int) \
             if dispersion is None else dispersion
+        
+        self._trained = False
+        for attribute in self._trained_attributes:
+            setattr(self, attribute, None)
         
         # The training data must be checked, but users can live dangerously if
         # they think they can correctly specify the label vector description.
@@ -115,16 +116,9 @@ class BaseCannonModel(object):
         """
 
         self._trained = False
-
-        attrs = [] + list(self._trained_attributes) + \
-            ["training_label_residuals", "_lowest_order_label_indices"]
-
-        for attr in self._trained_attributes:
-            try:
-                delattr(self, "_{}".format(attr))
-            except AttributeError:
-                continue
-
+        for attribute in self._trained_attributes:
+            setattr(self, attribute, None)
+        
         return None
 
 
@@ -305,16 +299,6 @@ class BaseCannonModel(object):
                 for label, power in term if power != 0]))
 
 
-    @property
-    def _lowest_order_label_indices(self):
-        try:
-            return self.__lowest_order_label_indices
-        except AttributeError:
-            self.__lowest_order_label_indices = \
-                self._get_lowest_order_label_indices()
-        return self.__lowest_order_label_indices
-
-
     def _get_lowest_order_label_indices(self):
         """
         Get the indices for the lowest power label terms in the label vector.
@@ -332,7 +316,7 @@ class BaseCannonModel(object):
     # Trained attributes that subclasses are likely to use.
     @property
     def coefficients(self):
-        return getattr(self, "_coefficients", None)
+        return self._coefficients
 
 
     @coefficients.setter
@@ -345,6 +329,10 @@ class BaseCannonModel(object):
             A 2-D array of coefficients of shape 
             (`N_pixels`, `N_label_vector_terms`).
         """
+
+        if coefficients is None:
+            self._coefficients = None
+            return None
 
         coefficients = np.atleast_2d(coefficients)
         if len(coefficients.shape) > 2:
@@ -365,7 +353,7 @@ class BaseCannonModel(object):
 
     @property
     def scatter(self):
-        return getattr(self, "_scatter", None)
+        return self._scatter
 
 
     @scatter.setter
@@ -376,6 +364,10 @@ class BaseCannonModel(object):
         :param scatter:
             A 1-D array of scatter terms.
         """
+
+        if scatter is None:
+            self._scatter = None
+            return None
         
         scatter = np.array(scatter).flatten()
         if scatter.size != len(self.dispersion):
@@ -404,16 +396,16 @@ class BaseCannonModel(object):
                                   "implemented by subclasses")
 
 
-    def solve_labels(self, *args, **kwargs):
-        raise NotImplementedError("The solve_labels method must be "
+    def fit(self, *args, **kwargs):
+        raise NotImplementedError("The fit method must be "
                                   "implemented by subclasses")
 
 
     # I/O
     @requires_training_wheels
-    def write(self, filename, include_training_data=False, overwrite=False):
+    def save(self, filename, include_training_data=False, overwrite=False):
         """
-        Serialise the trained model and write it to disk. This will save all
+        Serialise the trained model and save it to disk. This will save all
         relevant training attributes, and optionally, the training data.
 
         :param filename:
@@ -505,7 +497,7 @@ class BaseCannonModel(object):
         # Set training attributes.
         self.reset()
         for attribute in contents["metadata"]["trained_attributes"]:
-            setattr(self, attribute, contents[attribute])
+            setattr(self, "_{}".format(attribute), contents[attribute])
         self._trained = True
 
         return None
@@ -546,29 +538,29 @@ class BaseCannonModel(object):
 
 
     # Residuals in labels in the training data set.
-    @property
-    def training_label_residuals(self):
-        """
-        Label residuals for stars in the training set.
-        """
-        if not hasattr(self, "_training_label_residuals"):
-            self._training_label_residuals = self._get_training_label_residuals()
-        return self._training_label_residuals
-
-
     @requires_training_wheels
-    def _get_training_label_residuals(self):
+    def get_training_label_residuals(self):
         """
         Return the residuals (model - training) between the parameters that the
         model returns for each star, and the training set value.
         """
         
         expected_labels = self.training_label_array
-        optimised_labels = self.solve_labels(
-            self.training_fluxes, self.training_flux_uncertainties,
-            full_output=False)
+        optimised_labels = self.fit(self.training_fluxes,
+            self.training_flux_uncertainties, full_output=False)
 
         return optimised_labels - expected_labels
+
+
+    def _format_input_labels(self, args=None, **kwargs):
+        """
+        Format input labels either from a list or dictionary into a common form.
+        """
+
+        # We want labels in a dictionary.
+        labels = kwargs if args is None else dict(zip(self.labels, args))
+        return { k: [v] for k, v in labels.items() }
+
 
     # Put Cross-validation functions in here.
     @requires_label_vector
