@@ -90,16 +90,14 @@ class BaseCannonModel(object):
         
         self._pivot = False
         self._trained = False
-        self._training_set_mask = np.zeros(len(labels), dtype=bool)
-        self._pixel_mask = np.zeros(self.number_of_pixels, dtype=bool)
-        self._dispersion = np.arange(self.number_of_pixels, dtype=int) \
+        self._dispersion = np.arange(fluxes.shape[1], dtype=int) \
             if dispersion is None else dispersion
         
         # The training data must be checked, but users can live dangerously if
         # they think they can correctly specify the label vector description.
         self._verify_training_data()
         if not live_dangerously:
-            self._verify_label_names()
+            self._verify_labels_available()
 
         self.reset()
 
@@ -107,15 +105,34 @@ class BaseCannonModel(object):
         self.pool = pool or mp.Pool(threads) if threads > 1 else None
 
 
+    def reset(self):
+        """
+        Clear any attributes that have been trained upon.
+        """
+
+        self._trained = False
+
+        attrs = [] + list(self.__trained_attributes) + \
+            ["training_label_residuals", "_lowest_order_label_indices"]
+
+        for attr in self.__trained_attributes:
+            try:
+                delattr(self, "_{}".format(attr))
+            except AttributeError:
+                continue
+
+        return None
+
+
     def __str__(self):
-        return "<{module}.{name} {trained}with {N} stars of {K} labels and {M}"\
-               " pixels each>".format(
+        return "<{module}.{name} {trained}using a training set of {N} stars "\
+               "with {K} available labels and {M} pixels each>".format(
                     module=self.__module__,
                     name=type(self).__name__,
                     trained="trained " if self.is_trained else "",
-                    N=self.training_set_size,
-                    K=self.number_of_labels,
-                    M=self.number_of_pixels)
+                    N=len(self.training_labels),
+                    K=len(self.labels_available),
+                    M=len(self.dispersion))
 
 
     def __repr__(self):
@@ -123,6 +140,7 @@ class BaseCannonModel(object):
             self.__module__, type(self).__name__, hex(id(self)))
 
 
+    # Attributes related to the training data.
     @property
     def dispersion(self):
         """
@@ -141,15 +159,14 @@ class BaseCannonModel(object):
         except TypeError:
             raise TypeError("dispersion provided must be an array or list-like")
 
-        if len(dispersion) != self.number_of_pixels:
+        if len(dispersion) != self.training_fluxes.shape[1]:
             raise ValueError("dispersion provided does not match the number "
                              "of pixels per star ({0} != {1})".format(
-                                len(dispersion), self.number_of_pixels))
+                                len(dispersion), self.training_fluxes.shape[1]))
         self._dispersion = dispersion
         return None
 
 
-    # Attributes related to the training data.
     @property
     def training_labels(self):
         return self._training_labels
@@ -165,66 +182,50 @@ class BaseCannonModel(object):
         return self._training_flux_uncertainties
 
 
-    @property
-    def number_of_pixels(self):
+    # Verifying the training data.
+    def _verify_labels_available(self):
         """
-        Return the number of pixels for each star.
+        Verify the label names provided do not include forbidden characters.
         """
-        return self.training_fluxes.shape[1]
+        if self.__forbidden_label_characters is None:
+            return True
 
-
-    @property
-    def training_set_size(self):
-        """
-        Return the number of unmasked objects in the training set.
-        """
-        return self._get_training_set_size()
-
-
-    def _get_training_set_size(self, include_masked=False):
-        return sum(~self.training_set_mask) if include_masked \
-                                            else self.training_fluxes.shape[0]
-
-    @property
-    def training_set_mask(self):
-        return self._training_set_mask
-
-
-    @training_set_mask.setter
-    def training_set_mask(self, mask):
-        """
-        Set a mask for the training set.
-        """
-        try:
-            len(mask)
-        except TypeError:
-            raise TypeError("mask must be an array of the same length as the "
-                            "stars in the training set")
-
-        if mask.size != len(labels):
-            raise ValueError("mask must be an array of the same length as the "
-                             "stars in the training set")
-        self._training_set_mask = mask
+        for label in self.training_labels.dtype.names:
+            if any(char in label for char in self.__forbidden_label_characters):
+                raise ValueError(
+                    "forbidden character '{char}' is in potential "
+                    "label '{label}' - you can disable this verification by "
+                    "enabling live_dangerously".format(char=char, label=label))
         return None
 
 
-    @property
-    def pixel_mask(self):
-        return self._pixel_mask
-
-
-
-
-
-    @property
-    @requires_training_wheels
-    def training_data_hash(self):
+    def _verify_training_data(self):
         """
-        A concatenated string of 10-length hashes for each item in the training
-        data set.
+        Verify the training data for the appropriate shape and content.
         """
-        return utils.short_hash(
-            getattr(self, attr) for attr in self.__data_attributes)
+        if self.training_fluxes.shape != self.training_flux_uncertainties.shape:
+            raise ValueError(
+                "the training flux and uncertainty arrays should "
+                "have the same shape")
+
+        if len(self.training_labels) == 0 \
+        or self.training_labels.dtype.names is None:
+            raise ValueError("no named labels provided for the training set")
+
+        if len(self.training_labels) != self.training_fluxes.shape[0]:
+            raise ValueError(
+                "the first axes of the training flux array should "
+                "have the same shape as the nuber of rows in the label table "
+                "(N_stars, N_pixels)")
+
+        if self.dispersion is not None:
+            dispersion = np.atleast_1d(self.dispersion).flatten()
+            if dispersion.size != self.training_fluxes.shape[1]:
+                raise ValueError(
+                    "mis-match between the number of wavelength "
+                    "points ({0}) and flux values ({1})".format(
+                        self.training_fluxes.shape[1], dispersion.size))
+        return None
 
 
     @property
@@ -234,17 +235,11 @@ class BaseCannonModel(object):
 
     # Attributes related to the labels and the label vector description.
     @property
-    def label_names(self):
+    def labels_available(self):
         """
         All of the available labels for each star in the training set.
         """
         return self.training_labels.dtype.names
-
-
-    @property
-    def number_of_labels(self):
-        """ The number of available labels for each star. """
-        return len(self.label_names)
 
 
     @property
@@ -267,7 +262,8 @@ class BaseCannonModel(object):
 
         # Need to actually verify that the parameters listed in the label vector
         # are actually present in the training labels.
-        missing = set(self._get_labels(label_vector)).difference(self.label_names)
+        missing = \
+            set(self._get_labels(label_vector)).difference(self.labels_available)
         if missing:
             raise ValueError("the following labels parsed from the label vector "
                              "description are missing in the training set of "
@@ -287,41 +283,6 @@ class BaseCannonModel(object):
     def human_readable_label_vector(self):
         """ Return a human-readable form of the label vector. """
         return utils.human_readable_label_vector(self.label_vector)
-
-
-    @property
-    def pivot(self):
-        return self._pivot
-
-    @pivot.setter
-    def pivot(self, pivot):
-        self._pivot = bool(pivot)
-        return None
-
-
-    @property
-    def label_vector_array(self):
-        if not hasattr(self, "_label_vector_array"):
-            self._label_vector_array, self.pivot_offsets \
-                = self._get_label_vector_array()
-        return self._label_vector_array
-
-
-    @requires_label_vector
-    def _get_label_vector_array(self):
-        """
-        Build the label vector array.
-        """
-
-        offsets = np.zeros(self.number_of_labels)
-        lva = _build_label_vector_rows(self.label_vector, self.training_labels)
-
-        if not np.all(np.isfinite(lva)):
-            print("Non-finite labels identified in the label vector array!")
-
-        return (lva, offsets)
-
-
 
 
     @property
@@ -364,12 +325,6 @@ class BaseCannonModel(object):
         return [indices.get(label, None) for label in self.labels]
 
 
-    @property
-    def number_of_labels(self):
-        """ The number of labels in the model. """
-        return len(self.labels)
-
-
     # Trained attributes that subclasses are likely to use.
     @property
     def coefficients(self):
@@ -392,10 +347,10 @@ class BaseCannonModel(object):
             raise ValueError("coefficients must be a 2D array")
 
         P, Q = coefficients.shape
-        if P != self.number_of_pixels:
+        if P != len(self.dispersion):
             raise ValueError("axis 0 of coefficients array does not match the "
                              "number of pixels ({0} != {1})".format(
-                                P, self.number_of_pixels))
+                                P, len(self.dispersion)))
         if Q != 1 + len(self.label_vector):
             raise ValueError("axis 1 of coefficients array does not match the "
                              "number of label vector terms ({0} != {1})".format(
@@ -419,134 +374,38 @@ class BaseCannonModel(object):
         """
         
         scatter = np.array(scatter).flatten()
-        if scatter.size != self.number_of_pixels:
+        if scatter.size != len(self.dispersion):
             raise ValueError("number of scatter values does not match "
                              "the number of pixels ({0} != {1})".format(
-                                scatter.size, self.number_of_pixels))
+                                scatter.size, len(self.dispersion)))
         if np.any(scatter < 0):
             raise ValueError("scatter terms must be positive")
         self._scatter = scatter
         return None
 
 
-    @property
-    def pivot_offsets(self):
-        return getattr(self, "_pivot_offsets", None)
+    # Methods which must be implemented or updated by the subclasses.
+    def pixel_label_vector(self, pixel_index):
+        """ The label vector for a given pixel. """
+        return self.label_vector
 
 
-    @pivot_offsets.setter
-    def pivot_offsets(self, pivot_offsets):
-        """
-        Set the pivot offsets for each parameter.
-
-        :param pivot_offsets:
-            A 1-D array of positive offsets to apply.
-        """
-
-        pivot_offsets = np.array(pivot_offsets).flatten()
-        if pivot_offsets.size != self.number_of_labels:
-            raise ValueError("number of pivot terms does not match "
-                             "the number of parameters ({0} != {1})".format(
-                                pivot_offsets.size, self.number_of_labels))
-        self._pivot_offsets = pivot_offsets
-        return None
+    def train(self, *args, **kwargs):
+        raise NotImplementedError("The train method must be "
+                                  "implemented by subclasses")
 
 
-    @property
-    def training_label_residuals(self):
-        """
-        Label residuals for stars in the training set.
-        """
-        if not hasattr(self, "_training_label_residuals"):
-            self._training_label_residuals = self._get_training_label_residuals()
-        return self._training_label_residuals
+    def predict(self, *args, **kwargs):
+        raise NotImplementedError("The predict method must be "
+                                  "implemented by subclasses")
 
 
-    @requires_training_wheels
-    def _get_training_label_residuals(self):
-        """
-        Return the residuals (model - training) between the parameters that the
-        model returns for each star, and the training set value.
-        """
-        
-        expected_labels = self._get_training_label_vector()
-        optimised_labels = self.solve_labels(
-            self.training_fluxes, self.training_flux_uncertainties,
-            full_output=False)
-
-        return optimised_labels - expected_labels
+    def solve_labels(self, *args, **kwargs):
+        raise NotImplementedError("The solve_labels method must be "
+                                  "implemented by subclasses")
 
 
-    def _get_training_label_vector(self):
-        # Create a faux label vector to build the expected labels array.
-        return _build_label_vector_rows(
-            [[(label, 1)] for label in self.labels], self.training_labels)[1:].T
-
-
-    def reset(self):
-        """
-        Clear any attributes that have been trained upon.
-        """
-
-        self._trained = False
-
-        attrs = [] + list(self.__trained_attributes) + \
-            ["training_label_residuals", "lowest_order_label_indices"]
-
-        for attr in self.__trained_attributes:
-            try:
-                delattr(self, "_{}".format(attr))
-            except AttributeError:
-                continue
-
-        return None
-
-
-    def _verify_label_names(self):
-        """
-        Verify the label names provided do not include forbidden characters.
-        """
-        if self.__forbidden_label_characters is None:
-            return True
-
-        for label in self.training_labels.dtype.names:
-            if any(char in label for char in self.__forbidden_label_characters):
-                raise ValueError(
-                    "forbidden character '{char}' is in potential "
-                    "label '{label}' - you can disable this verification by "
-                    "enabling live_dangerously".format(char=char, label=label))
-        return None
-
-
-    def _verify_training_data(self):
-        """
-        Verify the training data for the appropriate shape and content.
-        """
-        if self.training_fluxes.shape != self.training_flux_uncertainties.shape:
-            raise ValueError(
-                "the training flux and uncertainty arrays should "
-                "have the same shape")
-
-        if len(self.training_labels) == 0 \
-        or self.training_labels.dtype.names is None:
-            raise ValueError("no named labels provided for the training set")
-
-        if len(self.training_labels) != self.training_fluxes.shape[0]:
-            raise ValueError(
-                "the first axes of the training flux array should "
-                "have the same shape as the nuber of rows in the label table "
-                "(N_stars, N_pixels)")
-
-        if self.dispersion is not None:
-            dispersion = np.atleast_1d(self.dispersion).flatten()
-            if dispersion.size != self.number_of_pixels:
-                raise ValueError(
-                    "mis-match between the number of wavelength "
-                    "points ({N_wls}) and flux values ({N_pxs})".format(
-                        N_pxs=self.number_of_pixels, N_wls=dispersion.size))
-        return None
-
-
+    # I/O
     @requires_training_wheels
     def write(self, filename, with_training_data=False, overwrite=False):
         """
@@ -564,8 +423,12 @@ class BaseCannonModel(object):
             Overwrite the existing file path, if it already exists.
         """
 
+        if not self.is_trained:
+            raise TypeError("the model needs training first")
+
         contents = [getattr(self, attr) for attr in self.__training_attributes]
-        contents += [self.training_data_hash]
+        contents += [utils.short_hash(
+            getattr(self, attr) for attr in self.__data_attributes)]
 
         if with_training_data:
             contents.extend(
@@ -627,32 +490,68 @@ class BaseCannonModel(object):
         return None
 
 
-    # Methods which must be implemented or updated by the subclasses.
+    # Properties and attribuets related to training, etc.
     @property
-    def pixel_label_vector(self, pixel_index):
-        """ The label vector for a given pixel. """
-        return self.label_vector
+    @requires_label_vector
+    def training_label_array(self):
+        """
+        Return an array containing just the training labels, given the label
+        vector.
+        """
+        return _build_label_vector_rows(
+            [[(label, 1)] for label in self.labels], self.training_labels)[1:].T
 
 
-    @pixel_label_vector.setter
-    def pixel_label_vector(self, pixel_index):
-        raise NotImplementedError("Pixel-to-pixel label vectors must be "
-                                  "implemented by subclasses")
+    @property
+    def label_vector_array(self):
+        if not hasattr(self, "_label_vector_array"):
+            self._label_vector_array, self.pivot_offsets \
+                = self._get_label_vector_array()
+        return self._label_vector_array
 
 
-    def train(self, *args, **kwargs):
-        raise NotImplementedError("The train method must be "
-                                  "implemented by subclasses")
+    @requires_label_vector
+    def _get_label_vector_array(self):
+        """
+        Build the label vector array.
+        """
+
+        offsets = 0
+        lva = _build_label_vector_rows(self.label_vector, self.training_labels)
+
+        if not np.all(np.isfinite(lva)):
+            print("Non-finite labels identified in the label vector array!")
+        return (lva, offsets)
 
 
-    def predict(self, *args, **kwargs):
-        raise NotImplementedError("The predict method must be "
-                                  "implemented by subclasses")
+    # Residuals in labels in the training data set.
+    @property
+    def training_label_residuals(self):
+        """
+        Label residuals for stars in the training set.
+        """
+        if not hasattr(self, "_training_label_residuals"):
+            self._training_label_residuals = self._get_training_label_residuals()
+        return self._training_label_residuals
 
 
-    def solve_labels(self, *args, **kwargs):
-        raise NotImplementedError("The solve_labels method must be "
-                                  "implemented by subclasses")
+    @requires_training_wheels
+    def _get_training_label_residuals(self):
+        """
+        Return the residuals (model - training) between the parameters that the
+        model returns for each star, and the training set value.
+        """
+        
+        expected_labels = self.training_label_array
+        optimised_labels = self.solve_labels(
+            self.training_fluxes, self.training_flux_uncertainties,
+            full_output=False)
+
+        return optimised_labels - expected_labels
+
+    # Put Cross-validation functions in here.
+
+
 
 
 def _build_label_vector_rows(label_vector, training_labels):
@@ -677,11 +576,12 @@ def _build_label_vector_rows(label_vector, training_labels):
         The corresponding label vector row.
     """
 
-    columns = [np.ones(len(training_labels))]
+    columns = [np.ones(len(training_labels), dtype=float)]
     for term in label_vector:
-        columns.append(np.multiply(*([1.0] + \
-            [np.array(training_labels[label]).flatten()**order \
-                for label, order in term])))
+        column = 1.
+        for label, order in term:
+            column *= np.array(training_labels[label]).flatten()**order
+        columns.append(column)
 
     try:
         return np.vstack(columns)

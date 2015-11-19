@@ -55,12 +55,8 @@ class CannonModel(model.BaseCannonModel):
     __trained_attributes = ["coefficients", "scatter", "pivot_offsets"]
     __forbidden_label_characters = "^*"
 
-    def __init__(self, labels, fluxes, flux_uncertainties, dispersion=None,
-        threads=1, pool=None, live_dangerously=False):
-
-        super(CannonModel, self).__init__(labels, fluxes, flux_uncertainties,
-            dispersion=dispersion, threads=threads, pool=pool,
-            live_dangerously=live_dangerously)
+    def __init__(self, *args, **kwargs):
+        super(CannonModel, self).__init__(*args, **kwargs)
 
 
     def train(self, **kwargs):
@@ -70,39 +66,42 @@ class CannonModel(model.BaseCannonModel):
         """
         
         # Initialise the scatter and coefficient arrays.
-        N_px = self.number_of_pixels
+        N_px = len(self.dispersion)
         scatter = np.nan * np.ones(N_px)
         theta = np.nan * np.ones((N_px, self.label_vector_array.shape[0]))
-
-        fluxes, flux_uncertainties = (
-            self.training_fluxes[~self.training_set_mask], 
-            self.training_flux_uncertainties[~self.training_set_mask])
 
         # Details for the progressbar.
         pb_kwds = {
             "message": "Training Cannon model from {0} stars with {1} pixels "
-                       "each".format(self.training_set_size, N_px),
+                       "each".format(len(self.training_labels), N_px),
             "size": 100 if kwargs.pop("progressbar", True) else -1
         }
         
         if self.pool is None:
             for pixel in utils.progressbar(range(N_px), **pb_kwds):
                 theta[pixel, :], scatter[pixel] = _fit_pixel(
-                    fluxes[:, pixel], flux_uncertainties[:, pixel],
+                    self.training_fluxes[:, pixel], 
+                    self.training_flux_uncertainties[:, pixel],
                     self.label_vector_array, **kwargs)
 
         else:
             # Not as nice as just mapping, but necessary for a progress bar.
-            process = { pixel: self.pool.apply_async(_fit_pixel,
-                    args=(fluxes[:, pixel], flux_uncertainties[:, pixel],
-                    self.label_vector_array), kwds=kwargs) \
+            process = { pixel: self.pool.apply_async(
+                    _fit_pixel,
+                    args=(
+                        self.training_fluxes[:, pixel], 
+                        self.training_flux_uncertainties[:, pixel],
+                        self.label_vector_array
+                    ),
+                    kwds=kwargs) \
                 for pixel in range(N_px) }
 
             for pixel, proc in utils.progressbar(process.items(), **pb_kwds):
                 theta[pixel, :], scatter[pixel] = proc.get()
 
         # TODO
-        offsets = np.zeros(self.number_of_labels, dtype=float)
+        #offsets = np.zeros(self.number_of_labels, dtype=float)
+        offsets = 0
 
         self.coefficients, self.scatter, self.pivot_offsets = \
             (theta, scatter, offsets)
@@ -126,6 +125,7 @@ class CannonModel(model.BaseCannonModel):
         # We want labels in a dictionary.
         labels = labels_as_kwargs if labels is None \
             else dict(zip(self.labels, labels))
+        labels = { k: [v] for k, v in labels.items() }
 
         # Check all labels that we require are given.
         missing_labels = set(self.labels).difference(labels)
@@ -214,7 +214,7 @@ class CannonModel(model.BaseCannonModel):
         # Need to match the initial theta coefficients back to label values.
         # (Maybe this should use some general non-linear simultaneous solver?)
         initial = {}
-        for index in self.lowest_order_label_indices:
+        for index in self._lowest_order_label_indices:
             if index is None: continue
             label, order = self.label_vector[index][0]
             # The +1 index offset is because the first theta is a scaling.
@@ -225,20 +225,20 @@ class CannonModel(model.BaseCannonModel):
         missing = set(self.labels).difference(initial)
         if missing:
             # There must be some coefficients that are only used in cross-terms.
-            
             # We could solve for them, or just take the mean of the training
             # set as the initial guess.
+            initial.update({ label: \
+                np.nanmean(self.training_labels[label] for label in missing)
+            })
             
-            # Note that if we were pivoting, we could just take zero implicitly.
-            for label in missing:
-                initial[label] = np.nanmean(self.training_labels[label])
-
         labels_p0 = np.array([initial[label] for label in self.labels])
 
         # Create and test the generating function.
         def function(coeffs, *labels):
-            return np.dot(coeffs, model._build_label_vector_rows(
-                self.label_vector, dict(zip(self.labels, labels)))).flatten()
+            return np.dot(coeffs, 
+                model._build_label_vector_rows(self.label_vector, 
+                    { label: [v] for label, v in zip(self.labels, labels) }
+                )).flatten()
 
         try:
             function(coefficients, *labels_p0)
@@ -270,7 +270,7 @@ class CannonModel(model.BaseCannonModel):
         
         N_realisations = self.training_set_size
         N_training_set = self.get_training_set_size(include_masked=True)
-        inferred = np.nan * np.ones((N_training_set, self.number_of_labels))
+        inferred = np.nan * np.ones((N_training_set, len(self.labels)))
 
         for i in range(N_training_set):
             if self.training_set_mask[i]: continue
@@ -328,8 +328,9 @@ def _fit_pixel(fluxes, flux_uncertainties, label_vector_array, **kwargs):
     """
 
     _ = kwargs.get("max_uncertainty", 1)
+    failed_response = (np.nan * np.ones(label_vector_array.shape[0]), _)
     if np.all(flux_uncertainties > _):
-        return (np.nan * np.ones(label_vector_array.shape[0]), _)
+        return failed_response
 
     # Get an initial guess of the scatter.
     scatter = np.var(fluxes) - np.median(flux_uncertainties)**2
@@ -359,7 +360,7 @@ def _fit_pixel(fluxes, flux_uncertainties, label_vector_array, **kwargs):
         print("Failed to calculate coefficients")
         if kwargs.get("debug", False): raise
 
-        return (np.zeros(label_vector_array.shape[0]), 10e8)
+        return failed_response
 
     else:
         return (coefficients, op_scatter)
