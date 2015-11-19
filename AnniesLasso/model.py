@@ -178,10 +178,10 @@ class BaseCannonModel(object):
         """
         Return the number of unmasked objects in the training set.
         """
-        return self.get_training_set_size()
+        return self._get_training_set_size()
 
 
-    def get_training_set_size(self, include_masked=False):
+    def _get_training_set_size(self, include_masked=False):
         return sum(~self.training_set_mask) if include_masked \
                                             else self.training_fluxes.shape[0]
 
@@ -267,7 +267,7 @@ class BaseCannonModel(object):
 
         # Need to actually verify that the parameters listed in the label vector
         # are actually present in the training labels.
-        missing = set(self.get_labels(label_vector)).difference(self.label_names)
+        missing = set(self._get_labels(label_vector)).difference(self.label_names)
         if missing:
             raise ValueError("the following labels parsed from the label vector "
                              "description are missing in the training set of "
@@ -303,12 +303,12 @@ class BaseCannonModel(object):
     def label_vector_array(self):
         if not hasattr(self, "_label_vector_array"):
             self._label_vector_array, self.pivot_offsets \
-                = self.get_label_vector_array()
+                = self._get_label_vector_array()
         return self._label_vector_array
 
 
     @requires_label_vector
-    def get_label_vector_array(self):
+    def _get_label_vector_array(self):
         """
         Build the label vector array.
         """
@@ -327,10 +327,10 @@ class BaseCannonModel(object):
     @property
     def labels(self):
         """ The labels that contribute to the label vector. """
-        return self.get_labels(self.label_vector)
+        return self._get_labels(self.label_vector)
     
 
-    def get_labels(self, label_vector):
+    def _get_labels(self, label_vector):
         """
         Return the labels that contribute to the structured label vector
         provided.
@@ -341,16 +341,16 @@ class BaseCannonModel(object):
 
 
     @property
-    def lowest_order_label_indices(self):
+    def _lowest_order_label_indices(self):
         try:
-            return self._lowest_order_label_indices
+            return self.__lowest_order_label_indices
         except AttributeError:
-            self._lowest_order_label_indices = \
-                self.get_lowest_order_label_indices()
-        return self._lowest_order_label_indices
+            self.__lowest_order_label_indices = \
+                self._get_lowest_order_label_indices()
+        return self.__lowest_order_label_indices
 
 
-    def get_lowest_order_label_indices(self):
+    def _get_lowest_order_label_indices(self):
         """
         Get the indices for the lowest power label terms in the label vector.
         """
@@ -458,27 +458,29 @@ class BaseCannonModel(object):
         Label residuals for stars in the training set.
         """
         if not hasattr(self, "_training_label_residuals"):
-            self._training_label_residuals = self.get_training_label_residuals()
+            self._training_label_residuals = self._get_training_label_residuals()
         return self._training_label_residuals
 
 
     @requires_training_wheels
-    def get_training_label_residuals(self):
+    def _get_training_label_residuals(self):
         """
-        Return the residuals (model - true) between the parameters that the
-        model returns for each star, and the believed value.
+        Return the residuals (model - training) between the parameters that the
+        model returns for each star, and the training set value.
         """
         
-        # Create a faux label vector to build the expected labels array.
-        expected_labels = _build_label_vector_rows(
-            [[(label, 1)] for label in self.labels], self.training_labels)[1:].T
-
-        # Solve the labels for all the stars in the training set.
+        expected_labels = self._get_training_label_vector()
         optimised_labels = self.solve_labels(
             self.training_fluxes, self.training_flux_uncertainties,
             full_output=False)
 
         return optimised_labels - expected_labels
+
+
+    def _get_training_label_vector(self):
+        # Create a faux label vector to build the expected labels array.
+        return _build_label_vector_rows(
+            [[(label, 1)] for label in self.labels], self.training_labels)[1:].T
 
 
     def reset(self):
