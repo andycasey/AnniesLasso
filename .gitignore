@@ -4,4 +4,9 @@
 *.pdf
 vc.tex
 
+.gitignore
+
 *.pyc
+build/
+dist/
+*.egg-info/
