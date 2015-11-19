@@ -14,10 +14,11 @@ import logging
 import numpy as np
 import multiprocessing as mp
 from collections import OrderedDict
+from datetime import datetime
 from os import path
 from six.moves import cPickle as pickle
 
-from . import utils
+from . import (utils, __version__ as code_version)
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +81,9 @@ class BaseCannonModel(object):
         the user to input human-readable forms of the label vector.
     """
 
-    __data_attributes = []
-    __trained_attributes = []
-    __forbidden_label_characters = None
+    _data_attributes = []
+    _trained_attributes = []
+    _forbidden_label_characters = None
     
     def __init__(self, labels, fluxes, flux_uncertainties, dispersion=None,
         threads=1, pool=None, live_dangerously=False):
@@ -91,8 +92,8 @@ class BaseCannonModel(object):
         self._training_fluxes = np.atleast_2d(fluxes)
         self._training_flux_uncertainties = np.atleast_2d(flux_uncertainties)
         
-        self._pivot = False
         self._trained = False
+        self._label_vector = None
         self._dispersion = np.arange(fluxes.shape[1], dtype=int) \
             if dispersion is None else dispersion
         
@@ -115,10 +116,10 @@ class BaseCannonModel(object):
 
         self._trained = False
 
-        attrs = [] + list(self.__trained_attributes) + \
+        attrs = [] + list(self._trained_attributes) + \
             ["training_label_residuals", "_lowest_order_label_indices"]
 
-        for attr in self.__trained_attributes:
+        for attr in self._trained_attributes:
             try:
                 delattr(self, "_{}".format(attr))
             except AttributeError:
@@ -190,11 +191,11 @@ class BaseCannonModel(object):
         """
         Verify the label names provided do not include forbidden characters.
         """
-        if self.__forbidden_label_characters is None:
+        if self._forbidden_label_characters is None:
             return True
 
         for label in self.training_labels.dtype.names:
-            if any(char in label for char in self.__forbidden_label_characters):
+            if any(char in label for char in self._forbidden_label_characters):
                 raise ValueError(
                     "forbidden character '{char}' is in potential "
                     "label '{label}' - you can disable this verification by "
@@ -248,7 +249,7 @@ class BaseCannonModel(object):
     @property
     def label_vector(self):
         """ The label vector for all pixels. """
-        return getattr(self, "_label_vector", None)
+        return self._label_vector
 
 
     @label_vector.setter
@@ -410,7 +411,7 @@ class BaseCannonModel(object):
 
     # I/O
     @requires_training_wheels
-    def write(self, filename, with_training_data=False, overwrite=False):
+    def write(self, filename, include_training_data=False, overwrite=False):
         """
         Serialise the trained model and write it to disk. This will save all
         relevant training attributes, and optionally, the training data.
@@ -418,7 +419,7 @@ class BaseCannonModel(object):
         :param filename:
             The path to save the model to.
 
-        :param with_training_data: [optional]
+        :param include_training_data: [optional]
             Save the training data (labels, fluxes, uncertainties) used to train
             the model.
 
@@ -426,19 +427,35 @@ class BaseCannonModel(object):
             Overwrite the existing file path, if it already exists.
         """
 
-        if not self.is_trained:
-            raise TypeError("the model needs training first")
-
-        contents = [getattr(self, attr) for attr in self.__training_attributes]
-        contents += [utils.short_hash(
-            getattr(self, attr) for attr in self.__data_attributes)]
-
-        if with_training_data:
-            contents.extend(
-                [getattr(self, attr) for attr in self.__data_attributes])
-
         if path.exists(filename) and not overwrite:
             raise IOError("filename already exists: {0}".format(filename))
+
+        if 0 in map(len, (self._trained_attributes, self._data_attributes)):
+            logger.warning("Trained/data attributes may not be saved correctly")
+
+        if "metadata" in self._data_attributes \
+        or "metadata" in self._trained_attributes:
+            raise ValueError("'metadata' is a protected attribute and cannot "
+                             "be used in the _data_attributes or "
+                             "_trained_attributes in a class.")
+
+        # Store up all the trained attributes and a hash of the training set.
+        contents = OrderedDict([(attr.lstrip("_"), getattr(self, attr)) \
+            for attr in self._trained_attributes])
+        contents["training_set_hash"] = utils.short_hash(getattr(self, attr) \
+            for attr in self._data_attributes)
+
+        if include_training_data:
+            contents.update([(attr.lstrip("_"), getattr(self, attr)) \
+                for attr in self._data_attributes])
+
+        contents["metadata"] = {
+            "version": code_version,
+            "model_name": type(self).__name__, 
+            "modified": str(datetime.now()),
+            "data_attributes": [_.lstrip("_") for _ in self._data_attributes],
+            "trained_attributes": [_.lstrip("_") for _ in self._trained_attributes]
+        }
 
         with open(filename, "w") as fp:
             pickle.dump(contents, fp, -1)
@@ -463,40 +480,41 @@ class BaseCannonModel(object):
         with open(filename, "r") as fp:
             contents = pickle.load(fp)
 
-        # Contents includes trained attributes, a data hash, and optionally the
-        # training data.
-        trained_contents = dict(zip(self.__training_attributes, contents))
-        
-        N = len(trained_contents)
-        expected_data_hash = contents[N]
+        assert contents["metadata"]["model_name"] == type(self).__name__
 
-        if len(contents) > N + 1:
-            data_contents = dict(zip(self.__data_attributes, contents[N + 1:]))
-            if verify_training_data and expected_data_hash is not None:
-                actual_data_hash = utils.short_hash(data_contents)
-                if actual_data_hash != expected_data_hash:
-                    raise ValueError(
-                        "expected hash for the training data ({0}) "
-                        "is different to the actual data hash ({1})".format(
-                            expected_data_hash, actual_data_hash))
+        # If data exists, deal with that first.
+        has_data = (contents["metadata"]["data_attributes"][0] in contents)
+        if has_data:
+
+            if verify_training_data:
+                data_hash = utils.short_hash(contents[attr] \
+                    for attr in contents["metadata"]["data_attributes"])
+                if contents["training_set_hash"] is not None \
+                and data_hash != contents["training_set_hash"]:
+                    raise ValueError("expected hash for the training data is "
+                                     "different to the actual data hash "
+                                     "({0} != {1})".format(
+                                        contents["training_set_hash"],
+                                        data_hash))
 
             # Set the data attributes.
-            for k, v in data_contents.items():
-                setattr(self, k, v)
+            for attribute in contents["metadata"]["data_attributes"]:
+                if attribute in contents:
+                    setattr(self, "_{}".format(attribute), contents[attribute])
 
-        # Set the training attributes.
+        # Set training attributes.
         self.reset()
-        for k, v in trained_contents.items():
-            setattr(self, k, v)
-
+        for attribute in contents["metadata"]["trained_attributes"]:
+            setattr(self, attribute, contents[attribute])
         self._trained = True
+
         return None
 
 
     # Properties and attribuets related to training, etc.
     @property
     @requires_label_vector
-    def training_label_array(self):
+    def labels_array(self):
         """
         Return an array containing just the training labels, given the label
         vector.

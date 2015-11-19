@@ -53,10 +53,10 @@ class CannonModel(model.BaseCannonModel):
         the user to input human-readable forms of the label vector.
     """
 
-    __data_attributes = ["training_labels", "training_fluxes",
+    _data_attributes = ["training_labels", "training_fluxes",
         "training_flux_uncertainties"]
-    __trained_attributes = ["coefficients", "scatter"]
-    __forbidden_label_characters = "^*"
+    _trained_attributes = ["_label_vector", "_coefficients", "_scatter"]
+    _forbidden_label_characters = "^*"
 
     def __init__(self, *args, **kwargs):
         super(CannonModel, self).__init__(*args, **kwargs)
