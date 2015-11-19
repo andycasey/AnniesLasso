@@ -52,7 +52,7 @@ class CannonModel(model.BaseCannonModel):
 
     __data_attributes = ["training_labels", "training_fluxes",
         "training_flux_uncertainties"]
-    __trained_attributes = ["coefficients", "scatter", "pivot_offsets"]
+    __trained_attributes = ["coefficients", "scatter"]
     __forbidden_label_characters = "^*"
 
     def __init__(self, *args, **kwargs):
@@ -99,15 +99,10 @@ class CannonModel(model.BaseCannonModel):
             for pixel, proc in utils.progressbar(process.items(), **pb_kwds):
                 theta[pixel, :], scatter[pixel] = proc.get()
 
-        # TODO
-        #offsets = np.zeros(self.number_of_labels, dtype=float)
-        offsets = 0
-
-        self.coefficients, self.scatter, self.pivot_offsets = \
-            (theta, scatter, offsets)
+        self.coefficients, self.scatter = (theta, scatter)
         self._trained = True
 
-        return (theta, scatter, offsets)
+        return (theta, scatter)
 
 
     @model.requires_training_wheels
@@ -132,8 +127,6 @@ class CannonModel(model.BaseCannonModel):
         if missing_labels:
             raise ValueError("missing the following labels: {0}".format(
                 ", ".join(missing_labels)))
-
-        # TODO: Offsets
 
         model_fluxes = np.dot(self.coefficients, 
             model._build_label_vector_rows(self.label_vector, labels)).flatten()
@@ -228,11 +221,9 @@ class CannonModel(model.BaseCannonModel):
             # We could solve for them, or just take the mean of the training
             # set as the initial guess.
             initial.update({ label: \
-                np.nanmean(self.training_labels[label] for label in missing)
+                np.nanmean(self.training_labels[label]) for label in missing
             })
             
-        labels_p0 = np.array([initial[label] for label in self.labels])
-
         # Create and test the generating function.
         def function(coeffs, *labels):
             return np.dot(coeffs, 
@@ -240,6 +231,7 @@ class CannonModel(model.BaseCannonModel):
                     { label: [v] for label, v in zip(self.labels, labels) }
                 )).flatten()
 
+        labels_p0 = np.array([initial[label] for label in self.labels])
         try:
             function(coefficients, *labels_p0)
         except:
@@ -256,57 +248,8 @@ class CannonModel(model.BaseCannonModel):
         kwds.update(kwargs)
         labels_opt, cov = op.curve_fit(function, coefficients, fluxes, **kwds)
 
-        # TODO: apply offsets to the solved labels.
         return (labels_opt, cov)
 
-
-    @model.requires_training_wheels
-    def cross_validate(self, *args, **kwargs):
-        """
-        Perform leave-one-out cross-validation on the training set.
-        """
-
-        debug = kwargs.get("debug", False)
-        
-        N_realisations = self.training_set_size
-        N_training_set = self.get_training_set_size(include_masked=True)
-        inferred = np.nan * np.ones((N_training_set, len(self.labels)))
-
-        for i in range(N_training_set):
-            if self.training_set_mask[i]: continue
-
-            mask = self.training_set_mask.copy()
-            mask[i] = True
-
-            # Create a clean model to use so we don't overwrite self.
-            model = self.__class__(
-                self.labels[~mask], self.training_fluxes[~mask],
-                self.training_flux_uncertainties[~mask], **kwargs)
-
-            # Initialise the label vector description, etc. This will need
-            # all the training_attributes from the current model.
-            raise NotImplementedError
-
-
-            # Solve for the one object left out.
-            try:
-                inferred[i, :] = model.solve_labels(
-                    self.training_fluxes[i, :],
-                    self.training_flux_uncertainties[i, :])
-
-            except:
-                logger.exception("Exception during cross-validation on object "
-                                 "with index {0}:".format(i))
-                if debug: raise
-
-        # TODO:
-        # Return parameter names as well? the expected labels?
-        return inferred[~self.training_set_mask, :]
-
-
-    @model.requires_training_wheels
-    def cross_validate_by_label(self, *args, **kwargs):
-        raise NotImplementedError("not done yet")
 
 
 def _fit_pixel(fluxes, flux_uncertainties, label_vector_array, **kwargs):
@@ -439,6 +382,3 @@ def _fit_coefficients(fluxes, flux_uncertainties, scatter, label_vector_array):
     theta = np.dot(ATCiAinv, ATY)
 
     return (theta, ATCiAinv, variance)
-
-
-

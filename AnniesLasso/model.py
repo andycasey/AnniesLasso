@@ -10,6 +10,7 @@ from __future__ import (division, print_function, absolute_import,
 
 __all__ = ["BaseCannonModel", "requires_training_wheels"]
 
+import logging
 import numpy as np
 import multiprocessing as mp
 from collections import OrderedDict
@@ -17,6 +18,8 @@ from os import path
 from six.moves import cPickle as pickle
 
 from . import utils
+
+logger = logging.getLogger(__name__)
 
 
 def requires_training_wheels(method):
@@ -550,7 +553,58 @@ class BaseCannonModel(object):
         return optimised_labels - expected_labels
 
     # Put Cross-validation functions in here.
+    @requires_training_wheels
+    def cross_validate(self, *args, **kwargs):
+        """
+        Perform leave-one-out cross-validation on the training set.
+        """
+        
+        expected = self.training_label_array
+        inferred = np.nan * np.ones_like(expected)
+        N_training_set, N_labels = inferred.shape
 
+        debug = kwargs.pop("debug", False)
+        pre_train = kwargs.pop("pre_train", None)
+
+        kwds = { "threads": self.threads }
+        kwds.update(kwargs)
+
+        for i in range(N_training_set):
+            
+            use = np.zeros(N_training_set, dtype=bool)
+            use[i] = True
+
+            # Create a clean model to use so we don't overwrite self.
+            model = self.__class__(
+                self.labels[use],
+                self.training_fluxes[use],
+                self.training_flux_uncertainties[use],
+                **kwds)
+
+            # Initialise and run any pre-training function.
+            model.label_vector = self.label_vector
+            if pre_train is not None:
+                pre_train(self, model)
+
+            model.train()
+
+
+            # Solve for the one object left out.
+            try:
+                inferred[i, :] = model.fit(self.training_fluxes[i],
+                    self.training_flux_uncertainties[i], full_output=False)
+
+            except:
+                logger.exception("Exception during cross-validation on object "
+                                 "with index {0}:".format(i))
+                if debug: raise
+
+        return inferred
+
+
+    @requires_training_wheels
+    def cross_validate_by_label(self, *args, **kwargs):
+        raise NotImplementedError("not done yet")
 
 
 
