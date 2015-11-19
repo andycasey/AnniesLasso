@@ -143,11 +143,10 @@ class CannonModel(model.BaseCannonModel):
     @model.requires_training_wheels
     def solve_labels(self, fluxes, flux_uncertainties, **kwargs):
         """
-        Solve the labels for given fluxes (and uncertainties) using the trained
-        model.
+        Solve the labels for given pixel fluxes and uncertainties.
 
         :param fluxes:
-            The normalised fluxes. These should be on the same wavelength scale
+            The normalised fluxes. These should be on the same dispersion scale
             as the trained data.
 
         :param flux_uncertainties:
@@ -155,24 +154,110 @@ class CannonModel(model.BaseCannonModel):
             shape as `fluxes`.
 
         :returns:
-            The labels for the given fluxes as an ordered dictionary.
+            The labels and covariance matrix.
         """
 
         fluxes, flux_uncertainties = map(np.array, (fluxes, flux_uncertainties))
 
-        # Do an initial estimate.
+        # TODO: Consider parallelising this, which would mean factoring
+        # _solve_labels out of the model class, which gets messy.
+        # Since solving for labels is not a big bottleneck (yet), let's leave
+        # this.
 
-        # Proper solve.
+        if fluxes.ndim == 1:
+            labels, covariance = \
+                self._solve_labels(fluxes, flux_uncertainties, **kwargs)
+        else:
+            N_stars, N_labels = (fluxes.shape[0], len(self.labels))
+            labels = np.empty((N_stars, N_labels), dtype=float)
+            covariance = np.empty((N_stars, N_labels, N_labels), dtype=float)
 
-        raise NotImplementedError
+            for i, (f, u) in enumerate(zip(fluxes, flux_uncertainties)):
+                labels[i, :], covariance[i, :] = \
+                    self._solve_labels(f, u, **kwargs)
+
+        if kwargs.get("full_output", False):
+            return (labels, covariance)
+        return labels
 
 
+    def _solve_labels(self, fluxes, flux_uncertainties, **kwargs):
+        """
+        Solve the labels for given pixel fluxes and uncertainties
+        for a single star.
 
+        :param fluxes:
+            The normalised fluxes. These should be on the same dispersion scale
+            as the trained data.
 
+        :param flux_uncertainties:
+            The 1-sigma uncertainties in the fluxes. This should have the same
+            shape as `fluxes`.
 
+        :returns:
+            The labels and covariance matrix.
+        """
 
+        # Check which pixels to use, then just use those.
+        use = (flux_uncertainties < kwargs.get("max_uncertainty", 1)) \
+            * np.isfinite(self.coefficients[:, 0] * fluxes * flux_uncertainties)
 
+        fluxes = fluxes.copy()[use]
+        flux_uncertainties = flux_uncertainties.copy()[use]
+        scatter, coefficients = self.scatter[use], self.coefficients[use]
 
+        Cinv = 1.0 / (scatter**2 + flux_uncertainties**2)
+        A = np.dot(coefficients.T, Cinv[:, None] * coefficients)
+        B = np.dot(coefficients.T, Cinv * fluxes)
+        theta_p0 = np.linalg.solve(A, B)
+
+        # Need to match the initial theta coefficients back to label values.
+        # (Maybe this should use some general non-linear simultaneous solver?)
+        initial = {}
+        for index in self.lowest_order_label_indices:
+            if index is None: continue
+            label, order = self.label_vector[index][0]
+            # The +1 index offset is because the first theta is a scaling.
+            value = abs(theta_p0[1 + index])**(1./order)
+            if not np.isfinite(value): continue
+            initial[label] = value
+
+        missing = set(self.labels).difference(initial)
+        if missing:
+            # There must be some coefficients that are only used in cross-terms.
+            
+            # We could solve for them, or just take the mean of the training
+            # set as the initial guess.
+            
+            # Note that if we were pivoting, we could just take zero implicitly.
+            for label in missing:
+                initial[label] = np.nanmean(self.training_labels[label])
+
+        labels_p0 = np.array([initial[label] for label in self.labels])
+
+        # Create and test the generating function.
+        def function(coeffs, *labels):
+            return np.dot(coeffs, model._build_label_vector_rows(
+                self.label_vector, dict(zip(self.labels, labels)))).flatten()
+
+        try:
+            function(coefficients, *labels_p0)
+        except:
+            print("Error occurred when using the initial values to test fn")
+            raise
+
+        # Solve for the parameters.
+        kwds = {
+            "p0": labels_p0,
+            "maxfev": 10000,
+            "sigma": 1.0/np.sqrt(Cinv),
+            "absolute_sigma": True
+        }
+        kwds.update(kwargs)
+        labels_opt, cov = op.curve_fit(function, coefficients, fluxes, **kwds)
+
+        # TODO: apply offsets to the solved labels.
+        return (labels_opt, cov)
 
 
     @model.requires_training_wheels
@@ -353,3 +438,6 @@ def _fit_coefficients(fluxes, flux_uncertainties, scatter, label_vector_array):
     theta = np.dot(ATCiAinv, ATY)
 
     return (theta, ATCiAinv, variance)
+
+
+

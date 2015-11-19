@@ -339,25 +339,35 @@ class BaseCannonModel(object):
             list(OrderedDict.fromkeys([label for term in label_vector \
                 for label, power in term if power != 0]))
 
+
+    @property
+    def lowest_order_label_indices(self):
+        try:
+            return self._lowest_order_label_indices
+        except AttributeError:
+            self._lowest_order_label_indices = \
+                self.get_lowest_order_label_indices()
+        return self._lowest_order_label_indices
+
+
+    def get_lowest_order_label_indices(self):
+        """
+        Get the indices for the lowest power label terms in the label vector.
+        """
+        indices = OrderedDict()
+        for i, term in enumerate(self.label_vector):
+            if len(term) > 1: continue
+            label, order = term[0]
+            if order < indices.get(label, np.inf):
+                indices[label] = i
+
+        return [indices.get(label, None) for label in self.labels]
+
+
     @property
     def number_of_labels(self):
         """ The number of labels in the model. """
         return len(self.labels)
-
-
-    @property
-    def training_label_vector(self):
-        """
-        Return an array of labels of all unmasked stars in the training set.
-        """
-        X = np.zeros((
-            self.get_training_set_size(include_masked=True),
-            self.number_of_labels))
-
-        for i, parameter in enumerate(self.parameters):
-            X[:, i] = np.array(self.training_labels[parameter])
-
-        return X[~self.training_set_mask, :]
 
 
     # Trained attributes that subclasses are likely to use.
@@ -458,18 +468,17 @@ class BaseCannonModel(object):
         Return the residuals (model - true) between the parameters that the
         model returns for each star, and the believed value.
         """
-        inferred_parameter_vector = np.zeros((
-            self.get_training_set_size(include_masked=True),
-            self.number_of_labels))
+        
+        # Create a faux label vector to build the expected labels array.
+        expected_labels = _build_label_vector_rows(
+            [[(label, 1)] for label in self.labels], self.training_labels)[1:].T
 
-        for i, data in \
-        enumerate(zip(self.training_fluxes, self.training_flux_uncertainties)):
-            if not self.training_set_mask[i]:
-                inferred_parameter_vector[i, :] = self.solve_labels(*data)
+        # Solve the labels for all the stars in the training set.
+        optimised_labels = self.solve_labels(
+            self.training_fluxes, self.training_flux_uncertainties,
+            full_output=False)
 
-        label_residuals = inferred_parameter_vector[self.training_set_mask] \
-            - self.training_label_vector
-        return label_residuals
+        return optimised_labels - expected_labels
 
 
     def reset(self):
@@ -478,13 +487,15 @@ class BaseCannonModel(object):
         """
 
         self._trained = False
-        for attr in self.__trained_attributes:
-            setattr(self, "_{0}".format(attr), None)
 
-        try:
-            del self._training_label_residuals
-        except AttributeError:
-            None
+        attrs = [] + list(self.__trained_attributes) + \
+            ["training_label_residuals", "lowest_order_label_indices"]
+
+        for attr in self.__trained_attributes:
+            try:
+                delattr(self, "_{}".format(attr))
+            except AttributeError:
+                continue
 
         return None
 
