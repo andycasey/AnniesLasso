@@ -7,11 +7,14 @@ General utility functions.
 
 __all__ = ["label_vector", "progressbar", "short_hash"]
 
-import sys
+import logging
 import numpy as np
+import sys
 from time import time
 from collections import Counter, OrderedDict
 from itertools import combinations_with_replacement
+
+logger = logging.getLogger(__name__)
 
 
 def short_hash(contents):
@@ -178,8 +181,7 @@ def progressbar(iterable, message=None, size=100):
 
     # Initialise.
     if size > 0:
-        #logger.info((message or "").rstrip())
-        if message is not None: print(message)
+        logger.info((message or "").rstrip())
         sys.stdout.flush()
 
     # Updaterise.

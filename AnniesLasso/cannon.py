@@ -10,10 +10,13 @@ from __future__ import (division, print_function, absolute_import,
 
 __all__ = ["CannonModel"]
 
+import logging
 import numpy as np
 import scipy.optimize as op
 
 from . import (model, utils)
+
+logger = logging.getLogger(__name__)
 
 
 class CannonModel(model.BaseCannonModel):
@@ -235,7 +238,8 @@ class CannonModel(model.BaseCannonModel):
         try:
             function(coefficients, *labels_p0)
         except:
-            print("Error occurred when using the initial values to test fn")
+            logger.exception(
+                "Error occurred when using the initial values to test fn")
             raise
 
         # Solve for the parameters.
@@ -287,7 +291,7 @@ def _fit_pixel(fluxes, flux_uncertainties, label_vector_array, **kwargs):
         disp=False, full_output=True)
 
     if warnflag > 0:
-        print("Warning: {}".format([
+        logger.warning("Warning: {}".format([
             "Maximum number of function evaluations made during optimisation.",
             "Maximum number of iterations made during optimisation."
             ][warnflag - 1]))
@@ -300,7 +304,7 @@ def _fit_pixel(fluxes, flux_uncertainties, label_vector_array, **kwargs):
             fluxes, flux_uncertainties, op_scatter, label_vector_array)
 
     except np.linalg.linalg.LinAlgError:
-        print("Failed to calculate coefficients")
+        logger.exception("Failed to calculate coefficients")
         if kwargs.get("debug", False): raise
 
         return failed_response

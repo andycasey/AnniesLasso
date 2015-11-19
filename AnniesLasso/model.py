@@ -523,7 +523,7 @@ class BaseCannonModel(object):
         lva = _build_label_vector_rows(self.label_vector, self.training_labels)
 
         if not np.all(np.isfinite(lva)):
-            print("Non-finite labels identified in the label vector array!")
+            logger.warn("Non-finite labels in the label vector array!")
         return (lva, offsets)
 
 
@@ -553,8 +553,8 @@ class BaseCannonModel(object):
         return optimised_labels - expected_labels
 
     # Put Cross-validation functions in here.
-    @requires_training_wheels
-    def cross_validate(self, *args, **kwargs):
+    @requires_label_vector
+    def cross_validate(self, pre_train=None, **kwargs):
         """
         Perform leave-one-out cross-validation on the training set.
         """
@@ -564,21 +564,20 @@ class BaseCannonModel(object):
         N_training_set, N_labels = inferred.shape
 
         debug = kwargs.pop("debug", False)
-        pre_train = kwargs.pop("pre_train", None)
-
+        
         kwds = { "threads": self.threads }
         kwds.update(kwargs)
 
         for i in range(N_training_set):
             
-            use = np.zeros(N_training_set, dtype=bool)
-            use[i] = True
+            training_set = np.ones(N_training_set, dtype=bool)
+            training_set[i] = False
 
             # Create a clean model to use so we don't overwrite self.
             model = self.__class__(
-                self.labels[use],
-                self.training_fluxes[use],
-                self.training_flux_uncertainties[use],
+                self.training_labels[training_set],
+                self.training_fluxes[training_set],
+                self.training_flux_uncertainties[training_set],
                 **kwds)
 
             # Initialise and run any pre-training function.
@@ -586,10 +585,9 @@ class BaseCannonModel(object):
             if pre_train is not None:
                 pre_train(self, model)
 
+            # Train and solve.
             model.train()
 
-
-            # Solve for the one object left out.
             try:
                 inferred[i, :] = model.fit(self.training_fluxes[i],
                     self.training_flux_uncertainties[i], full_output=False)
@@ -602,7 +600,7 @@ class BaseCannonModel(object):
         return inferred
 
 
-    @requires_training_wheels
+    @requires_label_vector
     def cross_validate_by_label(self, *args, **kwargs):
         raise NotImplementedError("not done yet")
 

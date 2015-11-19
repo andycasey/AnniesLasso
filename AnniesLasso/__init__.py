@@ -14,9 +14,13 @@ from .cannon import *
 from .model import *
 from . import utils
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
-logger = logging.getLogger("cannon")
-logger.setLevel(logging.CRITICAL)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter(
+    "%(asctime)s [%(levelname)-8s] (%(name)s/%(lineno)d): %(message)s"))
+logger.addHandler(handler)
 
 simplefilter("ignore", RankWarning)
 simplefilter("ignore", RuntimeWarning)
