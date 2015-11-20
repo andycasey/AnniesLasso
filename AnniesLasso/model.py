@@ -263,9 +263,9 @@ class BaseCannonModel(object):
         missing = \
             set(self._get_labels(label_vector)).difference(self.labels_available)
         if missing:
-            raise ValueError("the following labels parsed from the label vector "
-                             "description are missing in the training set of "
-                             "labels: {0}".format(", ".join(missing)))
+            raise ValueError("the following labels parsed from the label "
+                             "vector description are missing in the training "
+                             "set of labels: {0}".format(", ".join(missing)))
 
         # If this is really a new label vector description,
         # then we are no longer trained.
@@ -307,10 +307,9 @@ class BaseCannonModel(object):
         for i, term in enumerate(self.label_vector):
             if len(term) > 1: continue
             label, order = term[0]
-            if order < indices.get(label, np.inf):
-                indices[label] = i
-
-        return [indices.get(label, None) for label in self.labels]
+            if order < indices.get(label, [None, np.inf])[-1]:
+                indices[label] = (i, order)
+        return [indices.get(label, [None])[0] for label in self.labels]
 
 
     # Trained attributes that subclasses are likely to use.
