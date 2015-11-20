@@ -13,6 +13,7 @@ import sys
 from time import time
 from collections import (Counter, Iterable, OrderedDict)
 from itertools import combinations_with_replacement
+from six import string_types
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,7 @@ def parse_label_vector(label_vector_description, columns=None, **kwargs):
     kwds.update(kwargs)
     sep, mul, pow = (kwds[k] for k in ("sep", "mul", "pow"))
 
-    if isinstance(label_vector_description, (str, unicode)):
+    if isinstance(label_vector_description, string_types):
         label_vector_description = label_vector_description.split(sep)
     label_vector_description = map(str.strip, label_vector_description)
 

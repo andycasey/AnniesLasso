@@ -125,6 +125,26 @@ class TestLabelVectorParser(unittest.TestCase):
             ]
         )
 
+    def test_valid_label_vector(self):
+        label_vector = [
+            [("A", 4)],
+            [("B", 4), ("C", 3)],
+            [("D", 2), ("E", 1), ("F", 1)],
+            [("G", 4.3), ("H", 1)]
+        ]
+        self.assertTrue(utils.is_structured_label_vector(label_vector))
+        self.assertEquals(label_vector, utils.parse_label_vector(label_vector))
+
+    def test_parsing_with_columns(self):
+        self.assertEquals(utils.parse_label_vector("A + B^2 + C^3 + A*B",
+            columns=["C", "A", "B"]),
+            [
+                [(1, 1)],
+                [(2, 2)],
+                [(0, 3)],
+                [(1, 1), (2, 1)]
+            ])
+
 
 class TestHumanReadableLabelVector(unittest.TestCase):
 
