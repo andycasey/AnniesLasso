@@ -8,7 +8,7 @@ A compressed sensing edition of The Cannon.
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
-__all__ = ["CompressedSensingCannonModel"]
+__all__ = ["LassoCannonModel"]
 
 import logging
 import numpy as np
@@ -19,7 +19,7 @@ from . import (model, utils)
 logger = logging.getLogger(__name__)
 
 
-class CompressedSensingCannonModel(model.BaseCannonModel):
+class LassoCannonModel(model.BaseCannonModel):
     """
     A compressed sensing edition of The Cannon model for the estimation of 
     arbitrary stellar labels with regularized complexity.

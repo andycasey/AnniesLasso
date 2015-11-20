@@ -12,7 +12,7 @@ from warnings import simplefilter
 
 from .atomic import *
 from .cannon import *
-from .compressed_sensing import *
+from .lasso import *
 from .model import *
 from . import utils
 

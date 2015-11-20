@@ -116,8 +116,8 @@ class BaseCannonModel(object):
         """
 
         self._trained = False
-        for attribute in self._trained_attributes:
-            setattr(self, attribute, None)
+        for attr in set(self._trained_attributes).difference(["_label_vector"]):
+            setattr(self, attr, None)
         
         return None
 
@@ -544,11 +544,10 @@ class BaseCannonModel(object):
         model returns for each star, and the training set value.
         """
         
-        expected_labels = self.training_label_array
         optimised_labels = self.fit(self.training_fluxes,
             self.training_flux_uncertainties, full_output=False)
 
-        return optimised_labels - expected_labels
+        return optimised_labels - self.labels_array
 
 
     def _format_input_labels(self, args=None, **kwargs):
