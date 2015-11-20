@@ -81,9 +81,10 @@ class BaseCannonModel(object):
         the user to input human-readable forms of the label vector.
     """
 
-    _data_attributes = []
+    _descriptive_attributes = []
     _trained_attributes = []
-    _forbidden_label_characters = None
+    _data_attributes = []
+    _forbidden_label_characters = "^*"
     
     def __init__(self, labels, fluxes, flux_uncertainties, dispersion=None,
         threads=1, pool=None, live_dangerously=False):
@@ -425,13 +426,15 @@ class BaseCannonModel(object):
             logger.warning("Trained/data attributes may not be saved correctly")
 
         if "metadata" in self._data_attributes \
+        or "metadata" in self._descriptive_attributes \
         or "metadata" in self._trained_attributes:
             raise ValueError("'metadata' is a protected attribute and cannot "
-                             "be used in the _data_attributes or "
-                             "_trained_attributes in a class.")
+                             "be used in the _*_attributes in a class")
 
         # Store up all the trained attributes and a hash of the training set.
         contents = OrderedDict([(attr.lstrip("_"), getattr(self, attr)) \
+            for attr in self._descriptive_attributes])
+        contents.update([(attr.lstrip("_"), getattr(self, attr)) \
             for attr in self._trained_attributes])
         contents["training_set_hash"] = utils.short_hash(getattr(self, attr) \
             for attr in self._data_attributes)
@@ -444,8 +447,12 @@ class BaseCannonModel(object):
             "version": code_version,
             "model_name": type(self).__name__, 
             "modified": str(datetime.now()),
-            "data_attributes": [_.lstrip("_") for _ in self._data_attributes],
-            "trained_attributes": [_.lstrip("_") for _ in self._trained_attributes]
+            "data_attributes": \
+                [_.lstrip("_") for _ in self._data_attributes],
+            "trained_attributes": \
+                [_.lstrip("_") for _ in self._trained_attributes],
+            "descriptive_attributes": \
+                [_.lstrip("_") for _ in self._descriptive_attributes]
         }
 
         with open(filename, "w") as fp:
@@ -493,8 +500,10 @@ class BaseCannonModel(object):
                 if attribute in contents:
                     setattr(self, "_{}".format(attribute), contents[attribute])
 
-        # Set training attributes.
+        # Set descriptive and trained attributes.
         self.reset()
+        for attribute in contents["metadata"]["descriptive_attributes"]:
+            setattr(self, "_{}".format(attribute), contents[attribute])
         for attribute in contents["metadata"]["trained_attributes"]:
             setattr(self, "_{}".format(attribute), contents[attribute])
         self._trained = True
