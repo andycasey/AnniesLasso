@@ -13,7 +13,7 @@ See the file `LICENSE` for more details.
 
 ## Code
 [![Build Status](https://travis-ci.org/andycasey/AnniesLasso.svg?branch=code)](https://travis-ci.org/andycasey/AnniesLasso)
-[![Coverage Status](https://coveralls.io/repos/andycasey/AnniesLasso/badge.svg?branch=master&service=github)](https://coveralls.io/github/andycasey/AnniesLasso?branch=master)
+[![Coverage Status](https://coveralls.io/repos/andycasey/AnniesLasso/badge.svg?branch=code&service=github)](https://coveralls.io/github/andycasey/AnniesLasso?branch=code)
 
 To install:
 
