@@ -11,7 +11,7 @@ import logging
 import numpy as np
 import sys
 from time import time
-from collections import Counter, OrderedDict
+from collections import (Counter, Iterable, OrderedDict)
 from itertools import combinations_with_replacement
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,7 @@ def short_hash(contents):
         A concatenated string of 10-character length hashes for all items in the
         contents provided.
     """
+    if not isinstance(contents, Iterable): contents = [contents]
     return "".join([str(hash(str(item)))[:10] for item in contents])
 
 
@@ -48,6 +49,10 @@ def is_structured_label_vector(label_vector):
             or len(term) != 2 \
             or not isinstance(term[-1], (int, float)):
                 return False
+
+    if len(label_vector) == 0 or sum(map(len, label_vector)) == 0:
+        return False
+
     return True
 
 
@@ -106,7 +111,7 @@ def parse_label_vector(label_vector_description, columns=None, **kwargs):
     label_vector_description = map(str.strip, label_vector_description)
 
     # Functions to parse the parameter (or index) and order for each term.
-    get_power = lambda t: int(t.split(pow)[1].strip()) if pow in t else 1
+    get_power = lambda t: float(t.split(pow)[1].strip()) if pow in t else 1
     if columns is None:
         get_label = lambda d: d.split(pow)[0].strip()
     else:
@@ -123,8 +128,16 @@ def parse_label_vector(label_vector_description, columns=None, **kwargs):
             term[label] = term.get(label, 0) + order # Sum repeat term powers.
 
         # Prevent uses of x^0 etc clogging up the label vector.
-        label_vector.append([(l, o) for l, o in term.items() if o != 0])
+        valid_terms = [(l, o) for l, o in term.items() if o != 0]
+        if not np.all(np.isfinite([o for l, o in valid_terms])):
+            raise ValueError("non-finite power provided")
+
+        if len(valid_terms) > 0:
+            label_vector.append(valid_terms)
     
+    if sum(map(len, label_vector)) == 0:
+        raise ValueError("no valid terms provided")
+
     return label_vector
 
 
@@ -133,9 +146,10 @@ def human_readable_label_vector(label_vector, **kwargs):
     Return a human-readable form of the label vector provided.
     """
 
+    if not is_structured_label_vector(label_vector):
+        raise TypeError("invalid label vector provided")
+
     theta = ["1"]
-    if label_vector is None: return theta[0]
-    
     for descriptor in label_vector:
         cross_terms = []
         for label, order in descriptor:
@@ -196,7 +210,7 @@ def progressbar(iterable, message=None, size=100):
         sys.stdout.flush()
 
 
-def label_vector(labels, order, cross_term_order=0, mul="*", pow="^"):
+def build_label_vector(labels, order, cross_term_order=0, **kwargs):
     """
     Build a label vector description.
 
@@ -222,6 +236,10 @@ def label_vector(labels, order, cross_term_order=0, mul="*", pow="^"):
         A human-readable form of the label vector.
     """
 
+    sep = kwargs.pop("sep", "+")
+    mul = kwargs.pop("mul", "*")
+    pow = kwargs.pop("pow", "^")
+
     #I make no apologies: it's fun to code like this for short complex functions
     items = []
     for o in range(1, 1 + max(order, 1 + cross_term_order)):
@@ -230,4 +248,4 @@ def label_vector(labels, order, cross_term_order=0, mul="*", pow="^"):
             or len(t) > 1 and cross_term_order >= max(t.values()):
                 c = [pow.join([[l], [l, str(p)]][p > 1]) for l, p in t.items()]
                 if c: items.append(mul.join(map(str, c)))
-    return " ".join(items)
+    return " {} ".format(sep).join(items)
