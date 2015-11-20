@@ -591,6 +591,8 @@ class BaseCannonModel(object):
         expected = self.training_label_array
         inferred = np.nan * np.ones_like(expected)
         N_training_set, N_labels = inferred.shape
+        N_stop_at = kwargs.pop("N", N_training_set)
+
 
         debug = kwargs.pop("debug", False)
         
@@ -626,7 +628,11 @@ class BaseCannonModel(object):
                                  "with index {0}:".format(i))
                 if debug: raise
 
-        return inferred
+
+            if i == N_stop_at + 1:
+                break
+
+        return inferred[:N_stop_at, :]
 
 
     @requires_label_vector

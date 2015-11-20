@@ -201,6 +201,10 @@ class TestCannonModelRealistically(unittest.TestCase):
             remove(temp_filename)
 
 
+    def do_cv(self):
+        self.model_parallel.cross_validate(N=1)
+
+
     def runTest(self):
 
         # Train all.
