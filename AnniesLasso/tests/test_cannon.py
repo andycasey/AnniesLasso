@@ -9,9 +9,10 @@ import numpy as np
 import sys
 import unittest
 from six.moves import cPickle as pickle
-from os import path
+from os import path, remove
+from tempfile import mkstemp
 
-from AnniesLasso import cannon
+from AnniesLasso import cannon, utils
 
 # Test the individual fitting functions first, then we can generate some
 # real 'fake' data for the full Cannon model test.
@@ -107,6 +108,82 @@ class TestCannonModelRealistically(unittest.TestCase):
         self.assertTrue(np.allclose(serial, parallel))
 
 
+    def ruin_the_trained_coefficients(self):
+        self.model_serial.scatter = None
+        self.assertIsNone(self.model_serial.scatter)
+
+        with self.assertRaises(ValueError):
+            self.model_parallel.scatter = [3]
+
+        for item in (0., False, True):
+            with self.assertRaises(ValueError):
+                self.model_parallel.scatter = item
+
+        with self.assertRaises(ValueError):
+            self.model_parallel.scatter = \
+                -1 * np.ones_like(self.model_parallel.dispersion)
+
+        _ = np.array(self.model_parallel.scatter).copy()
+        _ += 1.
+        self.model_parallel.scatter = _
+        self.assertTrue(np.allclose(_, self.model_parallel.scatter))
+
+
+        self.model_serial.coefficients = None
+        self.assertIsNone(self.model_serial.coefficients)
+
+        with self.assertRaises(ValueError):
+            self.model_parallel.coefficients = np.arange(12).reshape((3, 2, 2))
+
+        with self.assertRaises(ValueError):
+            _ = np.ones_like(self.model_parallel.coefficients)
+            self.model_parallel.coefficients = _.T
+
+        with self.assertRaises(ValueError):
+            _ = np.ones_like(self.model_parallel.coefficients)
+            self.model_parallel.coefficients = _[:, :-1]
+        
+        _ = np.array(self.model_parallel.coefficients).copy()
+        _ += 0.5
+        self.model_parallel.coefficients = _
+        self.assertTrue(np.allclose(_, self.model_parallel.coefficients))
+
+
+    def do_io(self):
+
+        _, temp_filename = mkstemp()
+        remove(temp_filename)
+        self.model_serial.save(temp_filename, include_training_data=False)
+        self.model_serial.save(temp_filename, include_training_data=True,
+            overwrite=True)
+
+        self.model_parallel.reset()
+        self.model_parallel.load(temp_filename)
+
+        # Check that the trained attributes in both model are equal.
+        for _attribute in self.model_serial._trained_attributes:
+            self.assertTrue(np.allclose(
+                getattr(self.model_serial, _attribute),
+                getattr(self.model_parallel, _attribute)
+                ))
+
+            # And nearly as we expected.
+            self.assertTrue(np.allclose(
+                self.test_data_set[_attribute[1:]],
+                getattr(self.model_serial, _attribute),
+                rtol=0.5, atol=1e-8))
+
+        # Check that the data attributes in both model are equal.
+        for _attribute in self.model_serial._data_attributes:
+            self.assertTrue(
+                utils.short_hash(getattr(self.model_serial, _attribute)),
+                utils.short_hash(getattr(self.model_parallel, _attribute))
+            )
+
+        if path.exists(temp_filename):
+            remove(temp_filename)
+
+
     def runTest(self):
 
         # Train all.
@@ -114,4 +191,10 @@ class TestCannonModelRealistically(unittest.TestCase):
 
         self.do_residuals()
 
+        self.ruin_the_trained_coefficients()
 
+        # Train again.
+        self.do_training()
+
+        # Try I/O/
+        self.do_io()

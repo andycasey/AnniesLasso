@@ -439,8 +439,9 @@ class BaseCannonModel(object):
         if 0 in map(len, (self._trained_attributes, self._data_attributes)):
             logger.warning("Trained/data attributes may not be saved correctly")
 
-        attributes = sum(map(len, (self._descriptive_attributes,
-            self._trained_attributes, self._data_attributes)))
+        attributes = list(self._descriptive_attributes) \
+            + list(self._trained_attributes) \
+            + list(self._data_attributes)
         if "metadata" in attributes:
             raise ValueError("'metadata' is a protected attribute and cannot "
                              "be used in the _*_attributes in a class")
