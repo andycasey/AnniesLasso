@@ -16,7 +16,7 @@ class TestShortHash(unittest.TestCase):
 
     def test_hashing(self):
         # So that it does not change with time and break old hashes.
-        self.assertEqual("83200250248448025411857602579487040261818832026564",
+        self.assertEqual("7fc56270e79d5ed678fe0d61f8370cf623e75af33a3ea00cfc",
             utils.short_hash("ABCDE"))
 
 

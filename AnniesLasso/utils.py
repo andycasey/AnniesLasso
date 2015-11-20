@@ -12,6 +12,7 @@ import numpy as np
 import sys
 from time import time
 from collections import (Counter, Iterable, OrderedDict)
+from hashlib import md5
 from itertools import combinations_with_replacement
 from six import string_types
 
@@ -30,7 +31,7 @@ def short_hash(contents):
         contents provided.
     """
     if not isinstance(contents, Iterable): contents = [contents]
-    return "".join([str(hash(str(item)))[:10] for item in contents])
+    return "".join([str(md5(str(item)).hexdigest())[:10] for item in contents])
 
 
 def is_structured_label_vector(label_vector):
@@ -245,6 +246,9 @@ def build_label_vector(labels, order, cross_term_order=0, **kwargs):
     items = []
     for o in range(1, 1 + max(order, 1 + cross_term_order)):
         for t in map(Counter, combinations_with_replacement(labels, o)):
+            # Python 2 and 3 behave differently here, so generate an ordered
+            # dictionary based on sorting the keys.
+            t = OrderedDict([(k, t[k]) for k in sorted(t.keys())])
             if len(t) == 1 and order >= max(t.values()) \
             or len(t) > 1 and cross_term_order >= max(t.values()):
                 c = [pow.join([[l], [l, str(p)]][p > 1]) for l, p in t.items()]
