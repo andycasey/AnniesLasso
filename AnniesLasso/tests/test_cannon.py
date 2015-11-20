@@ -6,6 +6,7 @@ Unit tests for the Cannon model class and associated functions.
 """
 
 import numpy as np
+import sys
 import unittest
 from six.moves import cPickle as pickle
 from os import path
@@ -54,8 +55,9 @@ class TestCannonModelRealistically(unittest.TestCase):
     def setUp(self):
         # Set up a model using the test data set.
         here = path.dirname(path.realpath(__file__))
+        kwds = {"encoding": "utf-8"} if sys.version_info[0] >= 3 else {}
         with open(path.join(here, "test_data_set.pkl"), "rb") as fp:
-            contents = pickle.load(fp)
+            contents = pickle.load(fp, **kwds)
 
         # Unpack it all 
         training_labels, training_fluxes, training_flux_uncertainties, \
