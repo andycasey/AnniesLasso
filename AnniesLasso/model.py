@@ -82,7 +82,7 @@ class BaseCannonModel(object):
         the user to input human-readable forms of the label vector.
     """
 
-    _descriptive_attributes = []
+    _descriptive_attributes = ["_label_vector"]
     _trained_attributes = []
     _data_attributes = []
     _forbidden_label_characters = "^*"
@@ -265,6 +265,11 @@ class BaseCannonModel(object):
             A structured or human-readable version of the label vector
             description.
         """
+
+        if label_vector_description is None:
+            self._label_vector = None
+            self.reset()
+            return None
 
         label_vector = utils.parse_label_vector(label_vector_description)
 

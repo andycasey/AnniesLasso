@@ -7,7 +7,7 @@ Unit tests for the base model class and associated functions.
 
 import numpy as np
 import unittest
-from AnniesLasso import model
+from AnniesLasso import model, utils
 
 
 class NullObject(object):
@@ -57,17 +57,10 @@ class TestBaseCannonModel(unittest.TestCase):
         self.valid_fluxes = np.random.uniform(size=shape)
         self.valid_flux_uncertainties = np.random.uniform(size=shape)
 
-
     def get_model(self):
         return model.BaseCannonModel(
             self.valid_training_labels, self.valid_fluxes,
             self.valid_flux_uncertainties)
-
-
-    def runTest(self):
-
-        self.test_repr()
-
 
     def test_repr(self):
         m = self.get_model()
@@ -76,10 +69,10 @@ class TestBaseCannonModel(unittest.TestCase):
     def test_get_dispersion(self):
         m = self.get_model()
         self.assertSequenceEqual(
-            m.dispersion, np.arange(self.valid_fluxes.shape[1]))
+            tuple(m.dispersion), 
+            tuple(np.arange(self.valid_fluxes.shape[1])))
 
     def test_set_dispersion(self):
-
         m = self.get_model()
         for item in (None, False, True):
             # Incorrect data type (not an iterable)
@@ -130,29 +123,76 @@ class TestBaseCannonModel(unittest.TestCase):
         self.assertIsNotNone(m.training_fluxes)
         self.assertIsNotNone(m.training_flux_uncertainties)
 
-
     def test_invalid_label_names(self):
-
         m = self.get_model()
         for character in m._forbidden_label_characters:
 
-            invalid_labels = [] + list(m.training_labels.dtype.names)
+            invalid_labels = [] + list(m.labels_available)
             invalid_labels[0] = "".join([invalid_labels[0], character])
 
             N_stars = len(self.valid_training_labels)
             N_labels = len(invalid_labels)
             invalid_training_labels = np.rec.array(
                 np.random.uniform(size=(N_stars, N_labels)),
-                dtype=[(label.encode("utf-8"), ">f8") for label in invalid_labels])
+                dtype=[(l.encode("utf-8"), ">f8") for l in invalid_labels])
 
             m = model.BaseCannonModel(invalid_training_labels,
                 self.valid_fluxes, self.valid_flux_uncertainties,
                 live_dangerously=True)
 
+            m._forbidden_label_characters = None
+            self.assertTrue(m._verify_labels_available())
+
             with self.assertRaises(ValueError):
                 m = model.BaseCannonModel(invalid_training_labels,
                     self.valid_fluxes, self.valid_flux_uncertainties)
 
+    def test_get_label_vector(self):
+        m = self.get_model()
+        m.label_vector = "A + B + C"
+        self.assertEqual(m.pixel_label_vector(1), [
+            [("A", 1)],
+            [("B", 1)],
+            [("C", 1)]
+        ])
 
+    def test_set_label_vector(self):
+        m = self.get_model()
+        label_vector = "A + B + C + D + E"
 
+        m.label_vector = label_vector
+        self.assertEqual(m.label_vector, utils.parse_label_vector(label_vector))
+        self.assertEqual("1 + A + B + C + D + E", m.human_readable_label_vector)
 
+        with self.assertRaises(ValueError):
+            m.label_vector = "A + G"
+
+        m.label_vector = None
+        self.assertIsNone(m.label_vector)
+
+        for item in (True, False, 0, 1.0):
+            with self.assertRaises(TypeError):
+                m.label_vector = item
+
+    def test_label_getsetters(self):
+
+        m = self.get_model()
+        self.assertEqual((), m.labels)
+
+        m.label_vector = "A + B + C"
+        self.assertSequenceEqual(("A", "B", "C"), tuple(m.labels))
+
+        with self.assertRaises(AttributeError):
+            m.labels = None
+
+    def test_inheritence(self):
+        m = self.get_model()
+        with self.assertRaises(NotImplementedError):
+            m.train()
+        with self.assertRaises(NotImplementedError):
+            m.predict()
+        with self.assertRaises(NotImplementedError):
+            m.fit()
+        
+    # The trained attributes and I/O functions will be tested in the sub-classes
+    
