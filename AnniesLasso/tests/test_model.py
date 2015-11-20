@@ -75,7 +75,8 @@ class TestBaseCannonModel(unittest.TestCase):
 
     def test_get_dispersion(self):
         m = self.get_model()
-        self.assertItemsEqual(m.dispersion, np.arange(self.valid_fluxes.shape[1]))
+        self.assertSequenceEqual(
+            m.dispersion, np.arange(self.valid_fluxes.shape[1]))
 
     def test_set_dispersion(self):
 
