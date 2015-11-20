@@ -60,13 +60,14 @@ class TestBaseCannonModel(unittest.TestCase):
 
     def runTest(self):
         None
-
+    
     def get_model(self, **kwargs):
         return model.BaseCannonModel(
             self.valid_training_labels, self.valid_fluxes,
             self.valid_flux_uncertainties, **kwargs)
 
     def test_repr(self):
+        self.runTest() # Just for that 100%, baby.
         m = self.get_model()
         print("{0} {1}".format(m.__str__(), m.__repr__()))
 
@@ -219,6 +220,14 @@ class TestBaseCannonModel(unittest.TestCase):
         with self.assertRaises(ValueError):
             m = self.get_model(dispersion=[1,2,3])
 
+        N_labels = 2
+        N_stars, N_pixels = self.valid_fluxes.shape
+        invalid_training_labels = np.random.uniform(
+            low=0.5, high=1.5, size=(N_stars, N_labels))
+        with self.assertRaises(ValueError):
+            m = model.BaseCannonModel(invalid_training_labels,
+                self.valid_fluxes, self.valid_flux_uncertainties)
+
     def test_labels_array(self):
         m = self.get_model()
         m.label_vector = "A^2 + B^3 + C^5"
@@ -246,6 +255,24 @@ class TestBaseCannonModel(unittest.TestCase):
         self.assertTrue(np.allclose(
             np.array(m.training_labels["C"]**5).flatten(),
             m.label_vector_array[3]
+        ))
+
+        m.training_labels["A"][0] = np.nan
+        m.label_vector_array[1] # For Coveralls.
+
+        kwd1 = {
+            "A": float(m.training_labels["A"][1]),
+            "B": float(m.training_labels["B"][1]),
+            "C": float(m.training_labels["C"][1])
+        }
+        kwd2 = {
+            "A": [m.training_labels["A"][1][0]],
+            "B": [m.training_labels["B"][1][0]],
+            "C": [m.training_labels["C"][1][0]]
+        }
+        self.assertTrue(np.allclose(
+            model._build_label_vector_rows(m.label_vector, kwd1),
+            model._build_label_vector_rows(m.label_vector, kwd2)
         ))
 
     def test_format_input_labels(self):
