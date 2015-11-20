@@ -38,13 +38,15 @@ class TestLassoCannonModel(unittest.TestCase):
     def test_remind_myself_to_write_unit_tests_for_these_functions(self):
         m = self.get_model()
         m.label_vector = "A + B + C"
+        self.assertIsNotNone(m.label_vector)
+
         with self.assertRaises(NotImplementedError):
             m.train()
 
         m._trained = True
         with self.assertRaises(NotImplementedError):
-            m.predict()
+            m.predict(None)
 
         with self.assertRaises(NotImplementedError):
-            m.fit()
+            m.fit([], [])
     

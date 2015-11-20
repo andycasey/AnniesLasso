@@ -54,11 +54,11 @@ class LassoCannonModel(model.BaseCannonModel):
         the user to input human-readable forms of the label vector.
     """
 
-    _data_attributes = ["training_labels", "training_fluxes",
-        "training_flux_uncertainties"]
-    _trained_attributes = ["_label_vector", "_coefficients", "_scatter"]
-    _forbidden_label_characters = "^*"
-
+    _descriptive_attributes = ["_label_vector"]
+    _trained_attributes = ["_coefficients", "_scatter"]
+    _data_attributes = \
+        ["training_labels", "training_fluxes", "training_flux_uncertainties"]
+    
     def __init__(self, *args, **kwargs):
         super(LassoCannonModel, self).__init__(*args, **kwargs)
 
