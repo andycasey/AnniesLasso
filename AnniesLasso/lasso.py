@@ -60,7 +60,7 @@ class LassoCannonModel(model.BaseCannonModel):
     _forbidden_label_characters = "^*"
 
     def __init__(self, *args, **kwargs):
-        super(CompressedSensingCannonModel, self).__init__(*args, **kwargs)
+        super(LassoCannonModel, self).__init__(*args, **kwargs)
 
 
     # This class has additional attributes.

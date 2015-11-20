@@ -128,7 +128,7 @@ class TestBaseCannonModel(unittest.TestCase):
         for character in m._forbidden_label_characters:
 
             invalid_labels = [] + list(m.labels_available)
-            invalid_labels[0] = "".join([invalid_labels[0], character])
+            invalid_labels[0] = str(character)
 
             N_stars = len(self.valid_training_labels)
             N_labels = len(invalid_labels)
@@ -195,4 +195,3 @@ class TestBaseCannonModel(unittest.TestCase):
             m.fit()
         
     # The trained attributes and I/O functions will be tested in the sub-classes
-    
