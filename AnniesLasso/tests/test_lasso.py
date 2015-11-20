@@ -10,7 +10,6 @@ import unittest
 from AnniesLasso import lasso, utils
 
 
-
 class TestLassoCannonModel(unittest.TestCase):
 
     def setUp(self):
@@ -33,6 +32,19 @@ class TestLassoCannonModel(unittest.TestCase):
             self.valid_training_labels, self.valid_fluxes,
             self.valid_flux_uncertainties)
 
-
     def test_init(self):
         self.assertIsNotNone(self.get_model())
+
+    def test_remind_myself_to_write_unit_tests_for_these_functions(self):
+        m = self.get_model()
+        m.label_vector = "A + B + C"
+        with self.assertRaises(NotImplementedError):
+            m.train()
+
+        m._trained = True
+        with self.assertRaises(NotImplementedError):
+            m.predict()
+
+        with self.assertRaises(NotImplementedError):
+            m.fit()
+    

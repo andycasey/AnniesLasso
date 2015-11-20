@@ -128,13 +128,13 @@ class TestBaseCannonModel(unittest.TestCase):
         for character in m._forbidden_label_characters:
 
             invalid_labels = [] + list(m.labels_available)
-            invalid_labels[0] = str(character)
+            invalid_labels[0] = "HELLO_{}".format(character)
 
             N_stars = len(self.valid_training_labels)
             N_labels = len(invalid_labels)
             invalid_training_labels = np.rec.array(
                 np.random.uniform(size=(N_stars, N_labels)),
-                dtype=[(l.encode("utf-8"), ">f8") for l in invalid_labels])
+                dtype=[(l, '<f8') for l in invalid_labels])
 
             m = model.BaseCannonModel(invalid_training_labels,
                 self.valid_fluxes, self.valid_flux_uncertainties,
@@ -187,8 +187,10 @@ class TestBaseCannonModel(unittest.TestCase):
 
     def test_inheritence(self):
         m = self.get_model()
+        m.label_vector = "A + B + C"
         with self.assertRaises(NotImplementedError):
             m.train()
+        m._trained = True
         with self.assertRaises(NotImplementedError):
             m.predict()
         with self.assertRaises(NotImplementedError):

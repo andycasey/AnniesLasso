@@ -75,7 +75,6 @@ class LassoCannonModel(model.BaseCannonModel):
 
     @model.requires_training_wheels
     def predict(self, labels=None, **labels_as_kwargs):
-        labels = self._format_input_labels(labels, labels_as_kwargs)
         raise NotImplementedError
 
 
