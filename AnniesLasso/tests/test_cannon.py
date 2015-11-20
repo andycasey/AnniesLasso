@@ -158,18 +158,20 @@ class TestCannonModelRealistically(unittest.TestCase):
         with self.assertRaises(IOError):
             self.model_serial.save(temp_filename, overwrite=False)
 
+        names = ("_data_attributes", "_trained_attributes",
+            "_descriptive_attributes")
         attrs = (
             self.model_serial._data_attributes,
             self.model_serial._trained_attributes,
             self.model_serial._descriptive_attributes
             )
-        for item in attrs:
+        for name, item in zip(names, attrs):
             _ = [] + list(item)
             _.append("metadata")
-            setattr(self.model_serial, item, _)
+            setattr(self.model_serial, name, _)
             with self.assertRaises(ValueError):
                 self.model_serial.save(temp_filename, overwrite=True)
-            setattr(self.model_serial, item, _[:-1])
+            setattr(self.model_serial, name, _[:-1])
 
         self.model_serial.save(temp_filename, include_training_data=True,
             overwrite=True)
