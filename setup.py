@@ -21,7 +21,7 @@ def read(filename):
 # Get the version information.
 here = path.abspath(path.dirname(__file__))
 vre = re_compile("__version__ = \"(.*?)\"")
-version = vre.findall(read(path.join(here, "code", "__init__.py")))[0]
+version = vre.findall(read(path.join(here, "AnniesLasso", "__init__.py")))[0]
 
 
 setup(
