@@ -14,11 +14,6 @@ from tempfile import mkstemp
 
 from AnniesLasso import cannon, utils
 
-# Test the individual fitting functions first, then we can generate some
-# real 'fake' data for the full Cannon model test.
-
-
-# Now test the other stuff
 
 class TestCannonModel(unittest.TestCase):
 
@@ -108,7 +103,6 @@ class TestCannonModelRealistically(unittest.TestCase):
         parallel = self.model_parallel.get_training_label_residuals()
         self.assertTrue(np.allclose(serial, parallel))
 
-
     def ruin_the_trained_coefficients(self):
         self.model_serial.scatter = None
         self.assertIsNone(self.model_serial.scatter)
@@ -148,7 +142,6 @@ class TestCannonModelRealistically(unittest.TestCase):
         _ += 0.5
         self.model_parallel.coefficients = _
         self.assertTrue(np.allclose(_, self.model_parallel.coefficients))
-
 
     def do_io(self):
 
@@ -202,10 +195,15 @@ class TestCannonModelRealistically(unittest.TestCase):
         if path.exists(temp_filename):
             remove(temp_filename)
 
-
     def do_cv(self):
-        self.model_parallel.cross_validate(N=1)
+        self.model_parallel.cross_validate(N=1, debug=True)
 
+    def do_predict(self):
+        _ = [self.model_serial.training_labels[label][0] \
+            for label in self.model_serial.labels]
+        self.assertTrue(np.allclose(
+            self.model_serial.predict(_),
+            self.model_serial.predict(**dict(zip(self.model_serial.labels, _)))))
 
     def runTest(self):
 
@@ -218,6 +216,12 @@ class TestCannonModelRealistically(unittest.TestCase):
 
         # Train again.
         self.do_training()
+
+        # Predict stuff.
+        self.do_predict()
+
+        # Do cross-validation.
+        self.do_cv()
 
         # Try I/O/
         self.do_io()

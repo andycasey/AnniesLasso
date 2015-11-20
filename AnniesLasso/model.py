@@ -588,11 +588,9 @@ class BaseCannonModel(object):
         Perform leave-one-out cross-validation on the training set.
         """
         
-        expected = self.training_label_array
-        inferred = np.nan * np.ones_like(expected)
+        inferred = np.nan * np.ones_like(self.labels_array)
         N_training_set, N_labels = inferred.shape
         N_stop_at = kwargs.pop("N", N_training_set)
-
 
         debug = kwargs.pop("debug", False)
         

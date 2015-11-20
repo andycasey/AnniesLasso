@@ -121,7 +121,7 @@ class CannonModel(model.BaseCannonModel):
             given as keyword arguments.
         """
 
-        labels = self._format_input_labels(labels, labels_as_kwargs)
+        labels = self._format_input_labels(labels, **labels_as_kwargs)
 
         return np.dot(self.coefficients, 
             model._build_label_vector_rows(self.label_vector, labels)).flatten()
