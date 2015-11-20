@@ -8,7 +8,8 @@ An abstract model class for The Cannon.
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
-__all__ = ["BaseCannonModel", "requires_training_wheels"]
+__all__ = \
+    ["BaseCannonModel", "requires_training_wheels", "requires_label_vector"]
 
 import logging
 import numpy as np
@@ -95,8 +96,7 @@ class BaseCannonModel(object):
         self._dispersion = np.arange(fluxes.shape[1], dtype=int) \
             if dispersion is None else dispersion
         
-        self._trained = False
-        for attribute in self._trained_attributes:
+        for attribute in self._descriptive_attributes:
             setattr(self, attribute, None)
         
         # The training data must be checked, but users can live dangerously if
@@ -106,7 +106,6 @@ class BaseCannonModel(object):
             self._verify_labels_available()
 
         self.reset()
-
         self.threads = threads
         self.pool = pool or mp.Pool(threads) if threads > 1 else None
 
@@ -117,8 +116,8 @@ class BaseCannonModel(object):
         """
 
         self._trained = False
-        for attr in set(self._trained_attributes).difference(["_label_vector"]):
-            setattr(self, attr, None)
+        for attribute in self._trained_attributes:
+            setattr(self, attribute, None)
         
         return None
 
