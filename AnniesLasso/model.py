@@ -161,6 +161,14 @@ class BaseCannonModel(object):
             raise ValueError("dispersion provided does not match the number "
                              "of pixels per star ({0} != {1})".format(
                                 len(dispersion), self.training_fluxes.shape[1]))
+
+        dispersion = np.array(dispersion)
+        if dispersion.dtype.kind not in "iuf":
+            raise ValueError("dispersion values are not float-like")
+
+        if not np.all(np.isfinite(dispersion)):
+            raise ValueError("dispersion values must be finite")
+
         self._dispersion = dispersion
         return None
 

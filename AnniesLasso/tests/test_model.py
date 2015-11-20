@@ -1,0 +1,129 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+Unit tests for the base model class and associated functions.
+"""
+
+import numpy as np
+import unittest
+from AnniesLasso import model
+
+
+class NullObject(object):
+    pass
+
+
+class TestRequiresTrainingWheels(unittest.TestCase):
+    def test_not_trained(self):
+        o = NullObject()
+        o.is_trained = False
+        with self.assertRaises(TypeError):
+            model.requires_training_wheels(lambda x: None)(o)
+
+    def test_is_trained(self):
+        o = NullObject()
+        o.is_trained = True
+        self.assertIsNone(model.requires_training_wheels(lambda x: None)(o))
+
+
+class TestRequiresLabelVector(unittest.TestCase):
+    def test_with_label_vector(self):
+        o = NullObject()
+        o.label_vector = ""
+        self.assertIsNone(model.requires_label_vector(lambda x: None)(o))
+
+    def test_without_label_vector(self):
+        o = NullObject()
+        o.label_vector = None
+        with self.assertRaises(TypeError):
+            model.requires_label_vector(lambda x: None)(o)
+
+
+class TestBaseCannonModel(unittest.TestCase):
+
+    def setUp(self):
+        # Initialise some faux data and labels.
+        labels = "ABCDE"
+        N_labels = len(labels)
+        N_stars = np.random.randint(1, 500)
+        N_pixels = np.random.randint(1, 10000)
+        shape = (N_stars, N_pixels)
+
+        self.valid_training_labels = np.rec.array(
+            np.random.uniform(size=(N_stars, N_labels)),
+            dtype=[(label, ">f8") for label in labels])
+
+        self.valid_fluxes = np.random.uniform(size=shape)
+        self.valid_flux_uncertainties = np.random.uniform(size=shape)
+
+
+    def get_model(self):
+        return model.BaseCannonModel(
+            self.valid_training_labels, self.valid_fluxes,
+            self.valid_flux_uncertainties)
+
+
+    def runTest(self):
+
+        self.test_repr()
+
+
+    def test_repr(self):
+        m = self.get_model()
+        print("{0} {1}".format(m.__str__(), m.__repr__()))
+
+    def test_get_dispersion(self):
+        m = self.get_model()
+        self.assertItemsEqual(m.dispersion, np.arange(self.valid_fluxes.shape[1]))
+
+    def test_set_dispersion(self):
+
+        m = self.get_model()
+        for item in (None, False, True):
+            # Incorrect data type (not an iterable)
+            with self.assertRaises(TypeError):
+                m.dispersion = item
+
+        for item in ("", {}, [], (), set()):
+            # These are iterable but have the wrong lengths.
+            with self.assertRaises(ValueError):
+                m.dispersion = item
+
+        with self.assertRaises(ValueError):
+            m.dispersion = [3,4,2,1]
+
+        # These should work.
+        m.dispersion = 10 + np.arange(self.valid_fluxes.shape[1])
+        m.dispersion = -100 + np.arange(self.valid_fluxes.shape[1])
+        m.dispersion = 520938.4 + np.arange(self.valid_fluxes.shape[1])
+
+        # Disallow non-finite numbers.
+        with self.assertRaises(ValueError):
+            d = np.arange(self.valid_fluxes.shape[1], dtype=float)
+            d[0] = np.nan
+            m.dispersion = d
+
+        with self.assertRaises(ValueError):
+            d = np.arange(self.valid_fluxes.shape[1], dtype=float)
+            d[0] = np.inf
+            m.dispersion = d
+
+        with self.assertRaises(ValueError):
+            d = np.arange(self.valid_fluxes.shape[1], dtype=float)
+            d[0] = -np.inf
+            m.dispersion = d
+
+        # Disallow non-float like things.
+        with self.assertRaises(ValueError):
+            d = np.array([""] * self.valid_fluxes.shape[1])
+            m.dispersion = d
+
+        with self.assertRaises(ValueError):
+            d = np.array([None] * self.valid_fluxes.shape[1])
+            m.dispersion = d
+        
+        
+
+
+
