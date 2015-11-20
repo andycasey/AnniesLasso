@@ -46,21 +46,25 @@ class TestBaseCannonModel(unittest.TestCase):
         # Initialise some faux data and labels.
         labels = "ABCDE"
         N_labels = len(labels)
-        N_stars = np.random.randint(1, 500)
+        N_stars = np.random.randint(10, 500)
         N_pixels = np.random.randint(1, 10000)
         shape = (N_stars, N_pixels)
 
         self.valid_training_labels = np.rec.array(
-            np.random.uniform(size=(N_stars, N_labels)),
-            dtype=[(label, ">f8") for label in labels])
+            np.random.uniform(low=0.5, high=1.5, size=(N_stars, N_labels)),
+            dtype=[(label, '<f8') for label in labels])
 
-        self.valid_fluxes = np.random.uniform(size=shape)
-        self.valid_flux_uncertainties = np.random.uniform(size=shape)
+        self.valid_fluxes = np.random.uniform(low=0.5, high=1.5, size=shape)
+        self.valid_flux_uncertainties = np.random.uniform(low=0.5, high=1.5,
+            size=shape)
 
-    def get_model(self):
+    def runTest(self):
+        None
+
+    def get_model(self, **kwargs):
         return model.BaseCannonModel(
             self.valid_training_labels, self.valid_fluxes,
-            self.valid_flux_uncertainties)
+            self.valid_flux_uncertainties, **kwargs)
 
     def test_repr(self):
         m = self.get_model()
@@ -196,4 +200,69 @@ class TestBaseCannonModel(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             m.fit()
         
+    def test_get_label_indices(self):
+        m = self.get_model()
+        m.label_vector = "A^5 + A^2 + B^3 + C + C*D + D^6"
+        self.assertEqual([1, 2, 3, 5], m._get_lowest_order_label_indices())
+
+    def test_data_verification(self):
+        m = self.get_model()
+        m._training_fluxes = m._training_fluxes.reshape(1, -1)
+        with self.assertRaises(ValueError):
+            m._verify_training_data()
+
+        m._training_flux_uncertainties = \
+            m._training_flux_uncertainties.reshape(m._training_fluxes.shape)
+        with self.assertRaises(ValueError):
+            m._verify_training_data()
+
+        with self.assertRaises(ValueError):
+            m = self.get_model(dispersion=[1,2,3])
+
+    def test_labels_array(self):
+        m = self.get_model()
+        m.label_vector = "A^2 + B^3 + C^5"
+
+        for i, label in enumerate("ABC"):
+            foo = m.labels_array[:, i]
+            bar = np.array(m.training_labels[label]).flatten()
+            self.assertTrue(np.allclose(foo, bar))
+
+        with self.assertRaises(AttributeError):
+            m.labels_array = None
+
+    def test_label_vector_array(self):
+        m = self.get_model()
+        m.label_vector = "A^2.0 + B^3.4 + C^5"
+
+        self.assertTrue(np.allclose(
+            np.array(m.training_labels["A"]**2).flatten(),
+            m.label_vector_array[1],
+        ))
+        self.assertTrue(np.allclose(
+            np.array(m.training_labels["B"]**3.4).flatten(),
+            m.label_vector_array[2]
+        ))
+        self.assertTrue(np.allclose(
+            np.array(m.training_labels["C"]**5).flatten(),
+            m.label_vector_array[3]
+        ))
+
+    def test_format_input_labels(self):
+        m = self.get_model()
+        m.label_vector = "A^2.0 + B^3.4 + C^5"
+
+        kwds = {"A": [5], "B": [3], "C": [0.43]}
+        for k, v in m._format_input_labels(None, **kwds).items():
+            self.assertEqual(kwds[k], v)
+        for k, v in m._format_input_labels([5, 3, 0.43]).items():
+            self.assertEqual(kwds[k], v)
+
+        kwds_input = {k: v[0] for k, v in kwds.items() }
+        for k, v in m._format_input_labels(None, **kwds_input).items():
+            self.assertEqual(kwds[k], v)
+
+
+
+
     # The trained attributes and I/O functions will be tested in the sub-classes

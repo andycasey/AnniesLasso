@@ -579,7 +579,8 @@ class BaseCannonModel(object):
 
         # We want labels in a dictionary.
         labels = kwargs if args is None else dict(zip(self.labels, args))
-        return { k: [v] for k, v in labels.items() }
+        return { k: (v if isinstance(v, (list, tuple, np.ndarray)) else [v]) \
+            for k, v in labels.items() }
 
 
     # Put Cross-validation functions in here.
