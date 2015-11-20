@@ -424,17 +424,16 @@ class BaseCannonModel(object):
         if 0 in map(len, (self._trained_attributes, self._data_attributes)):
             logger.warning("Trained/data attributes may not be saved correctly")
 
-        if "metadata" in self._data_attributes \
-        or "metadata" in self._descriptive_attributes \
-        or "metadata" in self._trained_attributes:
+        attributes = sum(map(len, (self._descriptive_attributes,
+            self._trained_attributes, self._data_attributes)))
+        if "metadata" in attributes:
             raise ValueError("'metadata' is a protected attribute and cannot "
                              "be used in the _*_attributes in a class")
 
         # Store up all the trained attributes and a hash of the training set.
-        contents = OrderedDict([(attr.lstrip("_"), getattr(self, attr)) \
-            for attr in self._descriptive_attributes])
-        contents.update([(attr.lstrip("_"), getattr(self, attr)) \
-            for attr in self._trained_attributes])
+        contents = OrderedDict([
+            (attr.lstrip("_"), getattr(self, attr)) for attr in \
+            (self._descriptive_attributes + self._trained_attributes)])
         contents["training_set_hash"] = utils.short_hash(getattr(self, attr) \
             for attr in self._data_attributes)
 
