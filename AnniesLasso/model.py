@@ -197,11 +197,13 @@ class BaseCannonModel(object):
             return True
 
         for label in self.training_labels.dtype.names:
-            if any(char in label for char in self._forbidden_label_characters):
-                raise ValueError(
-                    "forbidden character '{char}' is in potential "
-                    "label '{label}' - you can disable this verification by "
-                    "enabling live_dangerously".format(char=char, label=label))
+            for character in self._forbidden_label_characters:
+                if character in label:
+                    raise ValueError(
+                        "forbidden character '{char}' is in potential "
+                        "label '{label}' - you can disable this verification "
+                        "by enabling `live_dangerously`".format(
+                            char=character, label=label))
         return None
 
 

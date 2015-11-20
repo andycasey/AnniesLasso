@@ -123,7 +123,35 @@ class TestBaseCannonModel(unittest.TestCase):
             d = np.array([None] * self.valid_fluxes.shape[1])
             m.dispersion = d
         
-        
+    def test_get_training_data(self):
+        m = self.get_model()
+        self.assertIsNotNone(m.training_labels)
+        self.assertIsNotNone(m.training_fluxes)
+        self.assertIsNotNone(m.training_flux_uncertainties)
+
+
+    def test_invalid_label_names(self):
+
+        m = self.get_model()
+        for character in m._forbidden_label_characters:
+
+            invalid_labels = [] + list(m.training_labels.dtype.names)
+            invalid_labels[0] = "".join([invalid_labels[0], character])
+
+            N_stars = len(self.valid_training_labels)
+            N_labels = len(invalid_labels)
+            invalid_training_labels = np.rec.array(
+                np.random.uniform(size=(N_stars, N_labels)),
+                dtype=[(label.encode("utf-8"), ">f8") for label in invalid_labels])
+
+            m = model.BaseCannonModel(invalid_training_labels,
+                self.valid_fluxes, self.valid_flux_uncertainties,
+                live_dangerously=True)
+
+            with self.assertRaises(ValueError):
+                m = model.BaseCannonModel(invalid_training_labels,
+                    self.valid_fluxes, self.valid_flux_uncertainties)
+
 
 
 
