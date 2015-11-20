@@ -22,5 +22,8 @@ before_install:
   #- sudo ln -s /run/shm /dev/shm
 install: 
   - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numpy scipy matplotlib nose six coverage
+  - pip install coveralls
 script:
   - nosetests --with-coverage --cover-package=AnniesLasso 
+after_success:
+  coveralls
