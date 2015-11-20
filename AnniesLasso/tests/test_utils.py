@@ -192,9 +192,15 @@ class TestBuildLabelVector(unittest.TestCase):
 
     def test_high_order_cross_term(self):
         self.assertEquals(
-            utils.build_label_vector("ABC", 3, 3)
+            utils.build_label_vector("ABC", 3, 3),
             "A + B + C + A^2 + A*B + A*C + B^2 + C*B + C^2 + A^3 + A^2*B + "
             "A^2*C + A*B^2 + A*C*B + A*C^2 + B^3 + C*B^2 + C^2*B + C^3 + "
             "A^3*B + A^3*C + A^2*B^2 + A^2*C*B + A^2*C^2 + A*B^3 + A*C*B^2 "
             "+ A*C^2*B + A*C^3 + C*B^3 + C^2*B^2 + C^3*B")
+
+    def test_different_order_cross_terms(self):
+        self.assertEquals(
+            utils.build_label_vector("ABC", 3, 2),
+            "A + B + C + A^2 + A*B + A*C + B^2 + C*B + C^2 + A^3 + A^2*B + "
+            "A^2*C + A*B^2 + A*C*B + A*C^2 + B^3 + C*B^2 + C^2*B + C^3")
 
