@@ -22,7 +22,7 @@ class TestLassoCannonModel(unittest.TestCase):
 
         self.valid_training_labels = np.rec.array(
             np.random.uniform(size=(N_stars, N_labels)),
-            dtype=[(label, ">f8") for label in labels])
+            dtype=[(label, '<f8') for label in labels])
 
         self.valid_fluxes = np.random.uniform(size=shape)
         self.valid_flux_uncertainties = np.random.uniform(size=shape)
