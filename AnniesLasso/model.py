@@ -610,7 +610,9 @@ class BaseCannonModel(object):
                 **kwds)
 
             # Initialise and run any pre-training function.
-            model.label_vector = self.label_vector
+            for _attribute in self._descriptive_attributes:
+                setattr(model, _attribute[1:], getattr(self, _attribute[1:]))
+
             if pre_train is not None:
                 pre_train(self, model)
 
