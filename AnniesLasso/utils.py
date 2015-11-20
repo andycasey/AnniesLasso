@@ -31,7 +31,8 @@ def short_hash(contents):
         contents provided.
     """
     if not isinstance(contents, Iterable): contents = [contents]
-    return "".join([str(md5(str(item)).hexdigest())[:10] for item in contents])
+    return "".join([str(md5(str(item).encode("utf-8")).hexdigest())[:10] \
+        for item in contents])
 
 
 def is_structured_label_vector(label_vector):
