@@ -468,7 +468,7 @@ class BaseCannonModel(object):
                 [_.lstrip("_") for _ in self._descriptive_attributes]
         }
 
-        with open(filename, "w") as fp:
+        with open(filename, "wb") as fp:
             pickle.dump(contents, fp, -1)
 
         return None
@@ -488,7 +488,7 @@ class BaseCannonModel(object):
             instantiated.
         """
 
-        with open(filename, "r") as fp:
+        with open(filename, "rb") as fp:
             contents = pickle.load(fp)
 
         assert contents["metadata"]["model_name"] == type(self).__name__

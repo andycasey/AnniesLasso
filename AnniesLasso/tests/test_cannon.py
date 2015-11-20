@@ -54,7 +54,7 @@ class TestCannonModelRealistically(unittest.TestCase):
     def setUp(self):
         # Set up a model using the test data set.
         here = path.dirname(path.realpath(__file__))
-        with open(path.join(here, "test_data_set.pkl"), "r") as fp:
+        with open(path.join(here, "test_data_set.pkl"), "rb") as fp:
             contents = pickle.load(fp)
 
         # Unpack it all 
