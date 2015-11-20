@@ -436,9 +436,6 @@ class BaseCannonModel(object):
         if path.exists(filename) and not overwrite:
             raise IOError("filename already exists: {0}".format(filename))
 
-        if 0 in map(len, (self._trained_attributes, self._data_attributes)):
-            logger.warning("Trained/data attributes may not be saved correctly")
-
         attributes = list(self._descriptive_attributes) \
             + list(self._trained_attributes) \
             + list(self._data_attributes)

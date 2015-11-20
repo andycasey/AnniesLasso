@@ -155,11 +155,27 @@ class TestCannonModelRealistically(unittest.TestCase):
         _, temp_filename = mkstemp()
         remove(temp_filename)
         self.model_serial.save(temp_filename, include_training_data=False)
+        with self.assertRaises(IOError):
+            self.model_serial.save(temp_filename, overwrite=False)
+
+        attrs = (
+            self.model_serial._data_attributes,
+            self.model_serial._trained_attributes,
+            self.model_serial._descriptive_attributes
+            )
+        for item in attrs:
+            _ = [] + list(item)
+            _.append("metadata")
+            setattr(self.model_serial, item, _)
+            with self.assertRaises(ValueError):
+                self.model_serial.save(temp_filename, overwrite=True)
+            setattr(self.model_serial, item, _[:-1])
+
         self.model_serial.save(temp_filename, include_training_data=True,
             overwrite=True)
 
         self.model_parallel.reset()
-        self.model_parallel.load(temp_filename)
+        self.model_parallel.load(temp_filename, verify_training_data=True)
 
         # Check that the trained attributes in both model are equal.
         for _attribute in self.model_serial._trained_attributes:
