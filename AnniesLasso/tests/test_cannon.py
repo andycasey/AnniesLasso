@@ -229,6 +229,20 @@ class TestCannonModelRealistically(unittest.TestCase):
                 self.model_serial.training_flux_uncertainties[0],
                 full_output=True))
 
+
+    def do_edge_cases(self):
+        self.model_serial.reset()
+        self.model_serial.label_vector = \
+            "TEFF^3 + TEFF^2 + TEFF + LOGG + PARAM_M_H*LOGG"
+
+        self._training_flux_uncertainties[:, 0] = 10.
+        self._training_fluxes[:, 1] = np.random.uniform(low=-0.5, high=0.5,
+            size=self._training_fluxes.shape[0])
+        
+        self.model_serial.train()
+
+
+
     def runTest(self):
 
         # Train all.
@@ -251,3 +265,6 @@ class TestCannonModelRealistically(unittest.TestCase):
 
         # Try I/O/
         self.do_io()
+
+        # Do_edges
+
