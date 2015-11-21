@@ -248,6 +248,10 @@ class TestCannonModelRealistically(unittest.TestCase):
         self.model_serial.fit(self.model_serial._training_fluxes[1],
             self.model_serial._training_flux_uncertainties[1])
 
+        # See if we can make things break or warn.
+        self.model_serial._training_fluxes[10] = 10.
+        self.model_serial._training_flux_uncertainties[10] = 0.99
+
     def runTest(self):
 
         # Train all.
