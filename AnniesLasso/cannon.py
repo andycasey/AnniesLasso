@@ -227,17 +227,9 @@ class CannonModel(model.BaseCannonModel):
                     { label: [v] for label, v in zip(self.labels, labels) }
                 )).flatten()
 
-        labels_p0 = np.array([initial[label] for label in self.labels])
-        try:
-            function(coefficients, *labels_p0)
-        except:
-            logger.exception(
-                "Error occurred when using the initial values to test fn")
-            raise
-
         # Solve for the parameters.
         kwds = {
-            "p0": labels_p0,
+            "p0": np.array([initial[label] for label in self.labels]),
             "maxfev": 10000,
             "sigma": 1.0/np.sqrt(Cinv),
             "absolute_sigma": True
