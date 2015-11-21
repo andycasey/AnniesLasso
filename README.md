@@ -14,7 +14,7 @@ See the file `LICENSE` for more details.
 ## Code
 [![Build Status](https://img.shields.io/travis/andycasey/AnniesLasso/code.svg)](https://travis-ci.org/andycasey/AnniesLasso)
 [![Coverage Status](https://img.shields.io/coveralls/andycasey/AnniesLasso/code.svg)](https://coveralls.io/github/andycasey/AnniesLasso?branch=code)
-[![Scrutinizer](https://img.shields.io/scrutinizer/coverage/g/andycasey/AnniesLasso/code.svg)](https://scrutinizer-ci.com/g/andycasey/AnniesLasso/?branch=code)
+[![Scrutinizer](https://img.shields.io/scrutinizer/g/andycasey/AnniesLasso.svg?b=code)](https://scrutinizer-ci.com/g/andycasey/AnniesLasso/?branch=code)
 [![License](https://img.shields.io/badge/LICENSE-MIT-blue.svg)](https://github.com/andycasey/AnniesLasso/blob/master/LICENSE)
 
 To install:
