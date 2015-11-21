@@ -51,7 +51,7 @@ class TestCannonModelRealistically(unittest.TestCase):
     def setUp(self):
         # Set up a model using the test data set.
         here = path.dirname(path.realpath(__file__))
-        kwds = {"encoding": "utf-8", "errors": "ignore"} \
+        kwds = {"encoding": "bytes", "errors": "ignore"} \
             if sys.version_info[0] >= 3 else {}
         with open(path.join(here, "test_data_set.pkl"), "rb") as fp:
             contents = pickle.load(fp, **kwds)
