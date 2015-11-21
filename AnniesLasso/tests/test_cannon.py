@@ -259,9 +259,11 @@ class TestCannonModelRealistically(unittest.TestCase):
             self.model_serial._training_labels[label] = 0.
         self.model_serial.train()
 
-
         with self.assertRaises(np.linalg.linalg.LinAlgError):
             self.model_serial.train(debug=True)
+
+        with self.assertRaises(np.linalg.linalg.LinAlgError):
+            self.model_serial.cross_validate(N=1, debug=True)
 
     def runTest(self):
 
