@@ -252,6 +252,17 @@ class TestCannonModelRealistically(unittest.TestCase):
         self.model_serial._training_fluxes[10] = 10.
         self.model_serial._training_flux_uncertainties[10] = 0.99
 
+        self.model_serial._training_flux_uncertainties[11] = 0.
+        self.model_serial.reset()
+        self.model_serial.label_vector = "TEFF^5 + LOGG^3 + PARAM_M_H^5"
+        for label in self.model_serial.labels:
+            self.model_serial._training_labels[label] = 0.
+        self.model_serial.train()
+
+
+        with self.assertRaises(np.linalg.linalg.LinAlgError):
+            self.model_serial.train(debug=True)
+
     def runTest(self):
 
         # Train all.
