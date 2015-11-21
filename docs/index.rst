@@ -1,24 +1,32 @@
-.. Annie's Lasso documentation master file, created by
-   sphinx-quickstart on Sat Nov 21 16:48:50 2015.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+Annie's Lasso
+=============
 
-Welcome to Annie's Lasso's documentation!
-=========================================
+The Cannon 2: Compressed Sensing Edition
+----------------------------------------
 
-(Hello World?)
+Hello world?
 
-Contents:
+User Guide
+----------
 
 .. toctree::
    :maxdepth: 2
 
+   guide/install
+   guide/quickstart
+   guide/cannon
+   guide/compressed
+   guide/custommodels
 
+API Documentation
+-----------------
 
-Indices and tables
-==================
+.. toctree::
+   :maxdepth: 2
+ 
+   api
 
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+License
+-------
+Copyright 2015 the authors. Software made available under the MIT license.
 
