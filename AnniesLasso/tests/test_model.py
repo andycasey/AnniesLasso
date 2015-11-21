@@ -258,7 +258,7 @@ class TestBaseCannonModel(unittest.TestCase):
         ))
 
         m.training_labels["A"][0] = np.nan
-        m._get_label_vector_array() # For Coveralls.
+        m.label_vector_array # For Coveralls.
 
         kwd1 = {
             "A": float(m.training_labels["A"][1]),

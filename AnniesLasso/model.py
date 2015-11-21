@@ -535,25 +535,17 @@ class BaseCannonModel(object):
 
 
     @property
-    def label_vector_array(self):
-        if not hasattr(self, "_label_vector_array"):
-            self._label_vector_array, self.pivot_offsets \
-                = self._get_label_vector_array()
-        return self._label_vector_array
-
-
     @requires_label_vector
-    def _get_label_vector_array(self):
+    def label_vector_array(self):
         """
         Build the label vector array.
         """
 
-        offsets = 0
         lva = _build_label_vector_rows(self.label_vector, self.training_labels)
 
         if not np.all(np.isfinite(lva)):
             logger.warn("Non-finite labels in the label vector array!")
-        return (lva, offsets)
+        return lva
 
 
     # Residuals in labels in the training data set.

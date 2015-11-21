@@ -72,7 +72,8 @@ class CannonModel(model.BaseCannonModel):
         # Initialise the scatter and coefficient arrays.
         N_px = len(self.dispersion)
         scatter = np.nan * np.ones(N_px)
-        theta = np.nan * np.ones((N_px, self.label_vector_array.shape[0]))
+        label_vector_array = self.label_vector_array
+        theta = np.nan * np.ones((N_px, label_vector_array.shape[0]))
 
         # Details for the progressbar.
         pb_kwds = {
@@ -86,7 +87,7 @@ class CannonModel(model.BaseCannonModel):
                 theta[pixel, :], scatter[pixel] = _fit_pixel(
                     self.training_fluxes[:, pixel], 
                     self.training_flux_uncertainties[:, pixel],
-                    self.label_vector_array, **kwargs)
+                    label_vector_array, **kwargs)
 
         else:
             # Not as nice as just mapping, but necessary for a progress bar.
@@ -95,7 +96,7 @@ class CannonModel(model.BaseCannonModel):
                     args=(
                         self.training_fluxes[:, pixel], 
                         self.training_flux_uncertainties[:, pixel],
-                        self.label_vector_array
+                        label_vector_array
                     ),
                     kwds=kwargs) \
                 for pixel in range(N_px) }
