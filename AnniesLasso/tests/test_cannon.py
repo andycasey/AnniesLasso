@@ -211,6 +211,11 @@ class TestCannonModelRealistically(unittest.TestCase):
     def do_cv(self):
         self.model_parallel.cross_validate(N=1, debug=True)
 
+        def choo_choo(old, new):
+            None
+
+        self.model_parallel.cross_validate(N=1, debug=True, pre_train=choo_choo)
+
     def do_predict(self):
         _ = [self.model_serial.training_labels[label][0] \
             for label in self.model_serial.labels]

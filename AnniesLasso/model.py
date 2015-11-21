@@ -628,17 +628,10 @@ class BaseCannonModel(object):
                                  "with index {0}:".format(i))
                 if debug: raise
 
-
             if i == N_stop_at + 1:
                 break
 
         return inferred[:N_stop_at, :]
-
-
-    @requires_label_vector
-    def cross_validate_by_label(self, *args, **kwargs):
-        raise NotImplementedError("not done yet")
-
 
 
 def _build_label_vector_rows(label_vector, training_labels):
