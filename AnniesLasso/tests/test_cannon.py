@@ -229,20 +229,24 @@ class TestCannonModelRealistically(unittest.TestCase):
                 self.model_serial.training_flux_uncertainties[0],
                 full_output=True))
 
-
     def do_edge_cases(self):
         self.model_serial.reset()
+
+        # This label vector only contains one term in cross-terms (PARAM_M_H)
         self.model_serial.label_vector = \
             "TEFF^3 + TEFF^2 + TEFF + LOGG + PARAM_M_H*LOGG"
+        self.assertIn(None, self.model_serial._get_lowest_order_label_indices())
 
+        # Set large uncertainties for one pixel.
         self.model_serial._training_flux_uncertainties[:, 0] = 10.
         self.model_serial._training_fluxes[:, 1] = \
             np.random.uniform(low=-0.5, high=0.5,
                 size=self.model_serial._training_fluxes.shape[0])
 
+        # Train and fit using this unusual label vector.
         self.model_serial.train()
-
-
+        self.model_serial.fit(self.model_serial._training_fluxes[1],
+            self.model_serial._training_flux_uncertainties[1])
 
     def runTest(self):
 
