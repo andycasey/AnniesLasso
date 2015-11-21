@@ -192,6 +192,19 @@ class TestCannonModelRealistically(unittest.TestCase):
                 utils.short_hash(getattr(self.model_parallel, _attribute))
             )
 
+
+        # Alter the hash and expect failure
+        kwds = { "encoding": "latin1" } if sys.version_info[0] >= 3 else {}
+        with open(temp_filename, "rb") as fp:
+            contents = pickle.load(fp, **kwds)
+
+        contents["training_set_hash"] = ""
+        with open(temp_filename, "wb") as fp:
+            pickle.dump(contents, fp, -1)
+
+        with self.assertRaises(ValueError):
+            self.model_serial.load(temp_filename, verify_training_data=True)
+
         if path.exists(temp_filename):
             remove(temp_filename)
 
@@ -204,6 +217,12 @@ class TestCannonModelRealistically(unittest.TestCase):
         self.assertTrue(np.allclose(
             self.model_serial.predict(_),
             self.model_serial.predict(**dict(zip(self.model_serial.labels, _)))))
+
+    def do_fit(self):
+        self.assertIsNotNone(
+            self.model_serial.fit(self.model_serial.training_fluxes[0],
+                self.model_serial.training_flux_uncertainties[0],
+                full_output=True))
 
     def runTest(self):
 
@@ -219,6 +238,8 @@ class TestCannonModelRealistically(unittest.TestCase):
 
         # Predict stuff.
         self.do_predict()
+
+        self.do_fit()
 
         # Do cross-validation.
         self.do_cv()

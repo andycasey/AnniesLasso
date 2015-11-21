@@ -152,6 +152,7 @@ class CannonModel(model.BaseCannonModel):
         # Since solving for labels is not a big bottleneck (yet), let's leave
         # this.
 
+        full_output = kwargs.pop("full_output", False)
         if fluxes.ndim == 1:
             labels, covariance = \
                 self._fit(fluxes, flux_uncertainties, label_indices, **kwargs)
@@ -164,7 +165,7 @@ class CannonModel(model.BaseCannonModel):
                 labels[i, :], covariance[i, :] = \
                     self._fit(f, u, label_indices, **kwargs)
 
-        if kwargs.get("full_output", False):
+        if full_output:
             return (labels, covariance)
         return labels
 
