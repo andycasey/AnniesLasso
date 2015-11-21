@@ -235,10 +235,11 @@ class TestCannonModelRealistically(unittest.TestCase):
         self.model_serial.label_vector = \
             "TEFF^3 + TEFF^2 + TEFF + LOGG + PARAM_M_H*LOGG"
 
-        self._training_flux_uncertainties[:, 0] = 10.
-        self._training_fluxes[:, 1] = np.random.uniform(low=-0.5, high=0.5,
-            size=self._training_fluxes.shape[0])
-        
+        self.model_serial._training_flux_uncertainties[:, 0] = 10.
+        self.model_serial._training_fluxes[:, 1] = \
+            np.random.uniform(low=-0.5, high=0.5,
+                size=self.model_serial._training_fluxes.shape[0])
+
         self.model_serial.train()
 
 
@@ -267,4 +268,5 @@ class TestCannonModelRealistically(unittest.TestCase):
         self.do_io()
 
         # Do_edges
+        self.do_edge_cases()
 
