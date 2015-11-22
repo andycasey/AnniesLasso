@@ -12,6 +12,7 @@ This is the original Cannon implementation as described by Ness et al.
 
 .. autoclass:: AnniesLasso.CannonModel
    :members:
+   :inherited-members:
 
 Compressed-Sensing Cannon Model
 -----------------------------------
@@ -20,6 +21,7 @@ For the future..
 
 .. autoclass:: AnniesLasso.LassoCannonModel
    :members:
+   :inherited-members:
 
 Abstract Cannon Model
 ---------------------
