@@ -6,13 +6,19 @@
 % - get to zeroth draft
 % - search for all occurrences of DWH, AC, or MKN in the text and fix them.
 
+% Style Notes
+% -----------
+% - Use \acronym{NASA} for acronyms like NASA.
+
 \documentclass[12pt,preprint]{aastex}
 \usepackage{amsmath,amssymb}
 
 \newcommand{\project}[1]{\textsl{#1}}
 \newcommand{\thecannon}{\project{The~Cannon}}
-\newcommand{\apogee}{\project{\textsc{apogee}}}
-\newcommand{\aspcap}{\project{\textsc{aspcap}}}
+\newcommand{\acronym}[1]{\small{#1}}
+\newcommand{\apogee}{\project{\acronym{APOGEE}}}
+\newcommand{\aspcap}{\project{\acronym{ASPCAP}}}
+\newcommand{\dr}{\acronym{DRXX}}
 \newcommand{\logg}{\log g}
 \newcommand{\Teff}{T_{\mathrm{eff}}}
 \newcommand{\argmin}[1]{\underset{#1}{\operatorname{argmin}}\,}
@@ -98,7 +104,7 @@ training set.
 We show, by very conservative cross-validation, that we can transfer these
 labels to much lower signal-to-noise stars, with reduced precision but no
 strong biases.
-We then use the system to label all of the stars in the \apogee\ DRXX data set.
+We then use the system to label all of the stars in the \apogee\ \dr\ data set.
 
 DWH: Etc!
 
@@ -138,15 +144,29 @@ $\theta_j,s^2_j$ that optimize a penalized likelihood:
   \theta_j,s^2_j &\leftarrow& \argmin{\theta,s^2}\left[
     \sum_{n=1}^N \frac{y_{jn}-v(\ell_n)\cdot\theta}{\sigma^2_{jn}+s^2}
     + \sum_{n=1}^N \ln(\sigma^2_{jn}+s^2)
-    + \Lambda\,||\theta||_1^1
+    + \Lambda_j\,||\theta||_1^1
     \right]
   \\
   ||\theta||_1^1 &\equiv& \sum_{d=1}^D |\theta_d|
   \quad ,
 \end{eqnarray}
-where $\Lambda$ is a regularization parameter, and $||\theta||_1^1$ is
+where $\Lambda_j$ is a regularization parameter, and $||\theta||_1^1$ is
 the L1-norm of $\theta$ or the sum of the absolute values of the
 components $\theta_d$ of the $D$-vector $\theta$.
+Although the training-step optimization problem is not convex, it
+would be convex at any fixed value of $s^2$; for this reason it will
+tend to optimize well in most cases of interest.
+
+The regularization parameter $\Lambda_j$ sets the strength of the
+regularization; as $\Lambda_j$ increases, the number of non-zero
+components of the parameter vector $\theta_j$ will decrease.
+We give the regularization parameter a subscript $j$ because in
+general we can set it differently at every wavelength.
+This makes sense, because different wavelengths have very different
+dependences on different components of the label vector $\ell$.
+In what follows, we will set the value of the $\Lambda_j$ by
+validation or cross-validation or possibly based on physical arguments
+about what matters!
 
 In the \emph{test step}, we fix the parameters $\theta_j,s^2_j$ at all
 wavelength pixels $j$.
@@ -158,6 +178,11 @@ that optimizes the likelihood:
     \right]
   \quad .
 \end{eqnarray}
+Because the vector-to-vector function $v(\ell)$ is non-linear, the
+test-step optimization is not convex.
+However, the fact that there are many pixels $j$ acting, each of which
+has a different functional dependence on $\ell$, tends to make the
+optimization (in practice) find a good value for $\ell$.
 
 \section{Training, validation, and test data}
 
@@ -165,12 +190,96 @@ MKN: Describe \apogee\ data here.
 
 MKN: What is different about our continuum normalization from everyone else's?
 
-DWH: Describe the random integer system here.
+DWH: Define the set of ``labeled'' stars and the set of ``unlabeled''
+stars, for our purposes.  Any training set must be a subset of the
+labeled stars.
+We are going to use different subsets for different trainings of \thecannon.
 
-DWH: How do integers map on to train, validate, and test?
+To demonstrate the predictive power and accuracy of the method, we
+will (below) perform a conservative cross-validation using cyclic
+training, validation, and test subsets of the labeled data:
+To each star in the input set of labeled stars (the superset of any
+possible training set we might use), we assign an integer $0\leq
+q<10$, with uniform probability across all 10 possible values of $q$.
+This permits a very conservative 10-fold cross-validation, in which we
+choose $8/10$ of the labeled data as the training set, a disjoint
+$1/10$ as a validation set for choosing the hyper-parameters
+$\Lambda_j$, and a mutually disjoint $1/10$ as a test set for
+prediction.
+This train--validate--test framework is very conservative, because there
+is no way, for each choice of train, validate, and test sets from the
+labeled data, for the test set to influence the choice of
+hyper-parameters.
+
+When \thecannon\ is used to label the full unlabeled set, we train on
+the entire unlabled data set (the largest possible training set) and
+use values for the hyper-parameters $\Lambda_j$ derived from the
+10-fold cross-validation experiment, as we will describe below.
 
 \section{Experiments}
 
-\section{Results}
+\paragraph{Conservative cross-validation:}
+Hello World!
+
+\paragraph{Full train-and-test:}
+Hello World!
+
+\paragraph{Low signal-to-noise test:}
+Hello World!
+
+\section{Discussion}
+
+DWh:  Hello World!  What were our assumptions and how would things have
+changed if we had changed or relaxed them?
+
+DWH:  What is bad or limited about what we have done?
+
+DWH:  Why is this going to change the World nonetheless?
+
+\acknowledgements
+DWH: people... grants... sdss-iv...
+
+\clearpage
+
+\begin{figure}[p]
+\caption{Choose two wavelengths (one continuum and one interesting)
+  and plot some scatter plots of flux vs various parameters, and also
+  cross-validation results for the
+  hyper-parameters.\label{fig:onewavelength}}
+\end{figure}
+
+\begin{figure}[p]
+\caption{Something about hyper-parameters and scatter as a function of
+  wavelength.\label{fig:hyperpars}}
+\end{figure}
+
+\begin{figure}[p]
+\caption{Something about first derivatives of the spectral expectation
+  with respect to labels as a function of
+  wavelength.\label{fig:derivatives}}
+\end{figure}
+
+\begin{figure}[p]
+\caption{Show a few sample spectra and demonstrate that the quality of
+  the model prediction is extremely good; better than
+  \aspcap.\label{fig:correctness}}
+\end{figure}
+
+\begin{figure}[p]
+\caption{Something showing that our results on the full unlabeled set
+  make sense and seem correct!\label{fig:fulltest}}
+\end{figure}
+
+\begin{figure}[p]
+\caption{Choose two elements that are interesting, and pull apart the
+  differences between what we have and what \aspcap\ has for those
+  elements.  We are better!\label{fig:elements}}
+\end{figure}
+
+\begin{figure}[p]
+\caption{Something about the quality of results in the
+  cross-validation as a function of the signal-to-noise of what we
+  give in the test subset.\label{fig:snr}}
+\end{figure}
 
 \end{document}
