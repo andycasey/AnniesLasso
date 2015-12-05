@@ -62,7 +62,7 @@ class CannonModel(model.BaseCannonModel):
         super(CannonModel, self).__init__(*args, **kwargs)
 
 
-    @model.requires_label_vector
+    @model.requires_model_description
     def train(self, **kwargs):
         """
         Train the model based on the training set and the description of the

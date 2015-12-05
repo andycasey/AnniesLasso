@@ -10,9 +10,9 @@ import logging
 from numpy import RankWarning
 from warnings import simplefilter
 
-from .cannon import *
-from .lasso import *
 from .model import *
+from .cannon import *
+from .regularized import *
 from . import utils
 
 logger = logging.getLogger(__name__)

@@ -8,8 +8,9 @@ An abstract model class for The Cannon.
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
-__all__ = \
-    ["BaseCannonModel", "requires_training_wheels", "requires_label_vector"]
+__all__ = [
+    "BaseCannonModel", "requires_training_wheels", "requires_model_description"]
+
 
 import logging
 import numpy as np
@@ -36,14 +37,17 @@ def requires_training_wheels(method):
     return wrapper
 
 
-def requires_label_vector(method):
+def requires_model_description(method):
     """
-    A decorator for model methods that require a label vector description.
+    A decorator for model methods that require a full model description.
+    (That is, none of the _descriptive_attributes are None)
     """
 
     def wrapper(model, *args, **kwargs):
-        if model.label_vector is None:
-            raise TypeError("the model requires a label vector description")
+        for descriptive_attribute in model._descriptive_attributes:
+            if getattr(model, descriptive_attribute) is None:
+                raise TypeError("the model requires a {} term".format(
+                    descriptive_attribute.lstrip("_")))
         return method(model, *args, **kwargs)
     return wrapper
 
@@ -524,7 +528,7 @@ class BaseCannonModel(object):
 
     # Properties and attribuets related to training, etc.
     @property
-    @requires_label_vector
+    @requires_model_description
     def labels_array(self):
         """
         Return an array containing just the training labels, given the label
@@ -535,7 +539,7 @@ class BaseCannonModel(object):
 
 
     @property
-    @requires_label_vector
+    @requires_model_description
     def label_vector_array(self):
         """
         Build the label vector array.
@@ -574,7 +578,7 @@ class BaseCannonModel(object):
 
 
     # Put Cross-validation functions in here.
-    @requires_label_vector
+    @requires_model_description
     def cross_validate(self, pre_train=None, **kwargs):
         """
         Perform leave-one-out cross-validation on the training set.

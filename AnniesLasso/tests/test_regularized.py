@@ -2,15 +2,15 @@
 # -*- coding: utf-8 -*-
 
 """
-Unit tests for the lasso model class and associated functions.
+Unit tests for the Regularized Cannon model class and associated functions.
 """
 
 import numpy as np
 import unittest
-from AnniesLasso import lasso, utils
+from AnniesLasso import regularized, utils
 
 
-class TestLassoCannonModel(unittest.TestCase):
+class TestRegularizedCannonModel(unittest.TestCase):
 
     def setUp(self):
         # Initialise some faux data and labels.
@@ -28,7 +28,7 @@ class TestLassoCannonModel(unittest.TestCase):
         self.valid_flux_uncertainties = np.random.uniform(size=shape)
 
     def get_model(self):
-        return lasso.LassoCannonModel(
+        return regularized.RegularizedCannonModel(
             self.valid_training_labels, self.valid_fluxes,
             self.valid_flux_uncertainties)
 
@@ -40,13 +40,17 @@ class TestLassoCannonModel(unittest.TestCase):
         m.label_vector = "A + B + C"
         self.assertIsNotNone(m.label_vector)
 
-        with self.assertRaises(NotImplementedError):
+        # Cannot train without regularization term.
+        with self.assertRaises(TypeError):
             m.train()
 
-        m._trained = True
-        with self.assertRaises(NotImplementedError):
-            m.predict(None)
+        # Regularization must be positive and finite.
+        for each in (-1, np.nan, +np.inf, -np.inf):
+            with self.assertRaises(ValueError):
+                m.regularization = each
 
-        with self.assertRaises(NotImplementedError):
-            m.fit([], [])
-    
+        # Regularization must be a float or match the dispersion size.
+        with self.assertRaises(ValueError):
+            m.regularization = [0., 1.]
+        m.regularization = np.zeros_like(m.dispersion)
+        m.train()

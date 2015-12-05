@@ -30,14 +30,16 @@ class TestRequiresTrainingWheels(unittest.TestCase):
 class TestRequiresLabelVector(unittest.TestCase):
     def test_with_label_vector(self):
         o = NullObject()
+        o._descriptive_attributes = ["label_vector"]
         o.label_vector = ""
-        self.assertIsNone(model.requires_label_vector(lambda x: None)(o))
+        self.assertIsNone(model.requires_model_description(lambda x: None)(o))
 
     def test_without_label_vector(self):
         o = NullObject()
+        o._descriptive_attributes = ["label_vector"]
         o.label_vector = None
         with self.assertRaises(TypeError):
-            model.requires_label_vector(lambda x: None)(o)
+            model.requires_model_description(lambda x: None)(o)
 
 
 class TestBaseCannonModel(unittest.TestCase):
