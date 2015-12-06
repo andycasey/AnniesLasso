@@ -13,7 +13,7 @@ from warnings import simplefilter
 from .model import *
 from .cannon import *
 from .regularized import *
-from . import utils
+from . import (continuum, utils)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)

@@ -683,6 +683,76 @@ class BaseCannonModel(object):
         return inferred[:N_stop_at, :]
 
 
+    @requires_training_wheels
+    def define_continuum_mask(self, baseline_flux=None, tolerances=None,
+        percentiles=None, absolute_percentiles=None):
+        """
+        Define a continuum mask based on constraints on the baseline flux values
+        and the percentiles or absolute percentiles of theta coefficients. The
+        resulting continuum mask is taken for whatever pixels meet all the given
+        constraints.
+
+        :param baseline_flux: [optional]
+            The `(lower, upper`) range of acceptable baseline flux values to be 
+            considered as continuum.
+
+        :param percentiles: [optional]
+            A dictionary containing the label vector description as keys and
+            acceptable percentile ranges `(lower, upper)` for each corresponding
+            label vector term.
+
+        :param absolute_percentiles: [optional]
+            The same as `percentiles`, except these are calculated on the
+            absolute values of the model coefficients.
+        """
+
+        mask = np.ones_like(self.dispersion, dtype=bool)
+        if baseline_flux is not None:
+            if len(baseline_flux) != 2:
+                raise ValueError("baseline flux constraints must be given as "
+                                 "(lower, upper)")
+            mask *= (max(baseline_flux) >= self.coefficients[:, 0]) \
+                  * (self.coefficients[:, 0] >= min(baseline_flux))
+
+        for term, constraints in (tolerances or {}).items():
+            if len(constraints) != 2:
+                raise ValueError("{} tolerance must be given as (lower, upper)"\
+                    .format(term))
+
+            p_term = utils.parse_label_vector(term)[0]
+            if p_term not in self.label_vector:
+                logger.warn("Term {0} ({1}) is not in the label vector, "
+                            "and is therefore being ignored".format(
+                                term, p_term))
+                continue
+
+            a = self.coefficients[:, 1 + self.label_vector.index(p_term)]
+            mask *= (max(constraints) >= a) * (a >= min(constraints))
+
+        for qs, use_abs in zip([percentiles, absolute_percentiles], [0, 1]):
+            if qs is None: continue
+
+            for term, constraints in qs.items():
+                if len(constraints) != 2:
+                    raise ValueError("{} constraints must be given as "
+                                     "(lower, upper)".format(term))
+
+                p_term = utils.parse_label_vector(term)[0]
+                if p_term not in self.label_vector:
+                    logger.warn("Term {0} ({1}) is not in the label vector, "
+                                "and is therefore being ignored".format(
+                                    term, p_term))
+                    continue
+
+                a = self.coefficients[:, 1 + self.label_vector.index(p_term)]
+                if use_abs: a = np.abs(a)
+
+                p = np.percentile(a, constraints)
+                mask *= (max(p) >= a) * (a >= min(p))
+
+        return mask
+
+
 def _build_label_vector_rows(label_vector, training_labels, pivots=None):
     """
     Build a label vector row from a description of the label vector (as indices
