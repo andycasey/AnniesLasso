@@ -20,7 +20,11 @@ logger.setLevel(logging.DEBUG)
 
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter(
-    "%(asctime)s [%(levelname)-8s] (%(name)s/%(lineno)d): %(message)s"))
+    "%(asctime)s [%(levelname)-8s] %(message)s"))
+
+#handler.setFormatter(logging.Formatter(
+#    "%(asctime)s [%(levelname)-8s] (%(name)s/%(lineno)d): %(message)s"))
+
 logger.addHandler(handler)
 
 simplefilter("ignore", RankWarning)

@@ -87,7 +87,7 @@ class BaseCannonModel(object):
     """
 
     _descriptive_attributes = ["_label_vector"]
-    _trained_attributes = []
+    _trained_attributes = ["_scatter", "_coefficients", "_pivots"]
     _data_attributes = []
     _forbidden_label_characters = "^*"
     
@@ -293,6 +293,9 @@ class BaseCannonModel(object):
             self._label_vector = label_vector
             self.reset()
 
+        self.pivots = \
+            { l: np.nanmean(self.training_labels[l]) for l in self.labels }
+        
         return None
 
 
@@ -395,6 +398,42 @@ class BaseCannonModel(object):
         if np.any(scatter < 0):
             raise ValueError("scatter terms must be positive")
         self._scatter = scatter
+        return None
+
+
+    @property
+    def pivots(self):
+        """
+        Return the mean values of the unique labels in the label vector.
+        """
+        return self._pivots
+
+
+    @pivots.setter
+    def pivots(self, pivots):
+        """
+        Return the pivot values for each unique label in the label vector.
+
+        :param pivots:
+            A list of pivot values for the corresponding terms in `self.labels`.
+        """
+
+        if pivots is None:
+            self._pivots = None
+            return None
+
+        if not isinstance(pivots, dict):
+            raise TypeError("pivots must be a dictionary")
+
+        missing = set(self.labels).difference(pivots)
+        if any(missing):
+            raise ValueError("pivot values for the following labels "
+                             "are missing: {}".format(", ".join(list(missing))))
+
+        if not np.all(np.isfinite(pivots.values())):
+            raise ValueError("pivot values must be finite")
+
+        self._pivots = pivots
         return None
 
 
@@ -526,16 +565,16 @@ class BaseCannonModel(object):
         return None
 
 
-    # Properties and attribuets related to training, etc.
+    # Properties and attributes related to training, etc.
     @property
     @requires_model_description
     def labels_array(self):
         """
         Return an array containing just the training labels, given the label
-        vector.
+        vector. This array does not account for any pivoting.
         """
-        return _build_label_vector_rows(
-            [[(label, 1)] for label in self.labels], self.training_labels)[1:].T
+        return _build_label_vector_rows([[(label, 1)] for label in self.labels], 
+            self.training_labels)[1:].T
 
 
     @property
@@ -545,7 +584,8 @@ class BaseCannonModel(object):
         Build the label vector array.
         """
 
-        lva = _build_label_vector_rows(self.label_vector, self.training_labels)
+        lva = _build_label_vector_rows(
+            self.label_vector, self.training_labels, self.pivots)
 
         if not np.all(np.isfinite(lva)):
             logger.warn("Non-finite labels in the label vector array!")
@@ -577,7 +617,6 @@ class BaseCannonModel(object):
             for k, v in labels.items() }
 
 
-    # Put Cross-validation functions in here.
     @requires_model_description
     def cross_validate(self, pre_train=None, **kwargs):
         """
@@ -630,7 +669,7 @@ class BaseCannonModel(object):
         return inferred[:N_stop_at, :]
 
 
-def _build_label_vector_rows(label_vector, training_labels):
+def _build_label_vector_rows(label_vector, training_labels, pivots=None):
     """
     Build a label vector row from a description of the label vector (as indices
     and orders to the power of) and the label values themselves.
@@ -652,11 +691,14 @@ def _build_label_vector_rows(label_vector, training_labels):
         The corresponding label vector row.
     """
 
+    pivots = pivots or {}
+
     columns = [np.ones(len(training_labels), dtype=float)]
     for term in label_vector:
         column = 1.
         for label, order in term:
-            column *= np.array(training_labels[label]).flatten()**order
+            column *= (np.array(training_labels[label]).flatten() \
+                - pivots.get(label, 0))**order
         columns.append(column)
 
     try:

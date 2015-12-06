@@ -54,7 +54,7 @@ class CannonModel(model.BaseCannonModel):
     """
 
     _descriptive_attributes = ["_label_vector"]
-    _trained_attributes = ["_coefficients", "_scatter"]
+    _trained_attributes = ["_coefficients", "_scatter", "_pivots"]
     _data_attributes = \
         ["training_labels", "training_fluxes", "training_flux_uncertainties"]
     
@@ -104,6 +104,7 @@ class CannonModel(model.BaseCannonModel):
             for pixel, proc in utils.progressbar(process.items(), **pb_kwds):
                 theta[pixel, :], scatter[pixel] = proc.get()
 
+        # Save the trained state.
         self.coefficients, self.scatter = (theta, scatter)
         self._trained = True
 
@@ -124,8 +125,8 @@ class CannonModel(model.BaseCannonModel):
 
         labels = self._format_input_labels(labels, **labels_as_kwargs)
 
-        return np.dot(self.coefficients, 
-            model._build_label_vector_rows(self.label_vector, labels)).flatten()
+        return np.dot(self.coefficients, model._build_label_vector_rows(
+            self.label_vector, labels, self.pivots)).flatten()
 
 
     @model.requires_training_wheels
@@ -212,15 +213,12 @@ class CannonModel(model.BaseCannonModel):
             if not np.isfinite(value): continue
             initial[label] = value
 
+        # There could be some coefficients that are only used in cross-terms.
+        # We could solve for them, or just take them as zero (i.e., near the
+        # pivot point of the data set).
         missing = set(self.labels).difference(initial)
-        if missing:
-            # There must be some coefficients that are only used in cross-terms.
-            # We could solve for them, or just take the mean of the training
-            # set as the initial guess.
-            initial.update({ label: \
-                np.nanmean(self.training_labels[label]) for label in missing
-            })
-            
+        initial.update({ label: 0.0 for label in missing })
+
         # Create and test the generating function.
         def function(coeffs, *labels):
             return np.dot(coeffs, 
@@ -238,8 +236,10 @@ class CannonModel(model.BaseCannonModel):
         kwds.update(kwargs)
         labels_opt, cov = op.curve_fit(function, coefficients, fluxes, **kwds)
 
+        # Apply any necessary pivots to put these back to real space.   
+        labels_opt += np.array([self.pivots[l] for l in self.labels])
+        
         return (labels_opt, cov)
-
 
 
 def _fit_pixel(fluxes, flux_uncertainties, label_vector_array, **kwargs):
