@@ -104,7 +104,11 @@ class CannonModel(model.BaseCannonModel):
             for pixel, proc in utils.progressbar(process.items(), **pb_kwds):
                 theta[pixel, :], scatter[pixel] = proc.get()
 
-        # Save the trained state.
+        if np.std(scatter) == 0:
+            logger.warning("All pixels show the same level of variance!"
+                           " (Something probably went very, very wrong)")
+
+        # Save the trained state.            
         self.coefficients, self.scatter = (theta, scatter)
         self._trained = True
 
@@ -263,7 +267,7 @@ def _fit_pixel(fluxes, flux_uncertainties, label_vector_array, **kwargs):
 
     _ = kwargs.get("max_uncertainty", 1)
     failed_response = (np.nan * np.ones(label_vector_array.shape[0]), _)
-    if np.all(flux_uncertainties > _):
+    if np.all(flux_uncertainties >= _):
         return failed_response
 
     # Get an initial guess of the scatter.

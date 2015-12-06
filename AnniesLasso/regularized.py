@@ -97,6 +97,10 @@ class RegularizedCannonModel(cannon.CannonModel):
         return None
 
 
+    # windows to specify zero coefficients for a given label (or terms comprising)
+    # that label.
+
+
     @model.requires_model_description
     def train(self, **kwargs):
         """
@@ -190,7 +194,7 @@ def _fit_pixel(fluxes, flux_uncertainties, label_vector_array,
 
     _ = kwargs.get("max_uncertainty", 1)
     failed_response = (np.nan * np.ones(label_vector_array.shape[0]), _)
-    if np.all(flux_uncertainties > _):
+    if np.all(flux_uncertainties >= _):
         return failed_response
 
     # Get an initial guess of the scatter.
