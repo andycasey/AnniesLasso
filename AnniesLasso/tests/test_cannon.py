@@ -90,26 +90,15 @@ class TestCannonModelRealistically(unittest.TestCase):
         for _attribute in self.model_serial._trained_attributes:
 
             # And nearly as we expected.
-            expected = self.test_data_set[_attribute[1:]]
-            if isinstance(expected, dict):
-                for key in expected:
-                    self.assertEqual(
-                        getattr(self.model_serial, _attribute)[key],
-                        getattr(self.model_parallel, _attribute)[key]
-                    )
-                    self.assertEqual(expected[key],
-                        getattr(self.model_serial, _attribute)[key])
-            else:
+            self.assertTrue(np.allclose(
+                getattr(self.model_serial, _attribute),
+                getattr(self.model_parallel, _attribute)
+                ))
 
-                self.assertTrue(np.allclose(
-                    getattr(self.model_serial, _attribute),
-                    getattr(self.model_parallel, _attribute)
-                    ))
-
-                self.assertTrue(np.allclose(
-                    expected,
-                    getattr(self.model_serial, _attribute)))
-                    #rtol=0.5, atol=1e-8))
+            self.assertTrue(np.allclose(
+                self.test_data_set[_attribute[1:]],
+                getattr(self.model_serial, _attribute)))
+                #rtol=0.5, atol=1e-8))
 
     def do_residuals(self):
         serial = self.model_serial.get_training_label_residuals()
@@ -189,27 +178,15 @@ class TestCannonModelRealistically(unittest.TestCase):
         for _attribute in self.model_serial._trained_attributes:
 
             # And nearly as we expected.
-            expected = self.test_data_set[_attribute[1:]]
-            if isinstance(expected, dict):
-                for key in expected:
-                    self.assertEqual(
-                        getattr(self.model_serial, _attribute)[key],
-                        getattr(self.model_parallel, _attribute)[key]
-                    )
-                    self.assertEqual(expected[key],
-                        getattr(self.model_serial, _attribute)[key])
-            else:
+            self.assertTrue(np.allclose(
+                getattr(self.model_serial, _attribute),
+                getattr(self.model_parallel, _attribute)
+                ))
 
-                self.assertTrue(np.allclose(
-                    getattr(self.model_serial, _attribute),
-                    getattr(self.model_parallel, _attribute)
-                    ))
-
-                self.assertTrue(np.allclose(
-                    expected,
-                    getattr(self.model_serial, _attribute)))
-                    #rtol=0.5, atol=1e-8))
-
+            self.assertTrue(np.allclose(
+                self.test_data_set[_attribute[1:]],
+                getattr(self.model_serial, _attribute)))
+                #rtol=0.5, atol=1e-8))
 
         # Check that the data attributes in both model are equal.
         for _attribute in self.model_serial._data_attributes:

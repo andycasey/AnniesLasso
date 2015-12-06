@@ -294,7 +294,7 @@ class BaseCannonModel(object):
             self.reset()
 
         self.pivots = \
-            { l: np.nanmean(self.training_labels[l]) for l in self.labels }
+            np.array([np.nanmean(self.training_labels[l]) for l in self.labels])
         
         return None
 
@@ -422,6 +422,7 @@ class BaseCannonModel(object):
             self._pivots = None
             return None
 
+        """
         if not isinstance(pivots, dict):
             raise TypeError("pivots must be a dictionary")
 
@@ -431,6 +432,19 @@ class BaseCannonModel(object):
                              "are missing: {}".format(", ".join(list(missing))))
 
         if not np.all(np.isfinite(pivots.values())):
+            raise ValueError("pivot values must be finite")
+
+        self._pivots = pivots
+        """
+
+        pivots = np.array(pivots).flatten()
+        N_labels = len(self.labels)
+        if pivots.size != N_labels:
+            raise ValueError("number of pivot values does not match the "
+                             "number of unique labels in the label vector "
+                             "({0} != {1})".format(pivots.size, N_labels))
+
+        if not np.all(np.isfinite(pivots)):
             raise ValueError("pivot values must be finite")
 
         self._pivots = pivots
@@ -584,8 +598,8 @@ class BaseCannonModel(object):
         Build the label vector array.
         """
 
-        lva = _build_label_vector_rows(
-            self.label_vector, self.training_labels, self.pivots)
+        lva = _build_label_vector_rows(self.label_vector, self.training_labels, 
+            dict(zip(self.labels, self.pivots)))
 
         if not np.all(np.isfinite(lva)):
             logger.warn("Non-finite labels in the label vector array!")

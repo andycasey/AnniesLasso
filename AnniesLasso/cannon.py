@@ -126,7 +126,8 @@ class CannonModel(model.BaseCannonModel):
         labels = self._format_input_labels(labels, **labels_as_kwargs)
 
         return np.dot(self.coefficients, model._build_label_vector_rows(
-            self.label_vector, labels, self.pivots)).flatten()
+            self.label_vector, labels, dict(zip(self.labels, self.pivots))
+            )).flatten()
 
 
     @model.requires_training_wheels
@@ -237,7 +238,7 @@ class CannonModel(model.BaseCannonModel):
         labels_opt, cov = op.curve_fit(function, coefficients, fluxes, **kwds)
 
         # Apply any necessary pivots to put these back to real space.   
-        labels_opt += np.array([self.pivots[l] for l in self.labels])
+        labels_opt += self.pivots
         
         return (labels_opt, cov)
 

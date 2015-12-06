@@ -245,7 +245,7 @@ class TestBaseCannonModel(unittest.TestCase):
     def test_label_vector_array(self):
         m = self.get_model()
         m.label_vector = "A^2.0 + B^3.4 + C^5"
-        m.pivots = { label: 0 for label in m.labels }
+        m.pivots = np.zeros(len(m.labels))
         
         self.assertTrue(np.allclose(
             np.array(m.training_labels["A"]**2).flatten(),
