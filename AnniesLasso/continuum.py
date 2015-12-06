@@ -11,7 +11,6 @@ from __future__ import (division, print_function, absolute_import,
 __all__ = ["chebyshev"]
 
 import numpy as np
-from . import utils
 
 
 def chebyshev(dispersion, fluxes, flux_uncertainties, continuum_mask,
