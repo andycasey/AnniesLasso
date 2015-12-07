@@ -17,35 +17,6 @@ from six import string_types
 from .base import BaseVectorizer
 
 
-class NormalizedPolynomialVectorizer(BaseVectorizer):
-    """
-    A vectorizer class that models spectral fluxes as a linear combination of
-    label terms in a polynomial fashion. The fiducials and scales are determined
-    automatically such that each label dimension has unit variance.
-
-    :param labels:
-        The label terms to use.
-
-    :param label_table:
-        A table containing the label values for all of the labels that will form
-        this label vector. These data are used to calculate the fiducials and
-        scales.
-
-    :param terms:
-        The terms that constitute the label vector.
-    """
-
-    def __init__(self, labels, label_table, terms):
-
-        # Calculate the scales and fiducials.
-        scales = \
-            [np.ptp(np.percentile(label_table[_], [2.1, 97.9])) for _ in labels]
-        fiducials = [np.percentile(label_table[_], 50) for _ in labels]
-
-        super(NormalizedPolynomialVectorizer, self).__init__(
-            labels, fiducials, scales, terms)
-
-
 class PolynomialVectorizer(BaseVectorizer):
     """
     A vectorizer class that models spectral fluxes as a linear combination of
@@ -109,6 +80,36 @@ class PolynomialVectorizer(BaseVectorizer):
 
     def get_label_vector_derivative(self, labels, d_label):
         raise NotImplementedError("soon..")
+
+
+
+class NormalizedPolynomialVectorizer(PolynomialVectorizer):
+    """
+    A vectorizer class that models spectral fluxes as a linear combination of
+    label terms in a polynomial fashion. The fiducials and scales are determined
+    automatically such that each label dimension has unit variance.
+
+    :param labels:
+        The label terms to use.
+
+    :param label_table:
+        A table containing the label values for all of the labels that will form
+        this label vector. These data are used to calculate the fiducials and
+        scales.
+
+    :param terms:
+        The terms that constitute the label vector.
+    """
+
+    def __init__(self, labels, label_table, terms):
+
+        # Calculate the scales and fiducials.
+        scales = \
+            [np.ptp(np.percentile(label_table[_], [2.1, 97.9])) for _ in labels]
+        fiducials = [np.percentile(label_table[_], 50) for _ in labels]
+
+        super(NormalizedPolynomialVectorizer, self).__init__(
+            labels, fiducials, scales, terms)
 
 
 
