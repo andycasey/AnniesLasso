@@ -13,13 +13,14 @@ __all__ = ["BaseVectorizer"]
 import numpy as np
 from six.moves import cPickle as pickle
 
+
 class BaseVectorizer(object):
     """
     A vectorizer class that models spectral fluxes, accounts for offsets and
     scaling of different labels, and computes the derivatives for the underlying
     spectral model.
 
-    :param label:
+    :param labels:
         The label terms to use.
 
     :param fiducials:

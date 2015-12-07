@@ -8,14 +8,42 @@ A polynomial vectorizer for use in The Cannon.
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
-__all__ = ["PolynomialVectorizer"]
+__all__ = ["PolynomialVectorizer", "NormalizedPolynomialVectorizer"]
 
 import numpy as np
 from collections import (Counter, OrderedDict)
 from six import string_types
 
-
 from .base import BaseVectorizer
+
+
+class NormalizedPolynomialVectorizer(BaseVectorizer):
+    """
+    A vectorizer class that models spectral fluxes as a linear combination of
+    label terms in a polynomial fashion. The fiducials and scales are determined
+    automatically such that each label dimension has unit variance.
+
+    :param labels:
+        The label terms to use.
+
+    :param label_table:
+        A table containing the label values for all of the labels that will form
+        this label vector. These data are used to calculate the fiducials and
+        scales.
+
+    :param terms:
+        The terms that constitute the label vector.
+    """
+
+    def __init__(self, labels, label_table, terms):
+
+        # Calculate the scales and fiducials.
+        scales = \
+            [np.ptp(np.percentile(label_table[_], [2.1, 97.9])) for _ in labels]
+        fiducials = [np.percentile(label_table[_], 50) for _ in labels]
+
+        super(NormalizedPolynomialVectorizer, self).__init__(
+            labels, fiducials, scales, terms)
 
 
 class PolynomialVectorizer(BaseVectorizer):
@@ -23,7 +51,7 @@ class PolynomialVectorizer(BaseVectorizer):
     A vectorizer class that models spectral fluxes as a linear combination of
     label terms in a polynomial fashion.
 
-    :param label:
+    :param labels:
         The label terms to use.
 
     :param fiducials:
@@ -72,13 +100,10 @@ class PolynomialVectorizer(BaseVectorizer):
         columns = [np.ones(N, dtype=float)]
         for term in self._parsed_terms:
             column = 1.
+            # TODO: Re-visit using np.multiply or np.product below instead.
             for index, order in term:
-                column *= scaled_labels[index]**order
-                # TODO: check that if we are giving many label rows that we
-                # calculate this properly.
-                raise a
+                column *= scaled_labels[:, index]**order
             columns.append(column)
-
         return np.vstack(columns)
 
 
