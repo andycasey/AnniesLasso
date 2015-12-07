@@ -77,6 +77,17 @@ class BaseVectorizer(object):
 
         return None
 
+    # These can be over-written by sub-classes, but it is useful to have some
+    # basic information if the sub-classes do not overwrite it.
+    def __str__(self):
+        return "<{module}.{name} object consisting of {K} labels and {D} terms>"\
+            .format(module=self.__module__, name=type(self).__name__,
+                K=len(self.labels), D=len(self._parsed_terms))
+
+    def __repr__(self):
+        return "<{0}.{1} object at {2}>".format(
+            self.__module__, type(self).__name__, hex(id(self)))
+
     # Read-only attributes. Don't try and change the state; create a new object.
     @property
     def labels(self):

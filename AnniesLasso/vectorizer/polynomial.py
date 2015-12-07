@@ -11,7 +11,9 @@ from __future__ import (division, print_function, absolute_import,
 __all__ = ["PolynomialVectorizer"]
 
 import numpy as np
-from collections import OrderedDict
+from collections import (Counter, OrderedDict)
+from six import string_types
+
 
 from .base import BaseVectorizer
 
@@ -39,7 +41,7 @@ class PolynomialVectorizer(BaseVectorizer):
 
         # Check that the terms are OK, and parse them into a useful format.
         self._parsed_terms = parse_label_vector_description(
-            label_vector_description, columns=self.labels)      
+            self.terms, columns=self.labels)      
         return None
 
 
@@ -165,7 +167,7 @@ def parse_label_vector_description(description, columns=None, **kwargs):
 
     if isinstance(description, string_types):
         description = description.split(sep)
-    description = map(str.strip, description)
+    description = [_.strip() for _ in description]
 
     # Functions to parse the parameter (or index) and order for each term.
     get_power = lambda t: float(t.split(pow)[1].strip()) if pow in t else 1
@@ -196,3 +198,51 @@ def parse_label_vector_description(description, columns=None, **kwargs):
         raise ValueError("no valid terms provided")
 
     return label_vector
+
+
+def build_label_vector(labels, order, cross_term_order=-1, **kwargs):
+    """
+    Build a label vector description.
+
+    :param labels:
+        The labels to use in describing the label vector.
+
+    :param order:
+        The maximum order of the terms (e.g., order 3 implies A^3 is a term).
+
+    :param cross_term_order: [optional]
+        The maximum order of the cross-terms (e.g., cross_term_order 2 implies
+        A^2*B is a term). If the provided `cross_term_order` value is negative, 
+        then `cross_term_order = order - 1` will be assumed.
+
+    :param mul: [optional]
+        The operator to use to represent multiplication in the description of 
+        the label vector.
+
+    :param pow: [optional]
+        The operator to use to represent exponents in the description of the
+        label vector.
+
+    :returns:
+        A human-readable form of the label vector.
+    """
+
+    sep = kwargs.pop("sep", "+")
+    mul = kwargs.pop("mul", "*")
+    pow = kwargs.pop("pow", "^")
+
+    #I make no apologies: it's fun to code like this for short complex functions
+    items = []
+    if 0 > cross_term_order:
+        cross_term_order = order - 1
+
+    for o in range(1, 1 + max(order, 1 + cross_term_order)):
+        for t in map(Counter, combinations_with_replacement(labels, o)):
+            # Python 2 and 3 behave differently here, so generate an ordered
+            # dictionary based on sorting the keys.
+            t = OrderedDict([(k, t[k]) for k in sorted(t.keys())])
+            if len(t) == 1 and order >= max(t.values()) \
+            or len(t) > 1 and cross_term_order >= max(t.values()):
+                c = [pow.join([[l], [l, str(p)]][p > 1]) for l, p in t.items()]
+                if c: items.append(mul.join(map(str, c)))
+    return " {} ".format(sep).join(items)
