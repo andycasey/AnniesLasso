@@ -780,9 +780,14 @@ def _build_label_vector_rows(label_vector, training_labels, pivots=None):
     columns = [np.ones(len(training_labels), dtype=float)]
     for term in label_vector:
         column = 1.
-        for label, order in term:
-            column *= (np.array(training_labels[label]).flatten() \
-                - pivots.get(label, 0))**order
+        for item in term:
+            try:
+                label, order = item
+            except TypeError:
+                column *= float(item)
+            else:
+                column *= (np.array(training_labels[label]).flatten() \
+                    - pivots.get(label, 0))**order
         columns.append(column)
 
     try:
