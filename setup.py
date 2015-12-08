@@ -23,15 +23,14 @@ here = path.abspath(path.dirname(__file__))
 vre = re_compile("__version__ = \"(.*?)\"")
 version = vre.findall(read(path.join(here, "AnniesLasso", "__init__.py")))[0]
 
-
 setup(
     name="AnniesLasso",
     version=version,
-    #author="",
-    #author_email="",  # <-- Direct complaints to this address.
+    author="Andrew R. Casey, David W. Hogg, Melissa K. Ness",
+    author_email="arc@ast.cam.ac.uk",  # <-- Direct complaints to this address.
     description="The Cannon 2: Compressed sensing edition",
     long_description=read(path.join(here, "README.md")),
-    url="https://github.com/davidwhogg/AnniesLasso",
+    url="https://github.com/andycasey/AnniesLasso",
     license="MIT",
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -43,7 +42,7 @@ setup(
         "Topic :: Scientific/Engineering :: Astronomy",
         "Topic :: Scientific/Engineering :: Physics"
     ],
-    keywords="Cannon Annies Lasso",
+    keywords="Cannon Annie's Lasso",
     packages=find_packages(exclude=["documents", "tests"]),
     install_requires=["numpy", "scipy", "six"],
     extras_require={
