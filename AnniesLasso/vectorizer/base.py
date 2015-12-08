@@ -138,7 +138,8 @@ class BaseVectorizer(object):
         :param labels:
             The values of the labels.
         """
-        raise NotImplemented("this method must be specified by the sub-classes")
+        raise NotImplemented("the get_label_vector method "
+                             "must be specified by the sub-classes")
 
 
     def get_label_vector_derivative(self, labels, d_label):
@@ -152,9 +153,22 @@ class BaseVectorizer(object):
         :param d_label:
             The name of the label to calculate the label vector with respect to.
         """
+        raise NotImplemented("the get_label_vector_derivative method "
+                             "must be specified by the sub-classes")
 
-        raise NotImplemented("this method must be specified by the sub-classes")
 
+    def get_approximate_labels(self, label_vector):
+        """
+        Return the approximate labels that would produce the given label_vector.
+        If all terms are linearly specified in the label vector, then this is
+        trivial. Otherwise, this is a per-vectorizer method.
+
+        :param label_vector:
+            The values of the label vector, typically estimated from a matrix
+            inversion using observed fluxes and uncertainties.
+        """
+        raise NotImplemented("the get_approximate_labels method "
+                             "must be specified by the sub-classes")
 
 
 

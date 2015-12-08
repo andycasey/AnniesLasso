@@ -72,6 +72,57 @@ class BasePolynomialVectorizer(BaseVectorizer):
         return np.vstack(columns).T
 
 
+    def get_approximate_labels(self, label_vector):
+        """
+        Return the approximate labels that would produce the given label_vector.
+        If all terms are linearly specified in the label vector, then this is
+        trivial. Otherwise, this is a per-vectorizer method.
+
+        :param label_vector:
+            The values of the label vector, typically estimated from a matrix
+            inversion using observed fluxes and uncertainties.
+        """
+
+        # Need to match the label vector terms back to real labels.
+        # (Maybe this should use some general non-linear simultaneous solver?)
+
+        # The term_index tells us which term in the label vector is the best to
+        # estimate the label from (e.g., a linear term).
+
+        # The label_index tells us which label this term is actually
+        # referring to.
+
+        labels = np.nan * np.ones(len(self.labels))
+        for term_index in self._lowest_order_label_indices:
+            if term_index is None: continue
+
+            label_index, order = self.terms[term_index][0]
+            # The +1 index offset is because the first theta is a scaling.
+            labels[label_index] = abs(label_vector[1 + term_index])**(1./order)
+
+        # There could be some coefficients that are only used in cross-terms...
+        # We could solve for them, or just take them as zeros (which will then
+        # put them as the fiducials)
+        labels[~np.isfinite(labels)] = 0.
+
+        return labels * self.scales + self.fiducials
+
+
+    @property
+    def _lowest_order_label_indices(self):
+        """
+        Get the indices for the lowest power label terms in the label vector.
+        """
+        indices = OrderedDict()
+        for i, term in enumerate(self.terms):
+            if len(term) > 1: continue
+            index, order = term[0]
+            if order < indices.get(index, [None, np.inf])[-1]:
+                indices[index] = (i, order)
+
+        return [indices.get(i, [None])[0] for i in range(len(self.labels))]
+
+
     def get_label_vector_derivative(self, labels, d_label):
         raise NotImplementedError("soon..")
 
@@ -291,14 +342,3 @@ def get_contributing_labels(label_vector):
 
 
 # TODO: SOMETHING ABOUT THIS
-def _get_lowest_order_label_indices(self):
-    """
-    Get the indices for the lowest power label terms in the label vector.
-    """
-    indices = OrderedDict()
-    for i, term in enumerate(self.label_vector):
-        if len(term) > 1: continue
-        label, order = term[0]
-        if order < indices.get(label, [None, np.inf])[-1]:
-            indices[label] = (i, order)
-    return [indices.get(label, [None])[0] for label in self.labels]
