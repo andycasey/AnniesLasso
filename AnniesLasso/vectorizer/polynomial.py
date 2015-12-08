@@ -166,7 +166,6 @@ class NormalizedPolynomialVectorizer(BasePolynomialVectorizer):
             labels, fiducials, scales, terms)
 
 
-
 def _is_structured_label_vector(label_vector):
     """
     Return whether the provided label vector is structured as a polynomial
@@ -307,9 +306,7 @@ def build_label_vector(labels, order, cross_term_order=-1, **kwargs):
         A human-readable form of the label vector.
     """
 
-    sep = kwargs.pop("sep", "+")
-    mul = kwargs.pop("mul", "*")
-    pow = kwargs.pop("pow", "^")
+    sep, mul, pow = kwargs.pop(["sep", "mul", "pow"], "+*^")
 
     #I make no apologies: it's fun to code like this for short complex functions
     items = []
@@ -338,7 +335,3 @@ def get_contributing_labels(label_vector):
     """
     return list(OrderedDict.fromkeys([label for term in label_vector \
         for label, power in term if power != 0]))
-
-
-
-# TODO: SOMETHING ABOUT THIS
