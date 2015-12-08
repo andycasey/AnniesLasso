@@ -19,7 +19,6 @@ from datetime import datetime
 from os import path
 from six.moves import cPickle as pickle
 
-from .interruptible_pool import InterruptiblePool
 from .vectorizer.base import BaseVectorizer
 from . import (utils, __version__ as code_version)
 
@@ -106,7 +105,8 @@ class BaseCannonModel(object):
 
         self.reset()
         self.threads = threads
-        self.pool = pool or InterruptiblePool(threads) if threads > 1 else None
+        self.pool = \
+            pool or utils.InterruptiblePool(threads) if threads > 1 else None
 
 
     def __str__(self):
