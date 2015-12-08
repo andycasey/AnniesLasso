@@ -170,8 +170,8 @@ def L1Norm(theta):
     return np.sum(np.abs(theta))
 
 
-def _fit_pixel_with_fixed_scatter(scatter, normalized_flux,
-    normalized_ivar, design_matrix, regularization, **kwargs):
+def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
+    design_matrix, regularization, **kwargs):
     """
     Fit the normalized flux for a single pixel (across many stars) given some
     pixel variance term, and return the best-fit theta coefficients.
@@ -214,8 +214,8 @@ def _fit_pixel_with_fixed_scatter(scatter, normalized_flux,
          + regularization * L1Norm(theta[1:])
 
 
-def _fit_pixel(normalized_flux, normalized_ivar, design_matrix,
-    regularization, **kwargs):
+def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, regularization,
+    **kwargs):
     """
     Return the optimal vectorizer coefficients and variance term for a pixel
     given the normalized flux, the normalized inverse variance, and the design
