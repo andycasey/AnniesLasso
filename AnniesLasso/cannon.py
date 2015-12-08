@@ -143,7 +143,7 @@ class CannonModel(model.BaseCannonModel):
         labels = np.nan * np.ones((N, len(self.vectorizer.labels)))
         if self.pool is None:
             for i in utils.progressbar(range(N), **pb_kwds):
-                labels[i], _ = self._fit_spectrum(
+                labels[i], _ = _fit_spectrum(
                     self.vectorizer, self.coefficients, self.scatter,
                     fluxes[i], flux_uncertainties[i], **kwargs)
 
@@ -160,15 +160,39 @@ class CannonModel(model.BaseCannonModel):
         return labels
 
 
+def _estimate_theta(coefficients, scatter, fluxes, flux_uncertainties, **kwargs):
+    """
+    Perform a matrix inversion to estimate the vectorizer values given some
+    fluxes and associated uncertainties.
 
+    :param fluxes:
+        The normalised fluxes. These should be on the same dispersion scale
+        as the trained data.
 
+    :param flux_uncertainties:
+        The 1-sigma uncertainties in the fluxes. This should have the same
+        shape as `fluxes`.
+
+    :returns:
+        A two-length tuple containing the label_vector from the matrix
+        inversion and the corresponding pixel mask used.
+    """
+
+    # Check which pixels to use, then just use those.
+    mask = (flux_uncertainties < kwargs.get("max_uncertainty", 1)) \
+        * np.isfinite(coefficients[:, 0] * fluxes * flux_uncertainties)
+
+    coefficients = coefficients[mask]
+    Cinv = 1.0 / (scatter[mask]**2 + flux_uncertainties[mask]**2)
+    A = np.dot(coefficients.T, Cinv[:, None] * coefficients)
+    B = np.dot(coefficients.T, Cinv * fluxes[mask])
+    return (np.linalg.solve(A, B), mask)
 
 
 def _fit_spectrum(vectorizer, coefficients, scatter, fluxes, flux_uncertainties,
     **kwargs):
     """
-    Solve the labels for given pixel fluxes and uncertainties
-    for a single star.
+    Solve the labels for given pixel fluxes and uncertainties for a single star.
 
     :param vectorizer:
         The model vectorizer.
@@ -210,38 +234,7 @@ def _fit_spectrum(vectorizer, coefficients, scatter, fluxes, flux_uncertainties,
 
     function = lambda c, *l: np.dot(c, vectorizer(l).T).T.flatten()[mask]
     labels, cov = op.curve_fit(function, coefficients, fluxes[mask], **kwds)
-
     return (labels, cov)
-
-
-
-def _estimate_theta(coefficients, scatter, fluxes, flux_uncertainties, **kwargs):
-    """
-    Perform a matrix inversion to estimate the vectorizer values given some
-    fluxes and associated uncertainties.
-
-    :param fluxes:
-        The normalised fluxes. These should be on the same dispersion scale
-        as the trained data.
-
-    :param flux_uncertainties:
-        The 1-sigma uncertainties in the fluxes. This should have the same
-        shape as `fluxes`.
-
-    :returns:
-        A two-length tuple containing the label_vector from the matrix
-        inversion and the corresponding pixel mask used.
-    """
-
-    # Check which pixels to use, then just use those.
-    mask = (flux_uncertainties < kwargs.get("max_uncertainty", 1)) \
-        * np.isfinite(coefficients[:, 0] * fluxes * flux_uncertainties)
-
-    coefficients = coefficients[mask]
-    Cinv = 1.0 / (scatter[mask]**2 + flux_uncertainties[mask]**2)
-    A = np.dot(coefficients.T, Cinv[:, None] * coefficients)
-    B = np.dot(coefficients.T, Cinv * fluxes[mask])
-    return (np.linalg.solve(A, B), mask)
 
 
 def _fit_pixel(fluxes, flux_uncertainties, design_matrix, **kwargs):
@@ -291,7 +284,6 @@ def _fit_pixel(fluxes, flux_uncertainties, design_matrix, **kwargs):
     # optimisation was successful), this code below *must* work.
     coefficients, ATCiAinv, variance = _fit_theta(fluxes, flux_uncertainties,
         op_scatter, design_matrix)
-
     return (coefficients, op_scatter)
 
 
