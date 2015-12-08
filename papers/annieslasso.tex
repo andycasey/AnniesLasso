@@ -218,8 +218,9 @@ that optimizes the likelihood:
 Because the vectorizing function $v(\ell)$ is non-linear, the
 test-step optimization is not convex.
 However, the fact that there are many pixels $j$ acting, each of which
-has a different functional dependence on $\ell$, tends to make the
-optimization (in practice) find a good value for $\ell$.
+has a different functional dependence on the labels in the label list
+$\ell$, tends to make the optimization (in practice) find a good value
+for the label list $\ell$.
 
 The model freedom of \TheCannon\ is set by the vectorizing function
 $v(\ell)$---which takes the $K$-element label list $\ell$ and expands
