@@ -15,7 +15,7 @@
 \usepackage{amsmath,amssymb}
 
 \newcommand{\project}[1]{\textsl{#1}}
-\newcommand{\thecannon}{\project{The~Cannon}}
+\newcommand{\TheCannon}{\project{The~Cannon}}
 \newcommand{\acronym}[1]{{\small{#1}}}
 \newcommand{\sdss}{\project{\acronym{SDSS-IV}}}
 \newcommand{\apogee}{\project{\acronym{APOGEE2}}}
@@ -77,13 +77,13 @@ spectroscopy at the precision with which we are currently observing,
 which is signal-to-noise ratios in the hundreds for thousands or tens
 of thousands of wavelength pixels per star.
 
-This led us to build \thecannon\ (\citealt{tc}), a data-driven---as
+This led us to build \TheCannon\ (\citealt{tc}), a data-driven---as
 opposed to physics-based---model for stellar spectra.
 
 DWH: Summarize what it does and what it can be used for.
 DWH: Mention some users and projects, past, current, and future.
 DWH: Cite some relevant literature.
-It is important (to us) to note that \thecannon\ is named not after a
+It is important (to us) to note that \TheCannon\ is named not after a
 weapon but instead after Annie Jump Cannon, who was the first to
 correctly order stellar spectra in temperature order (and who did so
 by looking at the data, and without any use of physics-based models).
@@ -96,25 +96,25 @@ abundances'' phrase to a word, and also connects to the terminology
 for supervised methods in the machine-learning and statistics
 literatures.
 
-DWH: Define the words ``train'', ``validate'', and ``test''.
+DWH: Define the words ``train'', ``validate'', and ``test''.  And maybe ``predict'' too?
 
 DWH: Labels for data at wavelengths where there are no good labels.
 
 DWH: Labels that are consistent across surveys and wavelengths.
 
-\thecannon\ is a data-driven model, but it differs from standard machine-learning
+\TheCannon\ is a data-driven model, but it differs from standard machine-learning
 approaches because it contains an explicit noise model.
 This means that it can transfer labels from high signal-to-noise training-set
 stars to low signal-to-noise test-set stars; that is, the training set and 
 the test set do not need to be statistically identical.
-This is related to the fact that \thecannon\ is an interpretable model;
+This is related to the fact that \TheCannon\ is an interpretable model;
 the internals of the model are the dependencies of the spectral expetation
 and variance on wavelength and physical parameters of the star.
 
 DWH: Should we be saying things about the fact that the model is probabilistic?
 It takes as input stellar labels and gives as output a pdf for stellar spectra?
 
-DWH: In the first work we did with \thecannon, we only used a small
+DWH: In the first work we did with \TheCannon, we only used a small
 number of labels (three in the original work, and four or five in late
 work; \citealt{tc, age}).
 Here we were guided by thoughts related to density estimation:
@@ -123,7 +123,7 @@ size of which scales exponentially (or worse) with $K$.
 Subsequent experiments, however, did not bear this out:
 We found that we can transfer many labels from the training set to
 the test set, with training sets of thousands of stars.
-The fundamental reason is that \thecannon\ is \emph{not} a density estimator!
+The fundamental reason is that \TheCannon\ is \emph{not} a density estimator!
 It is more like an \emph{interpolator}, which effectively finds stars in
 the training set that are close to the test star, and transfers labels,
 using the smooth polynomial model as a kind of regularizer.
@@ -219,6 +219,25 @@ However, the fact that there are many pixels $j$ acting, each of which
 has a different functional dependence on $\ell$, tends to make the
 optimization (in practice) find a good value for $\ell$.
 
+The model freedom of \TheCannon\ is set by the vectorizing function
+$v(\ell)$---which takes the $K$-element label vector $\ell$ and
+expands it into a $D$-dimensional vector of linear components---and
+the regularization parameter $\Lambda$.
+Because we want the regularization to treat the different parameters
+(the different components of $\theta$) in some sense ``equally'', we
+have to make sensible choices in this function.
+One thing that the vectorizing function $v(\ell)$ can do is offset the
+labels by some kind of fiducial (mean, median, or other central)
+value, such that $v(\ell)=0$ is at a central location in the label
+space.
+Another is divide out a scale, because, for example, $\Teff$ values
+are in the thousands, but $\logg$ values are of order unity.
+If scale is not divided out, the (isotropic in $\theta$)
+regularization will be much more harsh, effectively, on some
+parameters than others.
+
+In detail we construct the vectorizing function $v(\ell)$ as follows...DWH??
+
 \section{Training, validation, and test data}
 
 MKN: Describe \apogee\ data here.
@@ -228,7 +247,7 @@ MKN: What is different about our continuum normalization from everyone else's?
 DWH: Define the set of ``labeled'' stars and the set of ``unlabeled''
 stars, for our purposes.  Any training set must be a subset of the
 labeled stars.
-We are going to use different subsets for different trainings of \thecannon.
+We are going to use different subsets for different trainings of \TheCannon.
 
 To demonstrate the predictive power and accuracy of the method, we
 will (below) perform a conservative cross-validation using cyclic
@@ -247,7 +266,7 @@ labeled data, for the test set to influence the choice of
 hyper-parameters, or indeed for any information to flow from the test
 set into the training.
 
-When \thecannon\ is used to label the full unlabeled set, we train on
+When \TheCannon\ is used to label the full unlabeled set, we train on
 the entire unlabled data set (the largest possible training set) and
 use values for the hyper-parameters $\Lambda_j$ derived from the
 10-fold cross-validation experiment, as we will describe below.
