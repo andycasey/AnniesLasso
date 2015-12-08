@@ -11,38 +11,36 @@ from __future__ import (division, print_function, absolute_import,
 __all__ = ["BaseVectorizer"]
 
 import numpy as np
-from six.moves import cPickle as pickle
 
 
 class BaseVectorizer(object):
     """
-    A vectorizer class that models spectral fluxes, accounts for offsets and
+    A vectorizer class that models spectral fluxes, allows for offsets and
     scaling of different labels, and computes the derivatives for the underlying
     spectral model.
 
-    :param labels:
-        The label terms to use.
+    :param label_names:
+        The names of the labels that will be used by the vectorizer.
 
     :param fiducials:
-        The fiducial offsets for the labels.
+        The fiducial offsets for the `label_names` provided.
 
     :param scales:
-        The scaling values for the labels.
+        The scaling values for the `label_names` provided.
 
     :param terms:
         The terms that constitute the label vector.
     """
 
-    def __init__(self, labels, fiducials, scales, terms):
+    def __init__(self, label_names, fiducials, scales, terms):
 
-        N = len(labels)
-        
+        N = len(label_names)        
         fiducials = np.array(fiducials)
         scales = np.array(scales)
 
         if N != fiducials.size:
             raise ValueError("the number of fiducials does not match "
-                             "the number of labels ({0} != {1})".format(
+                             "the number of label_names ({0} != {1})".format(
                                 N, fiducials.size))
 
         if N != scales.size:
@@ -58,7 +56,7 @@ class BaseVectorizer(object):
         if not all(np.isfinite(scales)) or not all(scales > 0):
             raise ValueError("scales must be finite and positive values")
 
-        self._labels = labels
+        self._label_names = label_names
         self._fiducials = fiducials
         self._scales = scales
         self._terms = terms
@@ -70,7 +68,7 @@ class BaseVectorizer(object):
     def __str__(self):
         return "<{module}.{name} object consisting of {K} labels and {D} terms>"\
             .format(module=self.__module__, name=type(self).__name__,
-                K=len(self.labels), D=len(self.terms))
+                K=len(self.label_names), D=len(self.terms))
 
     def __repr__(self):
         return "<{0}.{1} object at {2}>".format(
@@ -82,23 +80,23 @@ class BaseVectorizer(object):
         """
         Return the state of the vectorizer.
         """
-        return (self._labels, self._fiducials, self._scales, self._terms)
+        return (self._label_names, self._fiducials, self._scales, self._terms)
 
 
     def __setstate__(self, state):
         """
         Set the state of the vectorizer.
         """
-        self._labels, self._fiducials, self._scales, self._terms = state
+        self._label_names, self._fiducials, self._scales, self._terms = state
 
 
     # Read-only attributes. Don't try and change the state; create a new object.
     @property
-    def labels(self):
+    def label_names(self):
         """
         Return the names of the labels that contribute to the label vector.
         """
-        return self._labels
+        return self._label_names
 
 
     @property
@@ -116,6 +114,7 @@ class BaseVectorizer(object):
         """
         return self._fiducials
 
+
     @property
     def terms(self):
         """
@@ -131,18 +130,19 @@ class BaseVectorizer(object):
         return self.get_label_vector(*args, **kwargs)
 
 
-    def get_label_vector(self, labels):
+    def get_label_vector(self, labels, *args, **kwargs):
         """
         Return the label vector based on the labels provided.
 
         :param labels:
-            The values of the labels.
+            The values of the labels. These should match the length and order of
+            the `label_names` attribute.
         """
         raise NotImplementedError("the get_label_vector method "
                                   "must be specified by the sub-classes")
 
 
-    def get_label_vector_derivative(self, labels, d_label):
+    def get_label_vector_derivative(self, labels, *args, **kwargs):
         """
         Return the derivative of the label vector with respect to the given
         label.
@@ -157,7 +157,7 @@ class BaseVectorizer(object):
                                   "must be specified by the sub-classes")
 
 
-    def get_approximate_labels(self, label_vector):
+    def get_approximate_labels(self, label_vector, *args, **kwargs):
         """
         Return the approximate labels that would produce the given label_vector.
         If all terms are linearly specified in the label vector, then this is
@@ -170,21 +170,14 @@ class BaseVectorizer(object):
         raise NotImplementedError("the get_approximate_labels method "
                                   "must be specified by the sub-classes")
 
-    def get_human_readable_label_vector(self, labels=None, mul="*", pow="^"):
+
+    def get_human_readable_label_vector(self, label_names=None, *args, **kwargs):
         """
         Return a human-readable form of the label vector.
 
-        :param labels: [optional]
-            Give new labels to form the human readable label vector (e.g.,
-            LaTeX labels).
-
-        :param mul: [optional]
-            String to use to represent a multiplication operator. For example,
-            if giving LaTeX label definitions one may want to use '\cdot' for
-            the `mul` term.
-
-        :param pow: [optional]
-            String to use to represent a power operator.
+        :param label_names: [optional]
+            Give new label names to form the human readable label vector (e.g.,
+            LaTeX label names).
         """
         raise NotImplementedError("the get_human_readable_label_vector method "
                                   "must be specified by the sub-classes")        

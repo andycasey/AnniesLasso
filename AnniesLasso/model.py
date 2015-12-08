@@ -446,8 +446,9 @@ class BaseCannonModel(object):
         """
         Return the design matrix for all pixels.
         """
-        design_matrix = self.vectorizer(np.vstack([
-            self.training_labels[label] for label in self.vectorizer.labels]).T)
+        design_matrix = \
+            self.vectorizer(np.vstack([self.training_labels[label_name] \
+                for label_name in self.vectorizer.label_names]).T)
 
         if not np.all(np.isfinite(design_matrix)):
             logger.warn("Non-finite values in the design matrix!")

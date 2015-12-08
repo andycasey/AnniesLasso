@@ -109,7 +109,7 @@ class CannonModel(model.BaseCannonModel):
         :param labels:
             The label values to predict model spectra of. The length and order
             should match what is required of the vectorizer
-            (`CannonModel.vectorizer.labels`).
+            (`CannonModel.vectorizer.label_names`).
         """
         return np.dot(self.coefficients, self.vectorizer(labels).T).T
 
@@ -140,7 +140,7 @@ class CannonModel(model.BaseCannonModel):
             "size": 100 if kwargs.pop("progressbar", True) and N > 10 else -1
         }
         
-        labels = np.nan * np.ones((N, len(self.vectorizer.labels)))
+        labels = np.nan * np.ones((N, len(self.vectorizer.label_names)))
         if self.pool is None:
             for i in utils.progressbar(range(N), **pb_kwds):
                 labels[i], _ = _fit_spectrum(
