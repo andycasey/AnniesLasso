@@ -328,7 +328,7 @@ def _model_pixel_with_scatter(scatter, fluxes, flux_uncertainties, design_matrix
     model = np.dot(theta, design_matrix.T)
     variance = scatter**2 + flux_uncertainties**2
     
-    return np.sum((fluxes - model) / variance) + np.sum(np.log(variance))
+    return np.sum((fluxes - model)**2 / variance) + np.sum(np.log(variance))
 
 
 def _fit_theta(fluxes, flux_uncertainties, scatter, design_matrix):

@@ -244,7 +244,7 @@ def _model_regularized_pixel_with_scatter(scatter, fluxes, flux_uncertainties,
     model = np.dot(theta, design_matrix.T)
     variance = scatter**2 + flux_uncertainties**2
 
-    return np.sum((fluxes - model) / variance) \
+    return np.sum((fluxes - model)**2 / variance) \
         +  np.sum(np.log(variance)) \
         +  regularization * np.abs(theta[1:]).sum()
 
