@@ -23,41 +23,33 @@ class CannonModel(model.BaseCannonModel):
     """
     A generalised Cannon model for the estimation of arbitrary stellar labels.
 
-    :param labels:
+    :param training_labels:
         A table with columns as labels, and stars as rows.
 
-    :type labels:
+    :type training_labels:
         :class:`~astropy.table.Table` or numpy structured array
 
-    :param fluxes:
+    :param training_fluxes:
         An array of fluxes for stars in the training set, given as shape
         `(num_stars, num_pixels)`. The `num_stars` should match the number of
         rows in `labels`.
 
-    :type fluxes:
+    :type training_fluxes:
         :class:`np.ndarray`
 
-    :param flux_uncertainties:
+    :param training_flux_uncertainties:
         An array of 1-sigma flux uncertainties for stars in the training set,
-        The shape of the `flux_uncertainties` should match `fluxes`. 
+        The shape of the `training_flux_uncertainties` should match that of
+        `training_fluxes`. 
 
-    :type flux_uncertainties:
+    :type training_flux_uncertainties:
         :class:`np.ndarray`
 
     :param dispersion: [optional]
         The dispersion values corresponding to the given pixels. If provided, 
         this should have length `num_pixels`.
-
-    :param live_dangerously: [optional]
-        If enabled then no checks will be made on the label names, prohibiting
-        the user to input human-readable forms of the label vector.
     """
 
-    _descriptive_attributes = ["_label_vector"]
-    _trained_attributes = ["_coefficients", "_scatter", "_pivots"]
-    _data_attributes = \
-        ["training_labels", "training_fluxes", "training_flux_uncertainties"]
-    
     def __init__(self, *args, **kwargs):
         super(CannonModel, self).__init__(*args, **kwargs)
 
@@ -69,13 +61,12 @@ class CannonModel(model.BaseCannonModel):
         label vector.
         """
         
-        # Initialise the scatter and coefficient arrays.
+        # Initialise the required arrays.
         N_px = len(self.dispersion)
+        design_matrix = self.design_matrix
         scatter = np.nan * np.ones(N_px)
-        label_vector_array = self.label_vector_array
-        theta = np.nan * np.ones((N_px, label_vector_array.shape[0]))
+        theta = np.nan * np.ones((N_px, design_matrix.shape[1]))
 
-        # Details for the progressbar.
         pb_kwds = {
             "message": "Training Cannon model from {0} stars with {1} pixels "
                        "each".format(len(self.training_labels), N_px),
@@ -87,16 +78,16 @@ class CannonModel(model.BaseCannonModel):
                 theta[pixel, :], scatter[pixel] = _fit_pixel(
                     self.training_fluxes[:, pixel], 
                     self.training_flux_uncertainties[:, pixel],
-                    label_vector_array, **kwargs)
+                    design_matrix, **kwargs)
 
         else:
-            # Not as nice as just mapping, but necessary for a progress bar.
+            # Not as nice as mapping, but necessary if we want a progress bar.
             process = { pixel: self.pool.apply_async(
                     _fit_pixel,
                     args=(
                         self.training_fluxes[:, pixel], 
                         self.training_flux_uncertainties[:, pixel],
-                        label_vector_array
+                        design_matrix
                     ),
                     kwds=kwargs) \
                 for pixel in range(N_px) }
@@ -104,34 +95,23 @@ class CannonModel(model.BaseCannonModel):
             for pixel, proc in utils.progressbar(process.items(), **pb_kwds):
                 theta[pixel, :], scatter[pixel] = proc.get()
 
-        if np.std(scatter) == 0:
-            logger.warning("All pixels show the same level of variance!"
-                           " (Something probably went very, very wrong)")
-
-        # Save the trained state.            
-        self.coefficients, self.scatter = (theta, scatter)
-        self._trained = True
-
-        return (theta, scatter)
-
+        # Save the trained data and finish up.
+        self.coefficients = theta
+        self.scatter = scatter
+        return None
+        
 
     @model.requires_training_wheels
-    def predict(self, labels=None, **labels_as_kwargs):
+    def predict(self, labels, **kwargs):
         """
         Predict spectra from the trained model, given the labels.
 
-        :param labels: [optional]
-            The labels required for the trained model. This should be a N-length
-            list matching the number of unique terms in the model, in the order
-            given by `self.labels`. Alternatively, labels can be explicitly 
-            given as keyword arguments.
+        :param labels:
+            The label values to predict model spectra of. The length and order
+            should match what is required of the vectorizer
+            (`CannonModel.vectorizer.labels`).
         """
-
-        labels = self._format_input_labels(labels, **labels_as_kwargs)
-
-        return np.dot(self.coefficients, model._build_label_vector_rows(
-            self.label_vector, labels, dict(zip(self.labels, self.pivots))
-            )).flatten()
+        return np.dot(self.coefficients, self.vectorizer(labels))
 
 
     @model.requires_training_wheels
@@ -247,7 +227,7 @@ class CannonModel(model.BaseCannonModel):
         return (labels_opt, cov)
 
 
-def _fit_pixel(fluxes, flux_uncertainties, label_vector_array, **kwargs):
+def _fit_pixel(fluxes, flux_uncertainties, design_matrix, **kwargs):
     """
     Return the optimal label vector coefficients and scatter for a pixel, given
     the fluxes, uncertainties, and the label vector array.
@@ -258,15 +238,15 @@ def _fit_pixel(fluxes, flux_uncertainties, label_vector_array, **kwargs):
     :param flux_uncertainties:
         The 1-sigma flux uncertainties for the given pixel, from all stars.
 
-    :param label_vector_array:
-        The label vector array. This should have shape `(N_stars, N_terms + 1)`.
+    :param design_matrix:
+        The design matrix for the spectral model.
 
     :returns:
         The optimised label vector coefficients and scatter for this pixel.
     """
 
     _ = kwargs.get("max_uncertainty", 1)
-    failed_response = (np.nan * np.ones(label_vector_array.shape[0]), _)
+    failed_response = (np.nan * np.ones(design_matrix.shape[1]), _)
     if np.all(flux_uncertainties >= _):
         return failed_response
 
@@ -277,8 +257,8 @@ def _fit_pixel(fluxes, flux_uncertainties, label_vector_array, **kwargs):
     # Optimise the scatter, and at each scatter value we will calculate the
     # optimal vector coefficients.
     op_scatter, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
-        _pixel_scatter_nll, scatter,
-        args=(fluxes, flux_uncertainties, label_vector_array),
+        _model_pixel_with_scatter, scatter,
+        args=(fluxes, flux_uncertainties, design_matrix),
         disp=False, full_output=True)
 
     if warnflag > 0:
@@ -287,24 +267,18 @@ def _fit_pixel(fluxes, flux_uncertainties, label_vector_array, **kwargs):
             "Maximum number of iterations made during optimisation."
             ][warnflag - 1]))
 
-    # Calculate the coefficients at the optimal scatter value.
-    # Note that if we can't solve for the coefficients, we should just set them
-    # as zero and send back a giant variance.
-    try:
-        coefficients, ATCiAinv, variance = _fit_coefficients(
-            fluxes, flux_uncertainties, op_scatter, label_vector_array)
-
-    except np.linalg.linalg.LinAlgError:
-        logger.exception("Failed to calculate coefficients")
-        if kwargs.get("debug", False): raise
-
+    if not np.isfinite(op_scatter):
         return failed_response
 
-    else:
-        return (coefficients, op_scatter)
+    # If op_scatter is a positive finite value (i.e., if the previous
+    # optimisation was successful), this code below *must* work.
+    coefficients, ATCiAinv, variance = _fit_theta(fluxes, flux_uncertainties,
+        op_scatter, design_matrix)
+
+    return (coefficients, op_scatter)
 
 
-def _pixel_scatter_nll(scatter, fluxes, flux_uncertainties, label_vector_array,
+def _model_pixel_with_scatter(scatter, fluxes, flux_uncertainties, design_matrix,
     **kwargs):
     """
     Return the negative log-likelihood for the scatter in a single pixel.
@@ -319,7 +293,7 @@ def _pixel_scatter_nll(scatter, fluxes, flux_uncertainties, label_vector_array,
         The 1-sigma uncertainties in the fluxes for a given pixel. This should
         have the same shape as `fluxes`.
 
-    :param label_vector_array:
+    :param design_matrix:
         The label vector array for each star, for the given pixel.
 
     :returns:
@@ -335,20 +309,20 @@ def _pixel_scatter_nll(scatter, fluxes, flux_uncertainties, label_vector_array,
 
     try:
         # Calculate the coefficients for the given level of scatter.
-        theta, ATCiAinv, variance = _fit_coefficients(
-            fluxes, flux_uncertainties, scatter, label_vector_array)
+        theta, ATCiAinv, variance = _fit_theta(
+            fluxes, flux_uncertainties, scatter, design_matrix)
 
     except np.linalg.linalg.LinAlgError:
         if kwargs.get("debug", False): raise
         return np.inf
 
-    model = np.dot(theta, label_vector_array)
+    model = np.dot(theta, design_matrix.T)
 
-    return 0.5 * np.sum((fluxes - model)**2 / variance) \
-        +  0.5 * np.sum(np.log(variance))
+    # TODO: Should this have the **2 term?
+    return np.sum((fluxes - model)**2 / variance) + np.sum(np.log(variance))
 
 
-def _fit_coefficients(fluxes, flux_uncertainties, scatter, label_vector_array):
+def _fit_theta(fluxes, flux_uncertainties, scatter, design_matrix):
     """
     Fit model coefficients and scatter to a given set of normalised fluxes for a
     single pixel.
@@ -360,7 +334,7 @@ def _fit_coefficients(fluxes, flux_uncertainties, scatter, label_vector_array):
         The 1-sigma uncertainties in normalised fluxes. This should have the
         same shape as `fluxes`.
 
-    :param label_vector_array:
+    :param design_matrix:
         The label vector array for each pixel.
 
     :returns:
@@ -369,11 +343,10 @@ def _fit_coefficients(fluxes, flux_uncertainties, scatter, label_vector_array):
     """
 
     variance = flux_uncertainties**2 + scatter**2
-    CiA = label_vector_array.T * \
-        np.tile(1./variance, (label_vector_array.shape[0], 1)).T
-    ATCiAinv = np.linalg.inv(np.dot(label_vector_array, CiA))
+    CiA = design_matrix * np.tile(1./variance, (design_matrix.shape[1], 1)).T
+    ATCiAinv = np.linalg.inv(np.dot(design_matrix.T, CiA))
 
-    ATY = np.dot(label_vector_array, fluxes/variance)
+    ATY = np.dot(design_matrix.T, fluxes/variance)
     theta = np.dot(ATCiAinv, ATY)
 
     return (theta, ATCiAinv, variance)

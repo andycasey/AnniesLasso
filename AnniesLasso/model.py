@@ -14,12 +14,13 @@ __all__ = [
 
 import logging
 import numpy as np
-import multiprocessing as mp
 from collections import OrderedDict
 from datetime import datetime
 from os import path
 from six.moves import cPickle as pickle
 
+from .interruptible_pool import InterruptiblePool
+from .vectorizer.base import BaseVectorizer
 from . import (utils, __version__ as code_version)
 
 logger = logging.getLogger(__name__)
@@ -80,19 +81,16 @@ class BaseCannonModel(object):
     :param dispersion: [optional]
         The dispersion values corresponding to the given pixels. If provided, 
         this should have length `num_pixels`.
-
-    :param live_dangerously: [optional]
-        If enabled then no checks will be made on the label names, prohibiting
-        the user to input human-readable forms of the label vector.
     """
 
-    _descriptive_attributes = ["_label_vector"]
-    _trained_attributes = ["_scatter", "_coefficients", "_pivots"]
-    _data_attributes = []
-    _forbidden_label_characters = "^*"
+    _descriptive_attributes = ["_vectorizer"]
+    _trained_attributes = ["_scatter", "_coefficients"]
+    _data_attributes = \
+        ["training_labels", "training_fluxes", "training_flux_uncertainties"]
+    
     
     def __init__(self, labels, fluxes, flux_uncertainties, dispersion=None,
-        threads=1, pool=None, live_dangerously=False):
+        threads=1, pool=None):
 
         self._training_labels = labels
         self._training_fluxes = np.atleast_2d(fluxes)
@@ -100,30 +98,15 @@ class BaseCannonModel(object):
         self._dispersion = np.arange(fluxes.shape[1], dtype=int) \
             if dispersion is None else dispersion
         
+        # Initialise descriptive attributes for the model and verify the data.
         for attribute in self._descriptive_attributes:
             setattr(self, attribute, None)
         
-        # The training data must be checked, but users can live dangerously if
-        # they think they can correctly specify the label vector description.
         self._verify_training_data()
-        if not live_dangerously:
-            self._verify_labels_available()
 
         self.reset()
         self.threads = threads
-        self.pool = pool or mp.Pool(threads) if threads > 1 else None
-
-
-    def reset(self):
-        """
-        Clear any attributes that have been trained upon.
-        """
-
-        self._trained = False
-        for attribute in self._trained_attributes:
-            setattr(self, attribute, None)
-        
-        return None
+        self.pool = pool or InterruptiblePool(threads) if threads > 1 else None
 
 
     def __str__(self):
@@ -142,7 +125,16 @@ class BaseCannonModel(object):
             self.__module__, type(self).__name__, hex(id(self)))
 
 
-    # Attributes related to the training data.
+    def reset(self):
+        """
+        Clear any attributes that have been trained upon.
+        """
+        for attribute in self._trained_attributes:
+            setattr(self, attribute, None)
+        return None
+
+
+    # Attributes related to the training set.
     @property
     def dispersion(self):
         """
@@ -192,25 +184,6 @@ class BaseCannonModel(object):
         return self._training_flux_uncertainties
 
 
-    # Verifying the training data.
-    def _verify_labels_available(self):
-        """
-        Verify the label names provided do not include forbidden characters.
-        """
-        if self._forbidden_label_characters is None:
-            return True
-
-        for label in self.training_labels.dtype.names:
-            for character in self._forbidden_label_characters:
-                if character in label:
-                    raise ValueError(
-                        "forbidden character '{char}' is in potential "
-                        "label '{label}' - you can disable this verification "
-                        "by enabling `live_dangerously`".format(
-                            char=character, label=label))
-        return None
-
-
     def _verify_training_data(self):
         """
         Verify the training data for the appropriate shape and content.
@@ -241,97 +214,24 @@ class BaseCannonModel(object):
 
 
     @property
-    def is_trained(self):
-        return self._trained
-
-
-    # Attributes related to the labels and the label vector description.
-    @property
-    def labels_available(self):
+    def vectorizer(self):
         """
-        All of the available labels for each star in the training set.
+        Return the vectorizer for this Cannon model.
         """
-        return self.training_labels.dtype.names
+        return self._vectorizer
 
 
-    @property
-    def label_vector(self):
-        """ The label vector for all pixels. """
-        return self._label_vector
-
-
-    @label_vector.setter
-    def label_vector(self, label_vector_description):
+    @vectorizer.setter
+    def vectorizer(self, vectorizer):
         """
-        Set a label vector.
-
-        :param label_vector_description:
-            A structured or human-readable version of the label vector
-            description.
+        Set the vectorizer for this Cannon model.
         """
-
-        if label_vector_description is None:
-            self._label_vector = None
-            self.reset()
-            return None
-
-        label_vector = utils.parse_label_vector(label_vector_description)
-
-        # Need to actually verify that the parameters listed in the label vector
-        # are actually present in the training labels.
-        missing = \
-            set(self._get_labels(label_vector)).difference(self.labels_available)
-        if missing:
-            raise ValueError("the following labels parsed from the label "
-                             "vector description are missing in the training "
-                             "set of labels: {0}".format(", ".join(missing)))
-
-        # If this is really a new label vector description,
-        # then we are no longer trained.
-        if not hasattr(self, "_label_vector") \
-        or label_vector != self._label_vector:
-            self._label_vector = label_vector
-            self.reset()
-
-        self.pivots = \
-            np.array([np.nanmean(self.training_labels[l]) for l in self.labels])
-        
+        if not isinstance(vectorizer, BaseVectorizer):
+            raise TypeError("vectorizer must be "
+                            "a sub-class of vectorizers.BaseVectorizer")
+        self._vectorizer = vectorizer
+        self.reset() # Any trained attributes must be reset.
         return None
-
-
-    @property
-    def human_readable_label_vector(self):
-        """ Return a human-readable form of the label vector. """
-        return utils.human_readable_label_vector(self.label_vector)
-
-
-    @property
-    def labels(self):
-        """ The labels that contribute to the label vector. """
-        return self._get_labels(self.label_vector)
-    
-
-    def _get_labels(self, label_vector):
-        """
-        Return the labels that contribute to the structured label vector
-        provided.
-        """
-        return () if label_vector is None else \
-            list(OrderedDict.fromkeys([label for term in label_vector \
-                for label, power in term if power != 0]))
-
-
-    def _get_lowest_order_label_indices(self):
-        """
-        Get the indices for the lowest power label terms in the label vector.
-        """
-        indices = OrderedDict()
-        for i, term in enumerate(self.label_vector):
-            if len(term) > 1: continue
-            label, order = term[0]
-            if order < indices.get(label, [None, np.inf])[-1]:
-                indices[label] = (i, order)
-        return [indices.get(label, [None])[0] for label in self.labels]
 
 
     # Trained attributes that subclasses are likely to use.
@@ -347,14 +247,14 @@ class BaseCannonModel(object):
         'standard' model where the label vector is common to all pixels.
 
         :param coefficients:
-            A 2-D array of coefficients of shape 
-            (`N_pixels`, `N_label_vector_terms`).
+            A 2-d coefficients array of shape `(N_pixels, N_vectorizer_terms)`.
         """
 
         if coefficients is None:
             self._coefficients = None
             return None
 
+        # Some sanity checks.
         coefficients = np.atleast_2d(coefficients)
         if len(coefficients.shape) > 2:
             raise ValueError("coefficients must be a 2D array")
@@ -364,10 +264,16 @@ class BaseCannonModel(object):
             raise ValueError("axis 0 of coefficients array does not match the "
                              "number of pixels ({0} != {1})".format(
                                 P, len(self.dispersion)))
-        if Q != 1 + len(self.label_vector):
+
+        if Q != 1 + len(self.vectorizer.terms):
             raise ValueError("axis 1 of coefficients array does not match the "
                              "number of label vector terms ({0} != {1})".format(
-                                Q, 1 + len(self.label_vector)))
+                                Q, 1 + len(self.vectorizer.terms)))
+
+        if np.any(np.all(~np.isfinite(coefficients), axis=0)):
+            logger.warning("At least one vectorizer term has a non-finite "
+                           "coefficient at all pixels")
+
         self._coefficients = coefficients
         return None
 
@@ -390,71 +296,27 @@ class BaseCannonModel(object):
             self._scatter = None
             return None
         
+        # Some sanity checks..
         scatter = np.array(scatter).flatten()
         if scatter.size != len(self.dispersion):
             raise ValueError("number of scatter values does not match "
                              "the number of pixels ({0} != {1})".format(
                                 scatter.size, len(self.dispersion)))
+
         if np.any(scatter < 0):
             raise ValueError("scatter terms must be positive")
+
+        if np.std(scatter) == 0:
+            logger.warning("All pixels show the same level of variance!"
+                           " (Something probably went very, very wrong)")
         self._scatter = scatter
         return None
 
 
     @property
-    def pivots(self):
-        """
-        Return the mean values of the unique labels in the label vector.
-        """
-        return self._pivots
-
-
-    @pivots.setter
-    def pivots(self, pivots):
-        """
-        Return the pivot values for each unique label in the label vector.
-
-        :param pivots:
-            A list of pivot values for the corresponding terms in `self.labels`.
-        """
-
-        if pivots is None:
-            self._pivots = None
-            return None
-
-        """
-        if not isinstance(pivots, dict):
-            raise TypeError("pivots must be a dictionary")
-
-        missing = set(self.labels).difference(pivots)
-        if any(missing):
-            raise ValueError("pivot values for the following labels "
-                             "are missing: {}".format(", ".join(list(missing))))
-
-        if not np.all(np.isfinite(pivots.values())):
-            raise ValueError("pivot values must be finite")
-
-        self._pivots = pivots
-        """
-
-        pivots = np.array(pivots).flatten()
-        N_labels = len(self.labels)
-        if pivots.size != N_labels:
-            raise ValueError("number of pivot values does not match the "
-                             "number of unique labels in the label vector "
-                             "({0} != {1})".format(pivots.size, N_labels))
-
-        if not np.all(np.isfinite(pivots)):
-            raise ValueError("pivot values must be finite")
-
-        self._pivots = pivots
-        return None
-
-
-    # Methods which must be implemented or updated by the subclasses.
-    def pixel_label_vector(self, pixel_index):
-        """ The label vector for a given pixel. """
-        return self.label_vector
+    def is_trained(self):
+        return all(getattr(self, attr, None) is not None \
+            for attr in self._trained_attributes)
 
 
     def train(self, *args, **kwargs):
@@ -574,36 +436,22 @@ class BaseCannonModel(object):
             setattr(self, "_{}".format(attribute), contents[attribute])
         for attribute in contents["metadata"]["trained_attributes"]:
             setattr(self, "_{}".format(attribute), contents[attribute])
-        self._trained = True
 
         return None
 
 
-    # Properties and attributes related to training, etc.
     @property
     @requires_model_description
-    def labels_array(self):
+    def design_matrix(self):
         """
-        Return an array containing just the training labels, given the label
-        vector. This array does not account for any pivoting.
+        Return the design matrix for all pixels.
         """
-        return _build_label_vector_rows([[(label, 1)] for label in self.labels], 
-            self.training_labels)[1:].T
+        design_matrix = self.vectorizer(np.vstack([
+            self.training_labels[label] for label in self.vectorizer.labels]).T)
 
-
-    @property
-    @requires_model_description
-    def label_vector_array(self):
-        """
-        Build the label vector array.
-        """
-
-        lva = _build_label_vector_rows(self.label_vector, self.training_labels, 
-            dict(zip(self.labels, self.pivots)))
-
-        if not np.all(np.isfinite(lva)):
-            logger.warn("Non-finite labels in the label vector array!")
-        return lva
+        if not np.all(np.isfinite(design_matrix)):
+            logger.warn("Non-finite values in the design matrix!")
+        return design_matrix
 
 
     # Residuals in labels in the training data set.
@@ -614,21 +462,10 @@ class BaseCannonModel(object):
         model returns for each star, and the training set value.
         """
         
-        optimised_labels = self.fit(self.training_fluxes,
+        predicted_labels = self.fit(self.training_fluxes,
             self.training_flux_uncertainties, full_output=False)
 
-        return optimised_labels - self.labels_array
-
-
-    def _format_input_labels(self, args=None, **kwargs):
-        """
-        Format input labels either from a list or dictionary into a common form.
-        """
-
-        # We want labels in a dictionary.
-        labels = kwargs if args is None else dict(zip(self.labels, args))
-        return { k: (v if isinstance(v, (list, tuple, np.ndarray)) else [v]) \
-            for k, v in labels.items() }
+        return predicted_labels - self.labels_array
 
 
     @requires_model_description
@@ -752,47 +589,3 @@ class BaseCannonModel(object):
 
         return mask
 
-
-def _build_label_vector_rows(label_vector, training_labels, pivots=None):
-    """
-    Build a label vector row from a description of the label vector (as indices
-    and orders to the power of) and the label values themselves.
-
-    For example: if the first item of `labels` is `A`, and the label vector
-    description is `A^3` then the first item of `label_vector` would be:
-
-    `[[(0, 3)], ...`
-
-    This indicates the first label item (index `0`) to the power `3`.
-
-    :param label_vector:
-        An `(index, order)` description of the label vector. 
-
-    :param training_labels:
-        The values of the corresponding training labels.
-
-    :returns:
-        The corresponding label vector row.
-    """
-
-    pivots = pivots or {}
-
-    columns = [np.ones(len(training_labels), dtype=float)]
-    for term in label_vector:
-        column = 1.
-        for item in term:
-            try:
-                label, order = item
-            except TypeError:
-                column *= float(item)
-            else:
-                column *= (np.array(training_labels[label]).flatten() \
-                    - pivots.get(label, 0))**order
-        columns.append(column)
-
-    try:
-        return np.vstack(columns)
-
-    except ValueError:
-        columns[0] = np.ones(1)
-        return np.vstack(columns)
