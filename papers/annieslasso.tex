@@ -25,6 +25,9 @@
 \newcommand{\dr}{\acronym{DRXX}}
 \newcommand{\logg}{\log g}
 \newcommand{\Teff}{T_{\mathrm{eff}}}
+\newcommand{\Dvector}[1]{\boldsymbol{#1}}
+\newcommand{\vectheta}{\Dvector{\theta}}
+\newcommand{\vecv}{\Dvector{v}}
 \newcommand{\argmin}[1]{\underset{#1}{\operatorname{argmin}}\,}
 
 \begin{document}
@@ -151,14 +154,14 @@ DWH: What are we going to assume?
 
 The model is
 \begin{eqnarray}
-  y_{jn} &=& v(\ell_n)\cdot\theta_j + e_{jn}
+  y_{jn} &=& \vecv(\ell_n)\cdot\vectheta_j + e_{jn}
   \label{eq:model}\quad ,
 \end{eqnarray}
 where $y_{jn}$ is the data for star $n$ at wavelength pixel $j$,
-$v(\ell_n)$ is a function that takes as input
+$\vecv(\ell_n)$ is a function that takes as input
 the label list $\ell_n$ of length $K$ for star $n$
 and outputs a vector of length $D>K$ of functions of those labels,
-$\theta_j$ is a vector of length $D$ of parameters controlling the model at wavelength pixel $j$,
+$\vectheta_j$ is a vector of length $D$ of parameters controlling the model at wavelength pixel $j$,
 and $e_{jn}$ is a noise draw or residual.
 Inasmuch as the model is good, the noise values $e_{jn}$ can be taken to be
 drawn from a Gaussian with zero mean and variance $\sigma^2_{jn}+s^2_j$,
@@ -169,34 +172,36 @@ Two comments about the model (\ref{eq:model}).
 The first is that, because the $e_{jn}$ are thought of as being drawn from a 
 probability density function (pdf), it is a probabilistic model for the spectral
 data $y_{jn}$.
-The second is that the output of the function $v(\ell)$ can be thought
+The second is that the output of the function $\vecv(\ell)$ can be thought
 of as a row of the ``design matrix'' that defines the possible freedom
 given to the spectrum expectation model.
 
 In the \emph{training step}, we fix the $K$-lists of labels $\ell_n$
 for all training-set stars $n$.
 We seek, at each wavelength pixel $j$, the $[D+1]$ parameters
-$\theta_j,s^2_j$ that optimize a penalized likelihood:
+$\vectheta_j,s^2_j$ that optimize a penalized likelihood:
 \begin{eqnarray}
-  \theta_j,s^2_j &\leftarrow& \argmin{\theta,s^2}\left[
-    \sum_{n=1}^N \frac{y_{jn}-v(\ell_n)\cdot\theta}{\sigma^2_{jn}+s^2}
-    + \sum_{n=1}^N \ln(\sigma^2_{jn}+s^2)
-    + \Lambda_j\,||\theta||_1^1
+  \vectheta_j,s^2_j &\leftarrow& \argmin{\vectheta,s^2}\left[
+    \sum_{n=0}^{N-1} \frac{[y_{jn}-\vecv(\ell_n)\cdot\vectheta]^2}{\sigma^2_{jn}+s^2}
+    + \sum_{n=0}^{N-1} \ln(\sigma^2_{jn}+s^2)
+    + \Lambda_j\,Q(\vectheta)
     \right]
-  \\
-  ||\theta||_1^1 &\equiv& \sum_{d=1}^D |\theta_d|
   \quad ,
 \end{eqnarray}
-where $\Lambda_j$ is a regularization parameter, and $||\theta||_1^1$ is
-the L1-norm of $\theta$ or the sum of the absolute values of the
-components $\theta_d$ of the $D$-vector $\theta$.
-Although the training-step optimization problem is not convex, it
-would be convex at any fixed value of $s^2$; for this reason it will
-tend to optimize well in most cases of interest.
+where $\Lambda_j$ is a regularization parameter, and $Q(\vectheta)$ is a 
+regularizing function that encourages parameters to take on zero values.
+The regularizing function takes a $D$-vector as input and returns a
+scalar.
+We will adopt for $Q(\vectheta)$ a modification of L1 regularization,
+discussed below.
+Although the training-step optimization problem will not in general be
+convex, we can make choices for $Q(\vectheta)$ (and we will) to make the
+problem such that it would be convex at any fixed value of $s^2$; for
+this reason it will tend to optimize well in most cases of interest.
 
 The regularization parameter $\Lambda_j$ sets the strength of the
 regularization; as $\Lambda_j$ increases, the number of non-zero
-components of the parameter vector $\theta_j$ will decrease.
+components of the parameter vector $\vectheta_j$ will decrease.
 We give the regularization parameter a subscript $j$ because in
 general we can set it differently at every wavelength.
 This makes sense, because different wavelengths have very different
@@ -205,17 +210,17 @@ In what follows, we will set the value of the $\Lambda_j$ by
 validation or cross-validation or possibly based on physical arguments
 about what matters!
 
-In the \emph{test step}, we fix the parameters $\theta_j,s^2_j$ at all
+In the \emph{test step}, we fix the parameters $\vectheta_j,s^2_j$ at all
 wavelength pixels $j$.
 We seek, for each test-set star $m$, the $K$-list of labels $\ell_m$
 that optimizes the likelihood:
 \begin{eqnarray}
   \ell_m &\leftarrow& \argmin{\ell}\left[
-    \sum_{j=1}^J \frac{y_{jm}-v(\ell)\cdot\theta_j}{\sigma^2_{jm}+s^2_j}
+    \sum_{j=0}^{J-1} \frac{[y_{jm}-\vecv(\ell)\cdot\vectheta_j]^2}{\sigma^2_{jm}+s^2_j}
     \right]
   \quad .
 \end{eqnarray}
-Because the vectorizing function $v(\ell)$ is non-linear, the
+Because the vectorizing function $\vecv(\ell)$ is non-linear, the
 test-step optimization is not convex.
 However, the fact that there are many pixels $j$ acting, each of which
 has a different functional dependence on the labels in the label list
@@ -223,23 +228,46 @@ $\ell$, tends to make the optimization (in practice) find a good value
 for the label list $\ell$.
 
 The model freedom of \TheCannon\ is set by the vectorizing function
-$v(\ell)$---which takes the $K$-element label list $\ell$ and expands
+$\vecv(\ell)$---which takes the $K$-element label list $\ell$ and expands
 it into a $D$-dimensional vector of components for the linear
-model---and the regularization parameter $\Lambda$.
-Because we want the regularization to treat the different parameters
-(the different components of $\theta$) in some sense ``equally'', we
-have to make sensible choices in this function.
-One thing that the vectorizing function $v(\ell)$ can do is offset the
+model---and the regularization $\Lambda_j\,Q(\vectheta)$.
+Because we want the (simple, see below) regularization to treat the
+different parameters (the different components of $\vectheta$) in some
+sense ``equally'', we have to make sensible choices in the vectorizing
+function $\vecv(\ell)$.
+One thing that the vectorizing function $\vecv(\ell)$ can do is offset the
 labels by some kind of fiducial (mean, median, or other central)
-value, such that $v(\ell)=0$ is at a central location in the label
+value, such that $\vecv(\ell)=0$ is at a central location in the label
 space.
 Another is divide out a scale, because, for example, $\Teff$ values
 are in the thousands, but $\logg$ values are of order unity.
-If scale is not divided out, the (isotropic in $\theta$)
+If scale is not divided out, the (isotropic in $\vectheta$)
 regularization will be much more harsh, effectively, on some
 parameters than others.
 
-In detail we construct the vectorizing function $v(\ell)$ as follows...DWH??
+DWH: In detail we construct the vectorizing function $\vecv(\ell)$ as follows...
+
+For the regularizer $Q(\vectheta)$ we adopt a variant of L1
+regularization; we set
+\begin{eqnarray}
+  Q(\vectheta) &=& \sum_{d=1}^{D-1} |\theta_d|
+  \quad,
+\end{eqnarray}
+where the sum is over the $[D-1]$ components of $\vectheta$, excluding
+the zeroth component (because we don't ever expect that component to
+vanish).
+(Forgive a notational similarity here: When we subscript $\vectheta$ with
+$j$ we mean ``the $D$-vector of parameters associated with wavelength
+pixel $j$''; when we subscript $\theta$ with $d$ we mean ``the single
+parameter along coordinate axis $d$ in the $D$-dimensional $\vectheta$
+vector space.)
+There is a great deal of theory about this kind of regularization; it
+is called L1 or LASSO or ridge regression (DWH CITE STUFF).
+L1 regularization encourages parameters to vanish precisely but
+doesn't break convexity for convex problems.
+
+DWH: To set the amplitude $\Lambda_j$ at each wavelength pixel $j$, we
+employ cross-validation...
 
 \section{Training, validation, and test data}
 
@@ -307,7 +335,7 @@ DWH: Dan Foreman-Mackey (UW) and Hans-Walter Rix (MPIA) and other people...
 grants...
 \sdss...
 
-\begin{thebibliography}{dummy}
+\begin{thebibliography}{dummy}\raggedright
 \bibitem[Ness et al.(2015a)]{tc} Ness, M., Hogg, D.~W., 
 Rix, H.-W., Ho, A.~Y.~Q., \& Zasowski, G.\ 2015, \apj, 808, 16
 \bibitem[Ness et al.(2015b)]{age} Ness, M., Hogg, D.~W., 
