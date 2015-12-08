@@ -33,11 +33,6 @@ class BaseVectorizer(object):
         The terms that constitute the label vector.
     """
 
-    # TODO:
-    # I/O functionality in order to save/load the vector.
-    # (Any sort of serialisation ability should be OK)
-
-
     def __init__(self, labels, fiducials, scales, terms):
 
         N = len(labels)
@@ -67,8 +62,8 @@ class BaseVectorizer(object):
         self._fiducials = fiducials
         self._scales = scales
         self._terms = terms
-
         return None
+
 
     # These can be over-written by sub-classes, but it is useful to have some
     # basic information if the sub-classes do not overwrite it.
@@ -80,6 +75,22 @@ class BaseVectorizer(object):
     def __repr__(self):
         return "<{0}.{1} object at {2}>".format(
             self.__module__, type(self).__name__, hex(id(self)))
+
+
+    # I/O (Serializable) functionality.
+    def __getstate__(self):
+        """
+        Return the state of the vectorizer.
+        """
+        return (self._labels, self._fiducials, self._scales, self._terms)
+
+
+    def __setstate__(self, state):
+        """
+        Set the state of the vectorizer.
+        """
+        self._labels, self._fiducials, self._scales, self._terms = state
+
 
     # Read-only attributes. Don't try and change the state; create a new object.
     @property
@@ -128,6 +139,7 @@ class BaseVectorizer(object):
             The values of the labels.
         """
         raise NotImplemented("this method must be specified by the sub-classes")
+
 
     def get_label_vector_derivative(self, labels, d_label):
         """
