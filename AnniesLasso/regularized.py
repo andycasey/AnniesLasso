@@ -126,19 +126,19 @@ class RegularizedCannonModel(cannon.CannonModel):
         
         if self.pool is None:
             for pixel in utils.progressbar(range(N_px), **pb_kwds):
-                theta[pixel, :], scatter[pixel] = _fit_pixel(
+                theta[pixel, :], scatter[pixel] = _fit_regularized_pixel(
                     self.training_fluxes[:, pixel], 
                     self.training_flux_uncertainties[:, pixel],
-                    design_matrix,self.regularization, **kwargs)
+                    design_matrix, self.regularization[pixel], **kwargs)
 
         else:
             # Not as nice as mapping, but necessary if we want a progress bar.
             process = { pixel: self.pool.apply_async(
-                    _fit_pixel,
+                    _fit_regularized_pixel,
                     args=(
                         self.training_fluxes[:, pixel], 
                         self.training_flux_uncertainties[:, pixel],
-                        design_matrix, self.regularization
+                        design_matrix, self.regularization[pixel]
                     ),
                     kwds=kwargs) \
                 for pixel in range(N_px) }
@@ -152,8 +152,8 @@ class RegularizedCannonModel(cannon.CannonModel):
         return None
 
 
-def _fit_pixel(fluxes, flux_uncertainties, design_matrix, regularization,
-    **kwargs):
+def _fit_regularized_pixel(fluxes, flux_uncertainties, design_matrix,
+    regularization, **kwargs):
     """
     Return the optimal label vector coefficients and scatter for a pixel, given
     the fluxes, uncertainties, and the label vector array.
@@ -183,7 +183,7 @@ def _fit_pixel(fluxes, flux_uncertainties, design_matrix, regularization,
     # Optimise the scatter, and at each scatter value we will calculate the
     # optimal vector coefficients.
     op_scatter, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
-        _model_pixel_with_scatter, scatter,
+        _model_regularized_pixel_with_scatter, scatter,
         args=(fluxes, flux_uncertainties, design_matrix, regularization),
         disp=False, full_output=True)
 
@@ -203,8 +203,8 @@ def _fit_pixel(fluxes, flux_uncertainties, design_matrix, regularization,
     return (coefficients, op_scatter)
 
 
-def _model_pixel_with_scatter(scatter, fluxes, flux_uncertainties, design_matrix,
-    regularization, **kwargs):
+def _model_regularized_pixel_with_scatter(scatter, fluxes, flux_uncertainties,
+    design_matrix, regularization, **kwargs):
     """
     Return the negative log-likelihood for the scatter in a single pixel.
 
@@ -242,9 +242,9 @@ def _model_pixel_with_scatter(scatter, fluxes, flux_uncertainties, design_matrix
         return np.inf
 
     model = np.dot(theta, design_matrix.T)
+    variance = scatter**2 + flux_uncertainties**2
 
-    # TODO: Should this have the **2 term?
-    return np.sum((fluxes - model)**2 / variance) \
+    return np.sum((fluxes - model) / variance) \
         +  np.sum(np.log(variance)) \
         +  regularization * np.abs(theta).sum()
 

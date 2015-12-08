@@ -127,6 +127,33 @@ class BasePolynomialVectorizer(BaseVectorizer):
         raise NotImplementedError("soon..")
 
 
+    def get_human_readable_label_vector(self, labels=None, mul="*", pow="^"):
+        """
+        Return a human-readable form of the label vector.
+
+        :param labels: [optional]
+            Give new labels to form the human readable label vector (e.g.,
+            LaTeX labels).
+
+        :param mul: [optional]
+            String to use to represent a multiplication operator. For example,
+            if giving LaTeX label definitions one may want to use '\cdot' for
+            the `mul` term.
+
+        :param pow: [optional]
+            String to use to represent a power operator.
+        """
+        labels = labels or self.labels
+        terms = ["1"]
+        for term in self.terms:
+            cross_term = []
+            for i, o in term:
+                if o > 1:
+                    cross_term.append("{0}{1}{2:.0f}".format(labels[i], pow, o))
+                else:
+                    cross_term.append(labels[i])
+            terms.append(mul.join(cross_term))
+        return terms
 
 class NormalizedPolynomialVectorizer(BasePolynomialVectorizer):
     """
