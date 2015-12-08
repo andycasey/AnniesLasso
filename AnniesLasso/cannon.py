@@ -23,33 +23,41 @@ class CannonModel(model.BaseCannonModel):
     """
     A generalised Cannon model for the estimation of arbitrary stellar labels.
 
-    :param training_labels:
-        A table with columns as labels, and stars as rows.
+    :param labelled_set:
+        A set of labelled objects. The most common input form is a table with
+        columns as labels, and stars/objects as rows.
 
-    :type training_labels:
-        :class:`~astropy.table.Table` or numpy structured array
+    :type labelled_set:
+        :class:`~astropy.table.Table`, numpy structured array
 
-    :param training_fluxes:
-        An array of fluxes for stars in the training set, given as shape
-        `(num_stars, num_pixels)`. The `num_stars` should match the number of
-        rows in `labels`.
+    :param normalized_flux:
+        An array of normalized fluxes for stars in the labelled set, given as
+        shape `(num_stars, num_pixels)`. The `num_stars` should match the number
+        of rows in `labelled_set`.
 
-    :type training_fluxes:
+    :type normalized_flux:
         :class:`np.ndarray`
 
-    :param training_flux_uncertainties:
-        An array of 1-sigma flux uncertainties for stars in the training set,
-        The shape of the `training_flux_uncertainties` should match that of
-        `training_fluxes`. 
+    :param normalized_ivar:
+        An array of inverse variances on the normalized fluxes for stars in the
+        labelled set. The shape of the `normalized_ivar` array should match that
+        of `normalized_flux`.
 
-    :type training_flux_uncertainties:
+    :type normalized_ivar:
         :class:`np.ndarray`
 
     :param dispersion: [optional]
         The dispersion values corresponding to the given pixels. If provided, 
         this should have length `num_pixels`.
-    """
 
+    :param threads: [optional]
+        Specify the number of parallel threads to use. If `threads > 1`, the
+        training and prediction phases will be automagically parallelised.
+
+    :param pool: [optional]
+        Specify an optional multiprocessing pool to map jobs onto.
+        This argument is only used if specified and if `threads > 1`.
+    """
     def __init__(self, *args, **kwargs):
         super(CannonModel, self).__init__(*args, **kwargs)
 
@@ -57,27 +65,26 @@ class CannonModel(model.BaseCannonModel):
     @model.requires_model_description
     def train(self, **kwargs):
         """
-        Train the model based on the training set and the description of the
-        label vector.
+        Train the model based on the labelled set using the given vectorizer.
         """
         
-        # Initialise the required arrays.
         N_px = len(self.dispersion)
         design_matrix = self.design_matrix
-        scatter = np.nan * np.ones(N_px)
-        theta = np.nan * np.ones((N_px, design_matrix.shape[1]))
+        
+        scatter = np.zeros(N_px)
+        theta = np.zeros((N_px, design_matrix.shape[1]))
 
         pb_kwds = {
             "message": "Training Cannon model from {0} stars with {1} pixels "
-                       "each".format(len(self.training_labels), N_px),
+                       "each".format(len(self.labelled_set), N_px),
             "size": 100 if kwargs.pop("progressbar", True) else -1
         }
         
         if self.pool is None:
             for pixel in utils.progressbar(range(N_px), **pb_kwds):
                 theta[pixel, :], scatter[pixel] = _fit_pixel(
-                    self.training_fluxes[:, pixel], 
-                    self.training_flux_uncertainties[:, pixel],
+                    self.normalized_flux[:, pixel], 
+                    self.normalized_ivar[:, pixel],
                     design_matrix, **kwargs)
 
         else:
@@ -85,8 +92,8 @@ class CannonModel(model.BaseCannonModel):
             process = { pixel: self.pool.apply_async(
                     _fit_pixel,
                     args=(
-                        self.training_fluxes[:, pixel], 
-                        self.training_flux_uncertainties[:, pixel],
+                        self.normalized_flux[:, pixel], 
+                        self.normalized_ivar[:, pixel],
                         design_matrix
                     ),
                     kwds=kwargs) \
@@ -96,8 +103,7 @@ class CannonModel(model.BaseCannonModel):
                 theta[pixel, :], scatter[pixel] = proc.get()
 
         # Save the trained data and finish up.
-        self.coefficients = theta
-        self.scatter = scatter
+        self.theta, self.scatter = theta, scatter
         return None
         
 
@@ -111,30 +117,30 @@ class CannonModel(model.BaseCannonModel):
             should match what is required of the vectorizer
             (`CannonModel.vectorizer.label_names`).
         """
-        return np.dot(self.coefficients, self.vectorizer(labels).T).T
+        return np.dot(self.theta, self.vectorizer(labels).T).T
 
 
     @model.requires_training_wheels
-    def fit(self, fluxes, flux_uncertainties, **kwargs):
+    def fit(self, normalized_flux, normalized_ivar, **kwargs):
         """
-        Solve the labels for given pixel fluxes and uncertainties.
+        Solve the labels for the given normalized fluxes and inverse variances.
 
-        :param fluxes:
-            The normalised fluxes. These should be on the same dispersion scale
+        :param normalized_flux:
+            The normalized fluxes. These should be on the same dispersion scale
             as the trained data.
 
-        :param flux_uncertainties:
-            The 1-sigma uncertainties in the fluxes. This should have the same
-            shape as `fluxes`.
+        :param normalized_ivar:
+            The inverse variances of the normalized flux values. This should
+            have the same shape as `normalized_flux`.
 
         :returns:
             The labels.
         """
 
-        fluxes, flux_uncertainties = \
-            map(np.atleast_2d, (fluxes, flux_uncertainties))
+        normalized_flux = np.atleast_2d(normalized_flux)
+        normalized_ivar = np.atleast_2d(normalized_ivar)
 
-        N = fluxes.shape[0]
+        N = normalized_flux.shape[0]
         pb_kwds = {
             "message": "Fitting spectra to {} stars".format(N),
             "size": 100 if kwargs.pop("progressbar", True) and N > 10 else -1
@@ -144,13 +150,13 @@ class CannonModel(model.BaseCannonModel):
         if self.pool is None:
             for i in utils.progressbar(range(N), **pb_kwds):
                 labels[i], _ = _fit_spectrum(
-                    self.vectorizer, self.coefficients, self.scatter,
-                    fluxes[i], flux_uncertainties[i], **kwargs)
+                    self.vectorizer, self.theta, self.scatter,
+                    normalized_flux[i], normalized_ivar[i], **kwargs)
 
         else:
             processes = { i: self.pool.apply_async(_fit_spectrum,
-                    args=(self.vectorizer, self.coefficients, self.scatter,
-                        fluxes[i], flux_uncertainties[i]),
+                    args=(self.vectorizer, self.theta, self.scatter,
+                        normalized_flux[i], normalized_ivar[i]),
                     kwds=kwargs) \
                 for i in range(N) }
 
@@ -160,56 +166,54 @@ class CannonModel(model.BaseCannonModel):
         return labels
 
 
-def _estimate_theta(coefficients, scatter, fluxes, flux_uncertainties, **kwargs):
-    """
-    Perform a matrix inversion to estimate the vectorizer values given some
-    fluxes and associated uncertainties.
-
-    :param fluxes:
-        The normalised fluxes. These should be on the same dispersion scale
-        as the trained data.
-
-    :param flux_uncertainties:
-        The 1-sigma uncertainties in the fluxes. This should have the same
-        shape as `fluxes`.
-
-    :returns:
-        A two-length tuple containing the label_vector from the matrix
-        inversion and the corresponding pixel mask used.
-    """
-
-    # Check which pixels to use, then just use those.
-    mask = (flux_uncertainties < kwargs.get("max_uncertainty", 1)) \
-        * np.isfinite(coefficients[:, 0] * fluxes * flux_uncertainties)
-
-    coefficients = coefficients[mask]
-    Cinv = 1.0 / (scatter[mask]**2 + flux_uncertainties[mask]**2)
-    A = np.dot(coefficients.T, Cinv[:, None] * coefficients)
-    B = np.dot(coefficients.T, Cinv * fluxes[mask])
-    return (np.linalg.solve(A, B), mask)
-
-
-def _fit_spectrum(vectorizer, coefficients, scatter, fluxes, flux_uncertainties,
+def _estimate_label_vector(theta, scatter, normalized_flux, normalized_ivar,
     **kwargs):
+    """
+    Perform a matrix inversion to estimate the values of the label vector given
+    some normalized fluxes and associated inverse variances.
+
+    :param theta:
+        The theta coefficients that have been trained from the labelled set.
+
+    :param scatter:
+        The pixel scatter that have been trained from the labelled set.
+
+    :param normalized_flux:
+        The normalized flux values. These should be on the same dispersion scale
+        as the labelled data set.
+
+    :param normalized_ivar:
+        The inverse variance of the normalized flux values. This should have the
+        same shape as `normalized_flux`.
+    """
+
+    inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
+    A = np.dot(theta.T, inv_var[:, None] * theta)
+    B = np.dot(theta.T, inv_var * fluxes)
+    return np.linalg.solve(A, B)
+
+
+def _fit_spectrum(vectorizer, theta, scatter, normalized_flux,
+    normalized_ivar, **kwargs):
     """
     Solve the labels for given pixel fluxes and uncertainties for a single star.
 
     :param vectorizer:
         The model vectorizer.
 
-    :param coefficients:
-        The trained coefficients for the model.
+    :param theta:
+        The trained theta coefficients for the model.
 
     :param scatter:
-        The trained scatter terms for the model.
+        The trained pixel scatter terms for the model.
 
-    :param fluxes:
-        The normalised fluxes. These should be on the same dispersion scale
+    :param normalized_flux:
+        The normalized fluxes. These should be on the same dispersion scale
         as the trained data.
 
-    :param flux_uncertainties:
+    :param normalized_ivar:
         The 1-sigma uncertainties in the fluxes. This should have the same
-        shape as `fluxes`.
+        shape as `normalized_flux`.
 
     :returns:
         The labels and covariance matrix.
@@ -219,34 +223,38 @@ def _fit_spectrum(vectorizer, coefficients, scatter, fluxes, flux_uncertainties,
     # and then ask the vectorizer to interpret that label vector into the 
     # (approximate) values of the labels that could have produced that 
     # label vector.
-    lv, mask = _estimate_theta(
-        coefficients, scatter, fluxes, flux_uncertainties)
-    initial = vectorizer.get_approximate_labels(lv)
+    label_vector = _estimate_label_vector(theta, scatter,
+        normalized_flux, normalized_ivar)
+    initial = vectorizer.get_approximate_labels(label_vector)
 
     # Solve for the parameters.
+    inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
+    
     kwds = {
         "p0": initial,
         "maxfev": 10000,
-        "sigma": scatter[mask]**2 + flux_uncertainties[mask]**2,
+        "sigma": np.sqrt(1.0/inv_var),
         "absolute_sigma": True
     }
     kwds.update(kwargs)
 
-    function = lambda c, *l: np.dot(c, vectorizer(l).T).T.flatten()[mask]
-    labels, cov = op.curve_fit(function, coefficients, fluxes[mask], **kwds)
+    function = lambda c, *l: np.dot(c, vectorizer(l).T).T.flatten()
+    labels, cov = op.curve_fit(function, theta, normalized_flux, **kwds)
     return (labels, cov)
 
 
-def _fit_pixel(fluxes, flux_uncertainties, design_matrix, **kwargs):
+def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, **kwargs):
     """
-    Return the optimal label vector coefficients and scatter for a pixel, given
-    the fluxes, uncertainties, and the label vector array.
+    Return the optimal vectorizer coefficients and variance term for a pixel
+    given the normalized flux, the normalized inverse variance, and the design
+    matrix.
 
-    :param fluxes:
-        The fluxes for the given pixel, from all stars.
+    :param normalized_flux:
+        The normalized flux values for a given pixel, from all stars.
 
-    :param flux_uncertainties:
-        The 1-sigma flux uncertainties for the given pixel, from all stars.
+    :param normalized_ivar:
+        The inverse variance of the normalized flux values for a given pixel,
+        from all stars.
 
     :param design_matrix:
         The design matrix for the spectral model.
@@ -255,20 +263,20 @@ def _fit_pixel(fluxes, flux_uncertainties, design_matrix, **kwargs):
         The optimised label vector coefficients and scatter for this pixel.
     """
 
-    _ = kwargs.get("max_uncertainty", 1)
-    failed_response = (np.nan * np.ones(design_matrix.shape[1]), _)
-    if np.all(flux_uncertainties >= _):
-        return failed_response
+    # Get an initial guess of the pixel scatter.
+    scatter = np.var(normalized_flux) - np.median(1.0/normalized_ivar)
+    scatter = np.sqrt(scatter) if scatter >= 0 else np.std(normalized_flux)
 
-    # Get an initial guess of the scatter.
-    scatter = np.var(fluxes) - np.median(flux_uncertainties)**2
-    scatter = np.sqrt(scatter) if scatter >= 0 else np.std(fluxes)
+    if 0 >= scatter:
+        assert np.sum(normalized_ivar > 0) == 0
+        assert np.std(normalized_flux) == 0.
+        return (np.zeros(design_matrix.shape[1]), 0.0)
     
-    # Optimise the scatter, and at each scatter value we will calculate the
-    # optimal vector coefficients.
+    # Optimise the pixel scatter, and at each pixel scatter value we will 
+    # calculate the optimal vector coefficients for that pixel scatter value.
     op_scatter, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
-        _model_pixel_with_scatter, scatter,
-        args=(fluxes, flux_uncertainties, design_matrix),
+        _fit_pixel_with_fixed_scatter, scatter,
+        args=(normalized_flux, normalized_ivar, design_matrix),
         disp=False, full_output=True)
 
     if warnflag > 0:
@@ -277,85 +285,76 @@ def _fit_pixel(fluxes, flux_uncertainties, design_matrix, **kwargs):
             "Maximum number of iterations made during optimisation."
             ][warnflag - 1]))
 
-    if not np.isfinite(op_scatter):
-        return failed_response
-
-    # If op_scatter is a positive finite value (i.e., if the previous
-    # optimisation was successful), this code below *must* work.
-    coefficients, ATCiAinv, variance = _fit_theta(fluxes, flux_uncertainties,
-        op_scatter, design_matrix)
-    return (coefficients, op_scatter)
+    theta, ATCiAinv, inv_var = _fit_theta(
+        normalized_flux, normalized_ivar, op_scatter, design_matrix)
+    return (theta, op_scatter)
 
 
-def _model_pixel_with_scatter(scatter, fluxes, flux_uncertainties, design_matrix,
-    **kwargs):
+def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
+    design_matrix, **kwargs):
     """
-    Return the negative log-likelihood for the scatter in a single pixel.
+    Fit the normalized flux for a single pixel (across many stars) given some
+    pixel variance term, and return the best-fit theta coefficients.
 
     :param scatter:
-        The model scatter in the pixel.
+        The additional scatter to adopt in the pixel.
 
-    :param fluxes:
-        The fluxes for a given pixel (in many stars).
+    :param normalized_flux:
+        The normalized flux values for a single pixel across many stars.
 
-    :param flux_uncertainties:
-        The 1-sigma uncertainties in the fluxes for a given pixel. This should
-        have the same shape as `fluxes`.
+    :param normalized_ivar:
+        The inverse variance of the normalized flux values for a single pixel
+        across many stars.
 
     :param design_matrix:
-        The label vector array for each star, for the given pixel.
-
-    :returns:
-        The log-likelihood of the log scatter, given the fluxes and the label
-        vector array.
-
-    :raises np.linalg.linalg.LinAlgError:
-        If there was an error in inverting a matrix, and `debug` is set to True.
+        The design matrix for the model.
     """
-
-    if 0 > scatter:
+    if 0 >= scatter:
         return np.inf
 
     try:
-        # Calculate the coefficients for the given level of scatter.
-        theta, ATCiAinv, variance = _fit_theta(
-            fluxes, flux_uncertainties, scatter, design_matrix)
+        # Calculate theta coefficients for the given level of pixel variance.
+        theta, ATCiAinv, inv_var = _fit_theta(
+            normalized_flux, normalized_ivar, scatter, design_matrix)
 
     except np.linalg.linalg.LinAlgError:
         if kwargs.get("debug", False): raise
         return np.inf
 
-    model = np.dot(theta, design_matrix.T)
-    variance = scatter**2 + flux_uncertainties**2
-    
-    return np.sum((fluxes - model)**2 / variance) + np.sum(np.log(variance))
+    # If you're wondering, we take inv_var back from _fit_theta because it is 
+    # the same quantity we wish to calculate, and it saves us one operation.
+    residuals = np.dot(theta, design_matrix.T) - normalized_flux
+
+    return np.sum(inv_var * residuals**2) + np.sum(np.log(1./inv_var))
 
 
-def _fit_theta(fluxes, flux_uncertainties, scatter, design_matrix):
+def _fit_theta(normalized_flux, normalized_ivar, scatter, design_matrix):
     """
-    Fit model coefficients and scatter to a given set of normalised fluxes for a
-    single pixel.
+    Fit theta coefficients to a set of normalized fluxes for a single pixel.
 
-    :param fluxes:
-        The normalised fluxes for a single pixel (in many stars).
+    :param normalized_flux:
+        The normalized fluxes for a single pixel (across many stars).
 
-    :param flux_uncertainties:
-        The 1-sigma uncertainties in normalised fluxes. This should have the
-        same shape as `fluxes`.
+    :param normalized_ivar:
+        The inverse variance of the normalized flux values for a single pixel
+        across many stars.
+
+    :param scatter:
+        The additional scatter to adopt in the pixel.
 
     :param design_matrix:
-        The label vector array for each pixel.
+        The model design matrix.
 
     :returns:
         The label vector coefficients for the pixel, the inverse variance matrix
-        and the total pixel variance.
+        and the total inverse variance.
     """
 
-    variance = flux_uncertainties**2 + scatter**2
-    CiA = design_matrix * np.tile(1./variance, (design_matrix.shape[1], 1)).T
+    inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
+    CiA = design_matrix * np.tile(inv_var, (design_matrix.shape[1], 1)).T
     ATCiAinv = np.linalg.inv(np.dot(design_matrix.T, CiA))
 
-    ATY = np.dot(design_matrix.T, fluxes/variance)
+    ATY = np.dot(design_matrix.T, normalized_flux * inv_var)
     theta = np.dot(ATCiAinv, ATY)
 
-    return (theta, ATCiAinv, variance)
+    return (theta, ATCiAinv, inv_var)

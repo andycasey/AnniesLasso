@@ -24,31 +24,40 @@ class RegularizedCannonModel(cannon.CannonModel):
     A L1-regularized edition of The Cannon model for the estimation of arbitrary
     stellar labels.
 
-    :param training_labels:
-        A table with columns as labels, and stars as rows.
+    :param labelled_set:
+        A set of labelled objects. The most common input form is a table with
+        columns as labels, and stars/objects as rows.
 
-    :type training_labels:
-        :class:`~astropy.table.Table` or numpy structured array
+    :type labelled_set:
+        :class:`~astropy.table.Table`, numpy structured array
 
-    :param training_fluxes:
-        An array of fluxes for stars in the training set, given as shape
-        `(num_stars, num_pixels)`. The `num_stars` should match the number of
-        rows in `labels`.
+    :param normalized_flux:
+        An array of normalized fluxes for stars in the labelled set, given as
+        shape `(num_stars, num_pixels)`. The `num_stars` should match the number
+        of rows in `labelled_set`.
 
-    :type training_fluxes:
+    :type normalized_flux:
         :class:`np.ndarray`
 
-    :param training_flux_uncertainties:
-        An array of 1-sigma flux uncertainties for stars in the training set,
-        The shape of the `training_flux_uncertainties` should match that of
-        `training_fluxes`. 
+    :param normalized_ivar:
+        An array of inverse variances on the normalized fluxes for stars in the
+        labelled set. The shape of the `normalized_ivar` array should match that
+        of `normalized_flux`.
 
-    :type training_flux_uncertainties:
+    :type normalized_ivar:
         :class:`np.ndarray`
 
     :param dispersion: [optional]
         The dispersion values corresponding to the given pixels. If provided, 
         this should have length `num_pixels`.
+
+    :param threads: [optional]
+        Specify the number of parallel threads to use. If `threads > 1`, the
+        training and prediction phases will be automagically parallelised.
+
+    :param pool: [optional]
+        Specify an optional multiprocessing pool to map jobs onto.
+        This argument is only used if specified and if `threads > 1`.
     """
 
     _descriptive_attributes = ["_vectorizer", "_regularization"]
@@ -88,8 +97,7 @@ class RegularizedCannonModel(cannon.CannonModel):
             if regularization.size != len(self.dispersion):
                 raise ValueError("regularization must be a positive value or "
                                  "an array of positive values for each pixel "
-                                 "({0} != {1})".format(
-                                    regularization.size,
+                                 "({0} != {1})".format(regularization.size,
                                     len(self.dispersion)))
 
             if any(0 > regularization) \
@@ -108,8 +116,8 @@ class RegularizedCannonModel(cannon.CannonModel):
     @model.requires_model_description
     def train(self, **kwargs):
         """
-        Train the model based on the training set and the description of the
-        label vector, and enforce regularization.
+        Train the model based on the labelled set using the given vectorizer and
+        regularization terms.
         """
         
         # Initialise the required arrays.
@@ -120,25 +128,26 @@ class RegularizedCannonModel(cannon.CannonModel):
 
         pb_kwds = {
             "message": "Training Cannon model from {0} stars with {1} pixels "
-                       "each".format(len(self.training_labels), N_px),
+                       "each".format(len(self.labelled_set), N_px),
             "size": 100 if kwargs.pop("progressbar", True) else -1
         }
         
         if self.pool is None:
             for pixel in utils.progressbar(range(N_px), **pb_kwds):
-                theta[pixel, :], scatter[pixel] = _fit_regularized_pixel(
-                    self.training_fluxes[:, pixel], 
-                    self.training_flux_uncertainties[:, pixel],
+                theta[pixel, :], scatter[pixel] = _fit_pixel(
+                    self.normalized_flux[:, pixel], 
+                    self.normalized_ivar[:, pixel],
                     design_matrix, self.regularization[pixel], **kwargs)
 
         else:
             # Not as nice as mapping, but necessary if we want a progress bar.
             process = { pixel: self.pool.apply_async(
-                    _fit_regularized_pixel,
+                    _fit_pixel,
                     args=(
-                        self.training_fluxes[:, pixel], 
-                        self.training_flux_uncertainties[:, pixel],
-                        design_matrix, self.regularization[pixel]
+                        self.normalized_flux[:, pixel], 
+                        self.normalized_ivar[:, pixel],
+                        design_matrix,
+                        self.regularization[pixel],
                     ),
                     kwds=kwargs) \
                 for pixel in range(N_px) }
@@ -147,44 +156,102 @@ class RegularizedCannonModel(cannon.CannonModel):
                 theta[pixel, :], scatter[pixel] = proc.get()
 
         # Save the trained data and finish up.
-        self.coefficients = theta
-        self.scatter = scatter
+        self.theta, self.scatter = theta, scatter
         return None
 
 
-def _fit_regularized_pixel(fluxes, flux_uncertainties, design_matrix,
+def L1Norm(theta):
+    """
+    Return the L1 normalization of theta.
+
+    :param theta:
+        An array of finite values.
+    """
+    return np.sum(np.abs(theta))
+
+
+def _fit_pixel_with_fixed_scatter(scatter, normalized_flux,
+    normalized_ivar, design_matrix, regularization, **kwargs):
+    """
+    Fit the normalized flux for a single pixel (across many stars) given some
+    pixel variance term, and return the best-fit theta coefficients.
+
+    :param scatter:
+        The additional scatter to adopt in the pixel.
+
+    :param normalized_flux:
+        The normalized flux values for a single pixel across many stars.
+
+    :param normalized_ivar:
+        The inverse variance of the normalized flux values for a single pixel
+        across many stars.
+
+    :param design_matrix:
+        The design matrix for the model.
+
+    :param regularization:
+        The regularization term to scale the L1 norm of theta with.
+    """
+    if 0 >= scatter:
+        return np.inf
+
+    try:
+        # Calculate theta coefficients for the given level of pixel variance.
+        theta, ATCiAinv, inv_var = cannon._fit_theta(
+            normalized_flux, normalized_ivar, scatter, design_matrix)
+
+    except np.linalg.linalg.LinAlgError:
+        if kwargs.get("debug", False): raise
+        return np.inf
+
+    # If you're wondering, we take inv_var back from _fit_theta because it is 
+    # the same quantity we wish to calculate, and it saves us one operation.
+    residuals = np.dot(theta, design_matrix.T) - normalized_flux
+
+    # TODO: Allow a kwarg to send back individual components?
+    return np.sum(inv_var * residuals**2) \
+         + np.sum(np.log(1./inv_var)) \
+         + regularization * L1Norm(theta[1:])
+
+
+def _fit_pixel(normalized_flux, normalized_ivar, design_matrix,
     regularization, **kwargs):
     """
-    Return the optimal label vector coefficients and scatter for a pixel, given
-    the fluxes, uncertainties, and the label vector array.
+    Return the optimal vectorizer coefficients and variance term for a pixel
+    given the normalized flux, the normalized inverse variance, and the design
+    matrix.
 
-    :param fluxes:
-        The fluxes for the given pixel, from all stars.
+    :param normalized_flux:
+        The normalized flux values for a given pixel, from all stars.
 
-    :param flux_uncertainties:
-        The 1-sigma flux uncertainties for the given pixel, from all stars.
+    :param normalized_ivar:
+        The inverse variance of the normalized flux values for a given pixel,
+        from all stars.
 
     :param design_matrix:
         The design matrix for the spectral model.
+
+    :param regularization:
+        The regularization term for the given pixel.
 
     :returns:
         The optimised label vector coefficients and scatter for this pixel.
     """
 
-    _ = kwargs.get("max_uncertainty", 1)
-    failed_response = (np.nan * np.ones(design_matrix.shape[1]), _)
-    if np.all(flux_uncertainties >= _):
-        return failed_response
+    # Get an initial guess of the pixel scatter.
+    scatter = np.var(normalized_flux) - np.median(1.0/normalized_ivar)
+    scatter = np.sqrt(scatter) if scatter >= 0 else np.std(normalized_flux)
 
-    # Get an initial guess of the scatter.
-    scatter = np.var(fluxes) - np.median(flux_uncertainties)**2
-    scatter = np.sqrt(scatter) if scatter >= 0 else np.std(fluxes)
+    if 0 >= scatter:
+        assert np.sum(normalized_ivar > 0) == 0
+        assert np.std(normalized_flux) == 0.
+        return (np.zeros(design_matrix.shape[1]), 0.0)
     
-    # Optimise the scatter, and at each scatter value we will calculate the
-    # optimal vector coefficients.
+    # Optimise the pixel scatter, and at each pixel scatter value we will 
+    # calculate the optimal vector coefficients for that pixel scatter value.
     op_scatter, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
-        _model_regularized_pixel_with_scatter, scatter,
-        args=(fluxes, flux_uncertainties, design_matrix, regularization),
+        _fit_pixel_with_fixed_scatter, scatter,
+        args=(normalized_flux, normalized_ivar, design_matrix, regularization),
         disp=False, full_output=True)
 
     if warnflag > 0:
@@ -193,58 +260,6 @@ def _fit_regularized_pixel(fluxes, flux_uncertainties, design_matrix,
             "Maximum number of iterations made during optimisation."
             ][warnflag - 1]))
 
-    if not np.isfinite(op_scatter):
-        return failed_response
-
-    # If op_scatter is a positive finite value (i.e., if the previous
-    # optimisation was successful), this code below *must* work.
-    coefficients, ATCiAinv, variance = cannon._fit_theta(
-        fluxes, flux_uncertainties, op_scatter, design_matrix)
-    return (coefficients, op_scatter)
-
-
-def _model_regularized_pixel_with_scatter(scatter, fluxes, flux_uncertainties,
-    design_matrix, regularization, **kwargs):
-    """
-    Return the negative log-likelihood for the scatter in a single pixel.
-
-    :param scatter:
-        The model scatter in the pixel.
-
-    :param fluxes:
-        The fluxes for a given pixel (in many stars).
-
-    :param flux_uncertainties:
-        The 1-sigma uncertainties in the fluxes for a given pixel. This should
-        have the same shape as `fluxes`.
-
-    :param design_matrix:
-        The label vector array for each star, for the given pixel.
-
-    :returns:
-        The log-likelihood of the log scatter, given the fluxes and the label
-        vector array.
-
-    :raises np.linalg.linalg.LinAlgError:
-        If there was an error in inverting a matrix, and `debug` is set to True.
-    """
-
-    if 0 > scatter:
-        return np.inf
-
-    try:
-        # Calculate the coefficients for the given level of scatter.
-        theta, ATCiAinv, variance = cannon._fit_theta(
-            fluxes, flux_uncertainties, scatter, design_matrix)
-
-    except np.linalg.linalg.LinAlgError:
-        if kwargs.get("debug", False): raise
-        return np.inf
-
-    model = np.dot(theta, design_matrix.T)
-    variance = scatter**2 + flux_uncertainties**2
-
-    return np.sum((fluxes - model)**2 / variance) \
-        +  np.sum(np.log(variance)) \
-        +  regularization * np.abs(theta[1:]).sum()
-
+    theta, ATCiAinv, inv_var = cannon._fit_theta(
+        normalized_flux, normalized_ivar, op_scatter, design_matrix)
+    return (theta, op_scatter)

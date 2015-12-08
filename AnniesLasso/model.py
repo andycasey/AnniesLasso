@@ -29,7 +29,6 @@ def requires_training_wheels(method):
     """
     A decorator for model methods that require training before being run.
     """
-
     def wrapper(model, *args, **kwargs):
         if not model.is_trained:
             raise TypeError("the model needs training first")
@@ -42,7 +41,6 @@ def requires_model_description(method):
     A decorator for model methods that require a full model description.
     (That is, none of the _descriptive_attributes are None)
     """
-
     def wrapper(model, *args, **kwargs):
         for descriptive_attribute in model._descriptive_attributes:
             if getattr(model, descriptive_attribute) is None:
@@ -56,73 +54,76 @@ class BaseCannonModel(object):
     """
     An abstract Cannon model object that implements convenience functions.
 
-    :param labels:
-        A table with columns as labels, and stars as rows.
+    :param labelled_set:
+        A set of labelled objects. The most common input form is a table with
+        columns as labels, and stars/objects as rows.
 
-    :type labels:
-        :class:`~astropy.table.Table` or numpy structured array
+    :type labelled_set:
+        :class:`~astropy.table.Table`, numpy structured array
 
-    :param fluxes:
-        An array of fluxes for stars in the training set, given as shape
-        `(num_stars, num_pixels)`. The `num_stars` should match the number of
-        rows in `labels`.
+    :param normalized_flux:
+        An array of normalised fluxes for stars in the labelled set, given as
+        shape `(num_stars, num_pixels)`. The `num_stars` should match the number
+        of rows in `labelled_set`.
 
-    :type fluxes:
+    :type normalized_flux:
         :class:`np.ndarray`
 
-    :param flux_uncertainties:
-        An array of 1-sigma flux uncertainties for stars in the training set,
-        The shape of the `flux_uncertainties` should match `fluxes`. 
+    :param normalized_ivar:
+        An array of inverse variances on the normalized fluxes for stars in the
+        labelled set. The shape of the `normalized_ivar` array should match that
+        of `normalized_flux`.
 
-    :type flux_uncertainties:
+    :type normalized_ivar:
         :class:`np.ndarray`
 
     :param dispersion: [optional]
         The dispersion values corresponding to the given pixels. If provided, 
         this should have length `num_pixels`.
+
+    :param threads: [optional]
+        Specify the number of parallel threads to use. If `threads > 1`, the
+        training and prediction phases will be automagically parallelised.
+
+    :param pool: [optional]
+        Specify an optional multiprocessing pool to map jobs onto.
+        This argument is only used if specified and if `threads > 1`.
     """
 
     _descriptive_attributes = ["_vectorizer"]
-    _trained_attributes = ["_scatter", "_coefficients"]
-    _data_attributes = \
-        ["training_labels", "training_fluxes", "training_flux_uncertainties"]
+    _trained_attributes = ["_scatter", "_theta"]
+    _data_attributes = ["labelled_set", "normalized_flux", "normalized_ivar"]
     
-    
-    def __init__(self, labels, fluxes, flux_uncertainties, dispersion=None,
-        threads=1, pool=None):
+    def __init__(self, labelled_set, normalized_flux, normalized_ivar,
+        dispersion=None, threads=1, pool=None):
 
-        self._training_labels = labels
-        self._training_fluxes = np.atleast_2d(fluxes)
-        self._training_flux_uncertainties = np.atleast_2d(flux_uncertainties)
-        self._dispersion = np.arange(fluxes.shape[1], dtype=int) \
-            if dispersion is None else dispersion
-        
+        self._labelled_set = labelled_set
+        self._normalized_flux = np.atleast_2d(normalized_flux)
+        self._normalized_ivar = np.atleast_2d(normalized_ivar)
+        self._dispersion = dispersion if dispersion is not None \
+            else np.arange(normalized_flux.shape[1], dtype=int)
+            
         # Initialise descriptive attributes for the model and verify the data.
         for attribute in self._descriptive_attributes:
             setattr(self, attribute, None)
-        
         self._verify_training_data()
-
         self.reset()
-        self.threads = threads
-        self.pool = \
-            pool or utils.InterruptiblePool(threads) if threads > 1 else None
+
+        self.threads, self.pool = threads, pool \
+            or (utils.InterruptiblePool(threads) if threads > 1 else None)
 
 
     def __str__(self):
         return "<{module}.{name} {trained}using a training set of {N} stars "\
-               "with {K} available labels and {M} pixels each>".format(
-                    module=self.__module__,
+               "with {M} pixels each>".format(module=self.__module__,
                     name=type(self).__name__,
                     trained="trained " if self.is_trained else "",
-                    N=len(self.training_labels),
-                    K=len(self.labels_available),
-                    M=len(self.dispersion))
+                    N=len(self.labelled_set), M=len(self.dispersion))
 
 
     def __repr__(self):
-        return "<{0}.{1} object at {2}>".format(
-            self.__module__, type(self).__name__, hex(id(self)))
+        return "<{0}.{1} object at {2}>".format(self.__module__, 
+            type(self).__name__, hex(id(self)))
 
 
     def reset(self):
@@ -153,10 +154,10 @@ class BaseCannonModel(object):
         except TypeError:
             raise TypeError("dispersion provided must be an array or list-like")
 
-        if len(dispersion) != self.training_fluxes.shape[1]:
+        if len(dispersion) != self.normalized_flux.shape[1]:
             raise ValueError("dispersion provided does not match the number "
                              "of pixels per star ({0} != {1})".format(
-                                len(dispersion), self.training_fluxes.shape[1]))
+                                len(dispersion), self.normalized_flux.shape[1]))
 
         dispersion = np.array(dispersion)
         if dispersion.dtype.kind not in "iuf":
@@ -170,46 +171,45 @@ class BaseCannonModel(object):
 
 
     @property
-    def training_labels(self):
-        return self._training_labels
+    def labelled_set(self):
+        return self._labelled_set
 
 
     @property
-    def training_fluxes(self):
-        return self._training_fluxes
+    def normalized_flux(self):
+        return self._normalized_flux
 
 
     @property
-    def training_flux_uncertainties(self):
-        return self._training_flux_uncertainties
+    def normalized_ivar(self):
+        return self._normalized_ivar
 
 
     def _verify_training_data(self):
         """
         Verify the training data for the appropriate shape and content.
         """
-        if self.training_fluxes.shape != self.training_flux_uncertainties.shape:
-            raise ValueError(
-                "the training flux and uncertainty arrays should "
-                "have the same shape")
+        if self.normalized_flux.shape != self.normalized_ivar.shape:
+            raise ValueError("the normalized flux and inverse variance arrays "
+                             "for the labelled set must have the same shape")
 
-        if len(self.training_labels) == 0 \
-        or self.training_labels.dtype.names is None:
-            raise ValueError("no named labels provided for the training set")
+        if len(self.labelled_set) == 0 \
+        or self.labelled_set.dtype.names is None:
+            raise ValueError("no named labels provided in the labelled set")
 
-        if len(self.training_labels) != self.training_fluxes.shape[0]:
+        if len(self.labelled_set) != self.normalized_flux.shape[0]:
             raise ValueError(
-                "the first axes of the training flux array should "
-                "have the same shape as the nuber of rows in the label table "
+                "the first axes of the normalised flux array should "
+                "have the same shape as the nuber of rows in the labelled set"
                 "(N_stars, N_pixels)")
 
         if self.dispersion is not None:
             dispersion = np.atleast_1d(self.dispersion).flatten()
-            if dispersion.size != self.training_fluxes.shape[1]:
+            if dispersion.size != self.normalized_flux.shape[1]:
                 raise ValueError(
-                    "mis-match between the number of wavelength "
-                    "points ({0}) and flux values ({1})".format(
-                        self.training_fluxes.shape[1], dispersion.size))
+                    "mis-match between the number of dispersion points and "
+                    "normalised flux values ({0} != {1})".format(
+                        self.normalized_flux.shape[1], dispersion.size))
         return None
 
 
@@ -236,45 +236,44 @@ class BaseCannonModel(object):
 
     # Trained attributes that subclasses are likely to use.
     @property
-    def coefficients(self):
-        return self._coefficients
+    def theta(self):
+        return self._theta
 
 
-    @coefficients.setter
-    def coefficients(self, coefficients):
+    @theta.setter
+    def theta(self, theta):
         """
-        Set the label vector coefficients for each pixel. This assumes a
-        'standard' model where the label vector is common to all pixels.
+        Set the theta coefficients for the vectorizer at each pixel.
 
-        :param coefficients:
-            A 2-d coefficients array of shape `(N_pixels, N_vectorizer_terms)`.
+        :param theta:
+            A 2-d theta array of shape `(N_pixels, N_vectorizer_terms)`.
         """
 
-        if coefficients is None:
-            self._coefficients = None
+        if theta is None:
+            self._theta = None
             return None
 
         # Some sanity checks.
-        coefficients = np.atleast_2d(coefficients)
-        if len(coefficients.shape) > 2:
-            raise ValueError("coefficients must be a 2D array")
+        theta = np.atleast_2d(theta)
+        if len(theta.shape) > 2:
+            raise ValueError("theta must be a 2D array")
 
-        P, Q = coefficients.shape
+        P, Q = theta.shape
         if P != len(self.dispersion):
-            raise ValueError("axis 0 of coefficients array does not match the "
+            raise ValueError("axis 0 of theta array does not match the "
                              "number of pixels ({0} != {1})".format(
                                 P, len(self.dispersion)))
 
         if Q != 1 + len(self.vectorizer.terms):
-            raise ValueError("axis 1 of coefficients array does not match the "
+            raise ValueError("axis 1 of theta array does not match the "
                              "number of label vector terms ({0} != {1})".format(
                                 Q, 1 + len(self.vectorizer.terms)))
 
-        if np.any(np.all(~np.isfinite(coefficients), axis=0)):
+        if np.any(np.all(~np.isfinite(theta), axis=0)):
             logger.warning("At least one vectorizer term has a non-finite "
                            "coefficient at all pixels")
 
-        self._coefficients = coefficients
+        self._theta = theta
         return None
 
 
@@ -286,10 +285,10 @@ class BaseCannonModel(object):
     @scatter.setter
     def scatter(self, scatter):
         """
-        Set the scatter values for each pixel.
+        Set the scatter term for all pixels.
 
         :param scatter:
-            A 1-D array of scatter terms.
+            A 1-d array of scatter values.
         """
 
         if scatter is None:
@@ -345,8 +344,8 @@ class BaseCannonModel(object):
             The path to save the model to.
 
         :param include_training_data: [optional]
-            Save the training data (labels, fluxes, uncertainties) used to train
-            the model.
+            Save the labelled set, normalised flux and inverse variance used to
+            train the model.
 
         :param overwrite: [optional]
             Overwrite the existing file path, if it already exists.
@@ -446,13 +445,23 @@ class BaseCannonModel(object):
         """
         Return the design matrix for all pixels.
         """
-        design_matrix = \
-            self.vectorizer(np.vstack([self.training_labels[label_name] \
-                for label_name in self.vectorizer.label_names]).T)
+        matrix = self.vectorizer(np.vstack([self.labelled_set[label_name] \
+            for label_name in self.vectorizer.label_names]).T)
 
-        if not np.all(np.isfinite(design_matrix)):
+        if not np.all(np.isfinite(matrix)):
             logger.warn("Non-finite values in the design matrix!")
-        return design_matrix
+        return matrix
+
+
+    @property
+    @requires_model_description
+    def labels_array(self):
+        """
+        Return an array of all the label values in the labelled set which
+        contribute to the design matrix.
+        """
+        return np.vstack([self.labelled_set[label_name] \
+            for label_name in self.vectorizer.label_names])
 
 
     # Residuals in labels in the training data set.
@@ -460,11 +469,10 @@ class BaseCannonModel(object):
     def get_training_label_residuals(self):
         """
         Return the residuals (model - training) between the parameters that the
-        model returns for each star, and the training set value.
+        model returns for each star in the labelled set.
         """
-        
-        predicted_labels = self.fit(self.training_fluxes,
-            self.training_flux_uncertainties, full_output=False)
+        predicted_labels = self.fit(self.normalized_flux, self.normalized_ivar,
+            full_output=False)
 
         return predicted_labels - self.labels_array
 
@@ -472,7 +480,7 @@ class BaseCannonModel(object):
     @requires_model_description
     def cross_validate(self, pre_train=None, **kwargs):
         """
-        Perform leave-one-out cross-validation on the training set.
+        Perform leave-one-out cross-validation on the labelled set.
         """
         
         inferred = np.nan * np.ones_like(self.labels_array)
@@ -491,9 +499,9 @@ class BaseCannonModel(object):
 
             # Create a clean model to use so we don't overwrite self.
             model = self.__class__(
-                self.training_labels[training_set],
-                self.training_fluxes[training_set],
-                self.training_flux_uncertainties[training_set],
+                self.labelled_set[training_set],
+                self.normalized_flux[training_set],
+                self.normalized_ivar[training_set],
                 **kwds)
 
             # Initialise and run any pre-training function.
@@ -507,8 +515,8 @@ class BaseCannonModel(object):
             model.train()
 
             try:
-                inferred[i, :] = model.fit(self.training_fluxes[i],
-                    self.training_flux_uncertainties[i], full_output=False)
+                inferred[i, :] = model.fit(self.normalized_flux[i],
+                    self.normalized_ivar[i], full_output=False)
 
             except:
                 logger.exception("Exception during cross-validation on object "
@@ -526,7 +534,7 @@ class BaseCannonModel(object):
         percentiles=None, absolute_percentiles=None):
         """
         Define a continuum mask based on constraints on the baseline flux values
-        and the percentiles or absolute percentiles of theta coefficients. The
+        and the percentiles or absolute percentiles of theta theta. The
         resulting continuum mask is taken for whatever pixels meet all the given
         constraints.
 
@@ -541,7 +549,7 @@ class BaseCannonModel(object):
 
         :param absolute_percentiles: [optional]
             The same as `percentiles`, except these are calculated on the
-            absolute values of the model coefficients.
+            absolute values of the model theta.
         """
 
         mask = np.ones_like(self.dispersion, dtype=bool)
@@ -549,8 +557,8 @@ class BaseCannonModel(object):
             if len(baseline_flux) != 2:
                 raise ValueError("baseline flux constraints must be given as "
                                  "(lower, upper)")
-            mask *= (max(baseline_flux) >= self.coefficients[:, 0]) \
-                  * (self.coefficients[:, 0] >= min(baseline_flux))
+            mask *= (max(baseline_flux) >= self.theta[:, 0]) \
+                  * (self.theta[:, 0] >= min(baseline_flux))
 
         for term, constraints in (tolerances or {}).items():
             if len(constraints) != 2:
@@ -564,7 +572,7 @@ class BaseCannonModel(object):
                                 term, p_term))
                 continue
 
-            a = self.coefficients[:, 1 + self.label_vector.index(p_term)]
+            a = self.theta[:, 1 + self.label_vector.index(p_term)]
             mask *= (max(constraints) >= a) * (a >= min(constraints))
 
         for qs, use_abs in zip([percentiles, absolute_percentiles], [0, 1]):
@@ -582,7 +590,7 @@ class BaseCannonModel(object):
                                     term, p_term))
                     continue
 
-                a = self.coefficients[:, 1 + self.label_vector.index(p_term)]
+                a = self.theta[:, 1 + self.label_vector.index(p_term)]
                 if use_abs: a = np.abs(a)
 
                 p = np.percentile(a, constraints)
