@@ -5,11 +5,13 @@
 % -----
 % - make full outline
 % - get to zeroth draft
+% - audit for usage of vector and list
 % - search for all occurrences of DWH, AC, or MKN in the text and fix them.
 
 % Style Notes
 % -----------
 % - Use \acronym{NASA} for acronyms like NASA.
+% - The label list \ell is a *list*; the vectorization v(ell) is a *vector*.
 
 \documentclass[12pt,preprint]{aastex}
 \usepackage{amsmath,amssymb}
@@ -154,8 +156,8 @@ The model is
 \end{eqnarray}
 where $y_{jm}$ is the data for star $n$ at wavelength pixel $j$,
 $v(\ell_n)$ is a function that takes as input
-the label vector $\ell_n$ of length $K$ for star $n$
-and outputs a vector of length $D>K$,
+the label list $\ell_n$ of length $K$ for star $n$
+and outputs a vector of length $D>K$ of functions of those labels,
 $\theta_j$ is a vector of length $D$ of parameters controlling the model at wavelength pixel $j$,
 and $e_{jn}$ is a noise draw or residual.
 Inasmuch as the model is good, the noise values $e_{jn}$ can be taken to be
@@ -171,7 +173,7 @@ The second is that the output of the function $v(\ell)$ can be thought
 of as a row of the ``design matrix'' that defines the possible freedom
 given to the spectrum expectation model.
 
-In the \emph{training step}, we fix the $K$-vectors of labels $\ell_n$
+In the \emph{training step}, we fix the $K$-lists of labels $\ell_n$
 for all training-set stars $n$.
 We seek, at each wavelength pixel $j$, the $[D+1]$ parameters
 $\theta_j,s^2_j$ that optimize a penalized likelihood:
@@ -198,14 +200,14 @@ components of the parameter vector $\theta_j$ will decrease.
 We give the regularization parameter a subscript $j$ because in
 general we can set it differently at every wavelength.
 This makes sense, because different wavelengths have very different
-dependences on different components of the label vector $\ell$.
+dependences on different components of the label list $\ell$.
 In what follows, we will set the value of the $\Lambda_j$ by
 validation or cross-validation or possibly based on physical arguments
 about what matters!
 
 In the \emph{test step}, we fix the parameters $\theta_j,s^2_j$ at all
 wavelength pixels $j$.
-We seek, for each test-set star $m$, the $K$-vector of labels $\ell_m$
+We seek, for each test-set star $m$, the $K$-list of labels $\ell_m$
 that optimizes the likelihood:
 \begin{eqnarray}
   \ell_m &\leftarrow& \argmin{\ell}\left[
@@ -213,16 +215,16 @@ that optimizes the likelihood:
     \right]
   \quad .
 \end{eqnarray}
-Because the vector-to-vector function $v(\ell)$ is non-linear, the
+Because the vectorizing function $v(\ell)$ is non-linear, the
 test-step optimization is not convex.
 However, the fact that there are many pixels $j$ acting, each of which
 has a different functional dependence on $\ell$, tends to make the
 optimization (in practice) find a good value for $\ell$.
 
 The model freedom of \TheCannon\ is set by the vectorizing function
-$v(\ell)$---which takes the $K$-element label vector $\ell$ and
-expands it into a $D$-dimensional vector of linear components---and
-the regularization parameter $\Lambda$.
+$v(\ell)$---which takes the $K$-element label list $\ell$ and expands
+it into a $D$-dimensional vector of components for the linear
+model---and the regularization parameter $\Lambda$.
 Because we want the regularization to treat the different parameters
 (the different components of $\theta$) in some sense ``equally'', we
 have to make sensible choices in this function.
