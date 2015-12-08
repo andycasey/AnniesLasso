@@ -178,15 +178,15 @@ class NormalizedPolynomialVectorizer(BasePolynomialVectorizer):
         # Ensure the requested label names are actually in the available tables.
         for label_name in label_names:
             try:
-                label_table[label_name]
+                labelled_set[label_name]
             except KeyError:
                 raise KeyError("missing label '{}' in the table"\
                     .format(label_name))
 
         # Calculate the scales and fiducials.
-        scales = [np.ptp(np.percentile(label_table[_], [2.1, 97.9])) \
+        scales = [np.ptp(np.percentile(labelled_set[_], [2.1, 97.9])) \
             for _ in label_names]
-        fiducials = [np.percentile(label_table[_], 50) for _ in label_names]
+        fiducials = [np.percentile(labelled_set[_], 50) for _ in label_names]
 
         super(NormalizedPolynomialVectorizer, self).__init__(
             label_names, fiducials, scales, terms)
