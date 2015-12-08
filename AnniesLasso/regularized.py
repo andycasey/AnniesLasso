@@ -129,7 +129,7 @@ class RegularizedCannonModel(cannon.CannonModel):
                 theta[pixel, :], scatter[pixel] = _fit_pixel(
                     self.training_fluxes[:, pixel], 
                     self.training_flux_uncertainties[:, pixel],
-                    design_matrix, **kwargs)
+                    design_matrix,self.regularization, **kwargs)
 
         else:
             # Not as nice as mapping, but necessary if we want a progress bar.
@@ -138,7 +138,7 @@ class RegularizedCannonModel(cannon.CannonModel):
                     args=(
                         self.training_fluxes[:, pixel], 
                         self.training_flux_uncertainties[:, pixel],
-                        design_matrix
+                        design_matrix, self.regularization
                     ),
                     kwds=kwargs) \
                 for pixel in range(N_px) }
