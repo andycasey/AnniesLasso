@@ -68,14 +68,6 @@ class BaseVectorizer(object):
         self._scales = scales
         self._terms = terms
 
-        # Vectorizers will used the _parsed_terms attribute!
-        # Note that we could just set this as the terms and let things crash
-        # later on, but actually we will not set this then let the (experienced)
-        # user who is writing sub-classes to take note that their methods must
-        # make use of _parsed_terms, not terms.
-
-        #self._parsed_terms = terms
-
         return None
 
     # These can be over-written by sub-classes, but it is useful to have some
@@ -83,7 +75,7 @@ class BaseVectorizer(object):
     def __str__(self):
         return "<{module}.{name} object consisting of {K} labels and {D} terms>"\
             .format(module=self.__module__, name=type(self).__name__,
-                K=len(self.labels), D=len(self._parsed_terms))
+                K=len(self.labels), D=len(self.terms))
 
     def __repr__(self):
         return "<{0}.{1} object at {2}>".format(

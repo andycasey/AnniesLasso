@@ -8,7 +8,7 @@ A polynomial vectorizer for use in The Cannon.
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
-__all__ = ["PolynomialVectorizer", "NormalizedPolynomialVectorizer"]
+__all__ = ["BasePolynomialVectorizer", "NormalizedPolynomialVectorizer"]
 
 import numpy as np
 from collections import (Counter, OrderedDict)
@@ -17,10 +17,10 @@ from six import string_types
 from .base import BaseVectorizer
 
 
-class PolynomialVectorizer(BaseVectorizer):
+class BasePolynomialVectorizer(BaseVectorizer):
     """
-    A vectorizer class that models spectral fluxes as a linear combination of
-    label terms in a polynomial fashion.
+    A base vectorizer class that models spectral fluxes as a linear combination
+    of label terms in a polynomial fashion.
 
     :param labels:
         The label terms to use.
@@ -36,11 +36,11 @@ class PolynomialVectorizer(BaseVectorizer):
     """
 
     def __init__(self, *args, **kwargs):
-        super(PolynomialVectorizer, self).__init__(*args, **kwargs)
+        super(BasePolynomialVectorizer, self).__init__(*args, **kwargs)
 
         # Check that the terms are OK, and parse them into a useful format.
-        self._parsed_terms = parse_label_vector_description(
-            self.terms, columns=self.labels)      
+        self._terms = parse_label_vector_description(
+            self._terms, columns=self.labels)
         return None
 
 
@@ -56,26 +56,20 @@ class PolynomialVectorizer(BaseVectorizer):
             where `D` is the number of terms in the label vector description.
         """
 
-        labels = np.array(labels)
-
-        # How many dimensions?
-        if labels.ndim == 1:
-            labels = labels.reshape((1, labels.size))
-        elif labels.ndim > 2:
+        labels = np.atleast_2d(labels)
+        if labels.ndim > 2:
             raise ValueError("labels must be a 1-d or 2-d array")
-        N = labels.shape[0]
 
         # Offset and scale the labels before building the vector.
         scaled_labels = (labels - self.fiducials)/self.scales
 
-        columns = [np.ones(N, dtype=float)]
-        for term in self._parsed_terms:
-            column = 1.
-            # TODO: Re-visit using np.multiply or np.product below instead.
+        columns = [np.ones(labels.shape[0], dtype=float)]
+        for term in self.terms:
+            column = 1. # This works; don't use np.multiply/np.product.
             for index, order in term:
                 column *= scaled_labels[:, index]**order
             columns.append(column)
-        return np.vstack(columns)
+        return np.vstack(columns).T
 
 
     def get_label_vector_derivative(self, labels, d_label):
@@ -83,14 +77,11 @@ class PolynomialVectorizer(BaseVectorizer):
 
 
 
-class NormalizedPolynomialVectorizer(PolynomialVectorizer):
+class NormalizedPolynomialVectorizer(BasePolynomialVectorizer):
     """
     A vectorizer class that models spectral fluxes as a linear combination of
     label terms in a polynomial fashion. The fiducials and scales are determined
     automatically such that each label dimension has unit variance.
-
-    :param labels:
-        The label terms to use.
 
     :param label_table:
         A table containing the label values for all of the labels that will form
@@ -101,7 +92,19 @@ class NormalizedPolynomialVectorizer(PolynomialVectorizer):
         The terms that constitute the label vector.
     """
 
-    def __init__(self, labels, label_table, terms):
+    def __init__(self, label_table, terms):
+
+        # First parse the terms so that we can get the label names.
+        structured_terms = parse_label_vector_description(terms)
+        labels = get_contributing_labels(structured_terms)
+        terms = parse_label_vector_description(terms, columns=labels)
+
+        # Ensure the requested labels are actually in the available tables.
+        for label in labels:
+            try:
+                label_table[label]
+            except KeyError:
+                raise KeyError("missing label '{}' in the table".format(label))
 
         # Calculate the scales and fiducials.
         scales = \
@@ -272,3 +275,30 @@ def build_label_vector(labels, order, cross_term_order=-1, **kwargs):
                 c = [pow.join([[l], [l, str(p)]][p > 1]) for l, p in t.items()]
                 if c: items.append(mul.join(map(str, c)))
     return " {} ".format(sep).join(items)
+
+
+def get_contributing_labels(label_vector):
+    """
+    Return the label names that contribute to the structured label vector
+    description provided.
+
+    :param label_vector:
+        A structured description of the label vector.
+    """
+    return list(OrderedDict.fromkeys([label for term in label_vector \
+        for label, power in term if power != 0]))
+
+
+
+# TODO: SOMETHING ABOUT THIS
+def _get_lowest_order_label_indices(self):
+    """
+    Get the indices for the lowest power label terms in the label vector.
+    """
+    indices = OrderedDict()
+    for i, term in enumerate(self.label_vector):
+        if len(term) > 1: continue
+        label, order = term[0]
+        if order < indices.get(label, [None, np.inf])[-1]:
+            indices[label] = (i, order)
+    return [indices.get(label, [None])[0] for label in self.labels]
