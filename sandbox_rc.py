@@ -4,55 +4,42 @@ import numpy as np
 
 from astropy.table import Table
 
-import AnniesLasso
+import AnniesLasso as tc
 
 PATH = "/Users/arc/research/apogee/"
 CATALOG = "apogee-rc-DR12.fits"
 MEMMAP_FILE_FORMAT = "apogee-rc-{}.memmap"
 
-model_filename = "rc-trained-abundances.pkl"
-
-N = 2000
+N = 500
 
 # Load up the data
-training_labels = Table.read(os.path.join(PATH, CATALOG))
-dispersion = 10**(np.memmap(
+labelled_set = Table.read(os.path.join(PATH, CATALOG))
+dispersion = np.memmap(
     os.path.join(PATH, MEMMAP_FILE_FORMAT).format("dispersion"),
-    mode="c", dtype=float).flatten())
-training_fluxes = np.memmap(
-    os.path.join(PATH, MEMMAP_FILE_FORMAT).format("flux"),
-    mode="c", dtype=float).reshape((len(training_labels), -1))
-training_flux_uncertainties = np.memmap(
-    os.path.join(PATH, MEMMAP_FILE_FORMAT).format("flux-uncertainties"),
-    mode="c", dtype=float).reshape(training_fluxes.shape)
+    mode="c", dtype=float).flatten()
+normalized_flux = np.memmap(
+    os.path.join(PATH, MEMMAP_FILE_FORMAT).format("normalized-flux"),
+    mode="c", dtype=float).reshape((len(labelled_set), -1))
+normalized_ivar = np.memmap(
+    os.path.join(PATH, MEMMAP_FILE_FORMAT).format("normalized-ivar"),
+    mode="c", dtype=float).reshape(normalized_flux.shape)
 
 
 # Issue: if training a complex model (or a simple one??), parallel can be slower
 # than serial if memory mapped arrays are used and the mode for opening them is
 # set to 'r'
 
-model = AnniesLasso.CannonModel(
-    training_labels[:N], training_fluxes[:N], training_flux_uncertainties[:N],
-    threads=4, dispersion=dispersion)
+model = tc.RegularizedCannonModel(
+    labelled_set[:N], normalized_flux[:N], normalized_ivar[:N],
+    threads=1, dispersion=dispersion)
 
-if not os.path.exists(model_filename):
+model.vectorizer = tc.vectorizer.NormalizedPolynomialVectorizer(
+    model.labelled_set,
+    "TEFF^2 + LOGG^2 + PARAM_M_H^2 + TEFF + LOGG + PARAM_M_H + "
+    "TEFF * LOGG + TEFF * PARAM_M_H + LOGG * PARAM_M_H")
 
-    element_labels = [label for label in model.training_labels.dtype.names \
-        if label.endswith("_H") and label != "PARAM_M_H"]
-
-    label_vector = " + ".join(["TEFF^4",
-        AnniesLasso.utils.build_label_vector(["TEFF", "LOGG"], 3, 2)])
-
-    for element_label in element_labels:
-        label_vector += " + {0}^2 + {0} + {0}*TEFF + {0}*LOGG".format(element_label)
-
-    model.label_vector = label_vector
-
-    model.train()
-    model.save(model_filename, include_training_data=True, overwrite=True)
-
-else:
-    model.load(model_filename)
+model.regularization = 0.
+model.train()
 
 
 # Calculate abundances for all the other stars in the sample!

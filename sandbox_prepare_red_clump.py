@@ -16,7 +16,7 @@ from astropy.io import fits
 PATH = "/Users/arc/research/apogee/"
 CATALOG = "apogee-rc-DR12.fits"
 MEMMAP_FILE_FORMAT = "apogee-rc-{}.memmap"
-dtype, ext_flux, ext_sigma = (float, 3, 2)
+dtype, ext_flux, ext_sigma = (float, 1, 2)
 
 catalog = fits.open(os.path.join(PATH, CATALOG))[1].data
 
@@ -24,12 +24,12 @@ catalog = fits.open(os.path.join(PATH, CATALOG))[1].data
 image = fits.open(glob("{path}/{location_id}/*{apogee_id}.fits".format(
     path=PATH, location_id=catalog["LOCATION_ID"][0],
     apogee_id=catalog["APOGEE_ID"][0]))[0])
-dispersion = image[ext_flux].header["CRVAL1"] + \
-    np.arange(image[ext_flux].data.size) * image[ext_flux].header["CDELT1"]
+dispersion = 10**(image[ext_flux].header["CRVAL1"] + \
+    np.arange(image[ext_flux].data.size) * image[ext_flux].header["CDELT1"])
 image.close()
 
-fluxes = np.nan * np.ones((len(catalog), dispersion.size))
-flux_uncertainties = np.nan * np.ones_like(fluxes)
+normalized_flux = np.nan * np.ones((len(catalog), dispersion.size))
+normalized_ivar = np.nan * np.ones_like(normalized_flux)
 
 failures = []
 
@@ -41,8 +41,8 @@ in enumerate(zip(catalog["LOCATION_ID"], catalog["APOGEE_ID"])):
 
     try:
         image = fits.open(spectrum_filename)
-        fluxes[i, :] = image[ext_flux].data
-        flux_uncertainties[i, :] = image[ext_sigma].data
+        normalized_flux[i, :] = image[ext_flux].data
+        normalized_ivar[i, :] = 1.0/(image[ext_sigma].data**2)
 
     except:
         failures.append(spectrum_filename)
@@ -52,10 +52,9 @@ in enumerate(zip(catalog["LOCATION_ID"], catalog["APOGEE_ID"])):
 
     print(i, len(catalog))
 
-
-bad = (flux_uncertainties == 0)
-fluxes[bad] = np.nan
-flux_uncertainties[bad] = 1.
+bad = ~np.isfinite(normalized_ivar)
+normalized_ivar[bad] = 0.
+normalized_flux[bad] = 1.
 
 # Copy to memory-mapped arrays.
 memmap_dispersion = np.memmap(
@@ -65,17 +64,17 @@ memmap_dispersion[:] = dispersion.copy()
 memmap_dispersion.flush()
 del memmap_dispersion
 
-memmap_fluxes = np.memmap(
-    os.path.join(PATH, MEMMAP_FILE_FORMAT).format("flux"),
-    dtype=dtype, mode="w+", shape=fluxes.shape)
-memmap_fluxes[:] = fluxes.copy()
-memmap_fluxes.flush()
-del memmap_fluxes
+memmap_normalized_flux = np.memmap(
+    os.path.join(PATH, MEMMAP_FILE_FORMAT).format("normalized-flux"),
+    dtype=dtype, mode="w+", shape=normalized_flux.shape)
+memmap_normalized_flux[:] = normalized_flux.copy()
+memmap_normalized_flux.flush()
+del memmap_normalized_flux
 
-memmap_flux_uncertainties = np.memmap(
-    os.path.join(PATH, MEMMAP_FILE_FORMAT).format("flux-uncertainties"),
-    dtype=dtype, mode="w+", shape=flux_uncertainties.shape)
-memmap_flux_uncertainties[:] = flux_uncertainties.copy()
-memmap_flux_uncertainties.flush()
-del memmap_flux_uncertainties
+memmap_normalized_ivar = np.memmap(
+    os.path.join(PATH, MEMMAP_FILE_FORMAT).format("normalized-ivar"),
+    dtype=dtype, mode="w+", shape=normalized_ivar.shape)
+memmap_normalized_ivar[:] = normalized_ivar.copy()
+memmap_normalized_ivar.flush()
+del memmap_normalized_ivar
 
