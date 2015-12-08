@@ -111,7 +111,7 @@ class CannonModel(model.BaseCannonModel):
             should match what is required of the vectorizer
             (`CannonModel.vectorizer.labels`).
         """
-        return np.dot(self.coefficients, self.vectorizer(labels))
+        return np.dot(self.coefficients, self.vectorizer(labels).T).T
 
 
     @model.requires_training_wheels
@@ -128,103 +128,120 @@ class CannonModel(model.BaseCannonModel):
             shape as `fluxes`.
 
         :returns:
-            The labels and covariance matrix.
+            The labels.
         """
 
-        label_indices = self._get_lowest_order_label_indices()
-        fluxes, flux_uncertainties = map(np.array, (fluxes, flux_uncertainties))
+        fluxes, flux_uncertainties = \
+            map(np.atleast_2d, (fluxes, flux_uncertainties))
 
-        # TODO: Consider parallelising this, which would mean factoring
-        # _fit out of the model class, which gets messy.
-        # Since solving for labels is not a big bottleneck (yet), let's leave
-        # this.
+        N = fluxes.shape[0]
+        pb_kwds = {
+            "message": "Fitting spectra to {} stars".format(N),
+            "size": 100 if kwargs.pop("progressbar", True) and N > 10 else -1
+        }
+        
+        labels = np.nan * np.ones((N, len(self.vectorizer.labels)))
+        if self.pool is None:
+            for i in utils.progressbar(range(N), **pb_kwds):
+                labels[i], _ = self._fit_spectrum(
+                    self.vectorizer, self.coefficients, self.scatter,
+                    fluxes[i], flux_uncertainties[i], **kwargs)
 
-        full_output = kwargs.pop("full_output", False)
-        if fluxes.ndim == 1:
-            labels, covariance = \
-                self._fit(fluxes, flux_uncertainties, label_indices, **kwargs)
         else:
-            N_stars, N_labels = (fluxes.shape[0], len(self.labels))
-            labels = np.empty((N_stars, N_labels), dtype=float)
-            covariance = np.empty((N_stars, N_labels, N_labels), dtype=float)
+            processes = { i: self.pool.apply_async(_fit_spectrum,
+                    args=(self.vectorizer, self.coefficients, self.scatter,
+                        fluxes[i], flux_uncertainties[i]),
+                    kwds=kwargs) \
+                for i in range(N) }
 
-            for i, (f, u) in enumerate(zip(fluxes, flux_uncertainties)):
-                labels[i, :], covariance[i, :] = \
-                    self._fit(f, u, label_indices, **kwargs)
+            for i, process in utils.progressbar(processes.items(), **pb_kwds):
+                labels[i], _ = process.get()
 
-        if full_output:
-            return (labels, covariance)
         return labels
 
 
-    def _fit(self, fluxes, flux_uncertainties, label_indices, **kwargs):
-        """
-        Solve the labels for given pixel fluxes and uncertainties
-        for a single star.
 
-        :param fluxes:
-            The normalised fluxes. These should be on the same dispersion scale
-            as the trained data.
 
-        :param flux_uncertainties:
-            The 1-sigma uncertainties in the fluxes. This should have the same
-            shape as `fluxes`.
 
-        :returns:
-            The labels and covariance matrix.
-        """
 
-        # Check which pixels to use, then just use those.
-        use = (flux_uncertainties < kwargs.get("max_uncertainty", 1)) \
-            * np.isfinite(self.coefficients[:, 0] * fluxes * flux_uncertainties)
+def _fit_spectrum(vectorizer, coefficients, scatter, fluxes, flux_uncertainties,
+    **kwargs):
+    """
+    Solve the labels for given pixel fluxes and uncertainties
+    for a single star.
 
-        fluxes = fluxes.copy()[use]
-        flux_uncertainties = flux_uncertainties.copy()[use]
-        scatter, coefficients = self.scatter[use], self.coefficients[use]
+    :param vectorizer:
+        The model vectorizer.
 
-        Cinv = 1.0 / (scatter**2 + flux_uncertainties**2)
-        A = np.dot(coefficients.T, Cinv[:, None] * coefficients)
-        B = np.dot(coefficients.T, Cinv * fluxes)
-        theta_p0 = np.linalg.solve(A, B)
+    :param coefficients:
+        The trained coefficients for the model.
 
-        # Need to match the initial theta coefficients back to label values.
-        # (Maybe this should use some general non-linear simultaneous solver?)
-        initial = {}
-        for index in label_indices:
-            if index is None: continue
-            label, order = self.label_vector[index][0]
-            # The +1 index offset is because the first theta is a scaling.
-            value = abs(theta_p0[1 + index])**(1./order)
-            if not np.isfinite(value): continue
-            initial[label] = value
+    :param scatter:
+        The trained scatter terms for the model.
 
-        # There could be some coefficients that are only used in cross-terms.
-        # We could solve for them, or just take them as zero (i.e., near the
-        # pivot point of the data set).
-        missing = set(self.labels).difference(initial)
-        initial.update({ label: 0.0 for label in missing })
+    :param fluxes:
+        The normalised fluxes. These should be on the same dispersion scale
+        as the trained data.
 
-        # Create and test the generating function.
-        def function(coeffs, *labels):
-            return np.dot(coeffs, 
-                model._build_label_vector_rows(self.label_vector, 
-                    { label: [v] for label, v in zip(self.labels, labels) }
-                )).flatten()
+    :param flux_uncertainties:
+        The 1-sigma uncertainties in the fluxes. This should have the same
+        shape as `fluxes`.
 
-        # Solve for the parameters.
-        kwds = {
-            "p0": np.array([initial[label] for label in self.labels]),
-            "maxfev": 10000,
-            "sigma": 1.0/np.sqrt(Cinv),
-            "absolute_sigma": True
-        }
-        kwds.update(kwargs)
-        labels_opt, cov = op.curve_fit(function, coefficients, fluxes, **kwds)
+    :returns:
+        The labels and covariance matrix.
+    """
 
-        # Apply any necessary pivots to put these back to real space.   
-        labels_opt += self.pivots
-        
-        return (labels_opt, cov)
+    # Get an initial estimate of the label vector from a matrix inversion,
+    # and then ask the vectorizer to interpret that label vector into the 
+    # (approximate) values of the labels that could have produced that 
+    # label vector.
+    lv, mask = _estimate_theta(
+        coefficients, scatter, fluxes, flux_uncertainties)
+    initial = vectorizer.get_approximate_labels(lv)
+
+    # Solve for the parameters.
+    kwds = {
+        "p0": initial,
+        "maxfev": 10000,
+        "sigma": scatter[mask]**2 + flux_uncertainties[mask]**2,
+        "absolute_sigma": True
+    }
+    kwds.update(kwargs)
+
+    function = lambda c, *l: np.dot(c, vectorizer(l).T).T.flatten()[mask]
+    labels, cov = op.curve_fit(function, coefficients, fluxes[mask], **kwds)
+
+    return (labels, cov)
+
+
+
+def _estimate_theta(coefficients, scatter, fluxes, flux_uncertainties, **kwargs):
+    """
+    Perform a matrix inversion to estimate the vectorizer values given some
+    fluxes and associated uncertainties.
+
+    :param fluxes:
+        The normalised fluxes. These should be on the same dispersion scale
+        as the trained data.
+
+    :param flux_uncertainties:
+        The 1-sigma uncertainties in the fluxes. This should have the same
+        shape as `fluxes`.
+
+    :returns:
+        A two-length tuple containing the label_vector from the matrix
+        inversion and the corresponding pixel mask used.
+    """
+
+    # Check which pixels to use, then just use those.
+    mask = (flux_uncertainties < kwargs.get("max_uncertainty", 1)) \
+        * np.isfinite(coefficients[:, 0] * fluxes * flux_uncertainties)
+
+    coefficients = coefficients[mask]
+    Cinv = 1.0 / (scatter[mask]**2 + flux_uncertainties[mask]**2)
+    A = np.dot(coefficients.T, Cinv[:, None] * coefficients)
+    B = np.dot(coefficients.T, Cinv * fluxes[mask])
+    return (np.linalg.solve(A, B), mask)
 
 
 def _fit_pixel(fluxes, flux_uncertainties, design_matrix, **kwargs):
