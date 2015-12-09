@@ -127,8 +127,9 @@ class RegularizedCannonModel(cannon.CannonModel):
         theta = np.nan * np.ones((N_px, design_matrix.shape[1]))
 
         pb_kwds = {
-            "message": "Training Cannon model from {0} stars with {1} pixels "
-                       "each".format(len(self.labelled_set), N_px),
+            "message": "Training {2} model from {0} stars with {1} pixels "
+                       "each".format(len(self.labelled_set), N_px,
+                            type(self).__name__),
             "size": 100 if kwargs.pop("progressbar", True) else -1
         }
         
