@@ -13,6 +13,7 @@ __all__ = ["RegularizedCannonModel"]
 import logging
 import numpy as np
 import scipy.optimize as op
+from sys import stdout
 
 from . import (cannon, model, utils)
 
@@ -127,9 +128,10 @@ class RegularizedCannonModel(cannon.CannonModel):
         theta = np.nan * np.ones((N_px, design_matrix.shape[1]))
 
         pb_kwds = {
-            "message": "Training {2} model from {0} stars with {1} pixels "
-                       "each".format(len(self.labelled_set), N_px,
-                            type(self).__name__),
+            "message": "Training L1-regularized Cannon model from {0} stars "
+                       "with {1} pixels and a {2:.0e} mean regularization "
+                       "factor".format(len(self.labelled_set), N_px,
+                            np.mean(self.regularization)),
             "size": 100 if kwargs.pop("progressbar", True) else -1
         }
         
@@ -171,14 +173,14 @@ def L1Norm(theta):
     return np.sum(np.abs(theta))
 
 
-def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
-    design_matrix, regularization, **kwargs):
+def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
+    normalized_ivar, design_matrix, regularization, **kwargs):
     """
-    Fit the normalized flux for a single pixel (across many stars) given some
-    pixel variance term, and return the best-fit theta coefficients.
+    Fit the normalized flux for a single pixel (across many stars) given the
+    parameters (scatter, theta) and a fixed regularization term.
 
-    :param scatter:
-        The additional scatter to adopt in the pixel.
+    :param parameters:
+        The parameters `(scatter, *theta)` to employ.
 
     :param normalized_flux:
         The normalized flux values for a single pixel across many stars.
@@ -193,26 +195,15 @@ def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
     :param regularization:
         The regularization term to scale the L1 norm of theta with.
     """
-    if 0 >= scatter:
+    scatter, theta = parameters[0], parameters[1:]
+    if 0 > scatter:
         return np.inf
 
-    try:
-        # Calculate theta coefficients for the given level of pixel variance.
-        theta, ATCiAinv, inv_var = cannon._fit_theta(
-            normalized_flux, normalized_ivar, scatter, design_matrix)
-
-    except np.linalg.linalg.LinAlgError:
-        if kwargs.get("debug", False): raise
-        return np.inf
-
-    # If you're wondering, we take inv_var back from _fit_theta because it is 
-    # the same quantity we wish to calculate, and it saves us one operation.
     residuals = np.dot(theta, design_matrix.T) - normalized_flux
-
-    # TODO: Allow a kwarg to send back individual components?
+    inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
     return np.sum(inv_var * residuals**2) \
-         + np.sum(np.log(1./inv_var)) \
-         + regularization * L1Norm(theta[1:])
+        + np.sum(np.log(1./inv_var)) \
+        + regularization * L1Norm(theta[1:])
 
 
 def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, regularization,
@@ -240,27 +231,59 @@ def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, regularization,
     """
 
     # Get an initial guess of the pixel scatter.
-    scatter = np.var(normalized_flux) - np.median(1.0/normalized_ivar)
-    scatter = np.sqrt(scatter) if scatter >= 0 else np.std(normalized_flux)
+    p0_scatter = np.var(normalized_flux) - np.median(1.0/normalized_ivar)
+    p0_scatter = \
+        np.sqrt(p0_scatter) if p0_scatter >= 0 else np.std(normalized_flux)
 
-    if 0 >= scatter:
+    if 0 > p0_scatter:
         assert np.sum(normalized_ivar > 0) == 0
         assert np.std(normalized_flux) == 0.
         return (np.zeros(design_matrix.shape[1]), 0.0)
-    
-    # Optimise the pixel scatter, and at each pixel scatter value we will 
-    # calculate the optimal vector coefficients for that pixel scatter value.
-    op_scatter, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
-        _fit_pixel_with_fixed_scatter, scatter,
-        args=(normalized_flux, normalized_ivar, design_matrix, regularization),
-        disp=False, full_output=True)
 
-    if warnflag > 0:
-        logger.warning("Warning: {}".format([
-            "Maximum number of function evaluations made during optimisation.",
-            "Maximum number of iterations made during optimisation."
-            ][warnflag - 1]))
+    # Get an initial guess of the theta parameters, or just use zeros?
+    if kwargs.get("initialize_at_fiducials", True):
+        # If the initial guess is zero, because our theta values are scaled, we
+        # don't need to know them and we can just set theta as zero.
+        p0_theta = np.hstack([1., np.zeros(design_matrix.shape[1] - 1)])
+        logger.debug("Initializing {theta_0..D} = {1, 0, ..., 0}")
+    else:
+        p0_theta, _, __ = cannon._fit_theta(normalized_flux, normalized_ivar, 
+            p0_scatter, design_matrix)
 
-    theta, ATCiAinv, inv_var = cannon._fit_theta(
-        normalized_flux, normalized_ivar, op_scatter, design_matrix)
-    return (theta, op_scatter)
+    # Build the initial guess.
+    p0 = np.hstack([p0_scatter, p0_theta])
+
+    # Optimise the model parameters (scatter, {theta})
+    # ISSUE: Do we have well-founded boundaries on the theta coefficients if the
+    #        vectorizer is scaled?
+    kwds = {
+        "disp": 0,
+        "args": (normalized_flux, normalized_ivar, design_matrix, regularization),
+        "approx_grad": True,
+        #"bounds": [(0, None)] + [(None, None)] * p0_theta.size,
+        "bounds": None,
+        "m": 10, # Default
+        "factr": 10000000.0, # Default
+        "pgtol": 1e-05, # Default
+        "epsilon": 1e-08, # Default
+        "iprint": -1,
+        "maxfun": 15000, # Default
+        "maxiter": 15000, # Default
+        "callback": None
+    }
+    op_parameters, fopt, info_dict = op.fmin_l_bfgs_b(
+        _fit_pixel_with_fixed_regularization, p0, **kwds)
+
+    if info_dict["warnflag"] > 0:
+        # Note: The writing and flushing is to print things nicely even if we
+        #       have a progressbar, which is likely during the optimization.
+        stdout.write("\r\n")
+        stdout.flush()
+        logger.warning("Optimization stopped prematurely: {}".format([
+            "too many function evaluations (>{0}) or iterations (>{1})".format(
+                kwds["maxfun"], kwds["maxiter"]),
+            "{}".format(info_dict.get("task", None))
+            ][info_dict["warnflag"] - 1]))
+
+    scatter, theta = op_parameters[0], op_parameters[1:]
+    return (theta, scatter)
