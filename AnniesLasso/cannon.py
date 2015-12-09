@@ -148,12 +148,13 @@ class CannonModel(model.BaseCannonModel):
         }
         
         labels = np.nan * np.ones((N, len(self.vectorizer.label_names)))
-        if self.pool is None:
-            for i in utils.progressbar(range(N), **pb_kwds):
-                labels[i], _ = _fit_spectrum(
-                    self.vectorizer, self.theta, self.scatter,
-                    normalized_flux[i], normalized_ivar[i], **kwargs)
-
+        # ISSUE: TODO: parallelism breaks.
+        #if self.pool is None:
+        for i in utils.progressbar(range(N), **pb_kwds):
+            labels[i], _ = _fit_spectrum(
+                self.vectorizer, self.theta, self.scatter,
+                normalized_flux[i], normalized_ivar[i], **kwargs)
+        """
         else:
             processes = { i: self.pool.apply_async(_fit_spectrum,
                     args=(self.vectorizer, self.theta, self.scatter,
@@ -163,7 +164,7 @@ class CannonModel(model.BaseCannonModel):
 
             for i, process in utils.progressbar(processes.items(), **pb_kwds):
                 labels[i], _ = process.get()
-
+        """
         return labels
 
 
@@ -190,7 +191,7 @@ def _estimate_label_vector(theta, scatter, normalized_flux, normalized_ivar,
 
     inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
     A = np.dot(theta.T, inv_var[:, None] * theta)
-    B = np.dot(theta.T, inv_var * fluxes)
+    B = np.dot(theta.T, inv_var * normalized_flux)
     return np.linalg.solve(A, B)
 
 
@@ -239,7 +240,7 @@ def _fit_spectrum(vectorizer, theta, scatter, normalized_flux,
     }
     kwds.update(kwargs)
 
-    function = lambda c, *l: np.dot(c, vectorizer(l).T).T.flatten()
+    function = lambda t, *l: np.dot(t, vectorizer(l).T).T.flatten()
     labels, cov = op.curve_fit(function, theta, normalized_flux, **kwds)
     return (labels, cov)
 

@@ -13,6 +13,7 @@ __all__ = ["BasePolynomialVectorizer", "NormalizedPolynomialVectorizer",
 
 import numpy as np
 from collections import (Counter, OrderedDict)
+from itertools import combinations_with_replacement
 from six import string_types
 
 from .base import BaseVectorizer
@@ -141,16 +142,16 @@ class BasePolynomialVectorizer(BaseVectorizer):
         :param pow: [optional]
             String to use to represent a power operator.
         """
-        labels = labels or self.label_names
+        label_names = label_names or self.label_names
         terms = ["1"]
         for term in self.terms:
-            cross_term = []
+            ct = []
             for i, o in term:
                 if o > 1:
-                    cross_term.append("{0}{1}{2:.0f}".format(labels[i], pow, o))
+                    ct.append("{0}{1}{2:.0f}".format(label_names[i], pow, o))
                 else:
-                    cross_term.append(labels[i])
-            terms.append(mul.join(cross_term))
+                    ct.append(label_names[i])
+            terms.append(mul.join(ct))
         return terms
 
 
@@ -184,7 +185,7 @@ class NormalizedPolynomialVectorizer(BasePolynomialVectorizer):
                     .format(label_name))
 
         # Calculate the scales and fiducials.
-        scales = [np.ptp(np.percentile(labelled_set[_], [2.1, 97.9])) \
+        scales = [np.ptp(np.percentile(labelled_set[_], [2.5, 97.5]))/2. \
             for _ in label_names]
         fiducials = [np.percentile(labelled_set[_], 50) for _ in label_names]
 

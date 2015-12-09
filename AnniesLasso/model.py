@@ -461,7 +461,7 @@ class BaseCannonModel(object):
         contribute to the design matrix.
         """
         return np.vstack([self.labelled_set[label_name] \
-            for label_name in self.vectorizer.label_names])
+            for label_name in self.vectorizer.label_names]).T
 
 
     # Residuals in labels in the training data set.
