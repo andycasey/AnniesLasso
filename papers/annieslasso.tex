@@ -180,7 +180,7 @@ In the \emph{training step}, we fix the $K$-lists of labels $\ell_n$
 for all training-set stars $n$.
 We seek, at each wavelength pixel $j$, the $[D+1]$ parameters
 $\vectheta_j,s^2_j$ that optimize a penalized likelihood:
-\begin{eqnarray}
+\begin{eqnarray}\label{eq:train}
   \vectheta_j,s^2_j &\leftarrow& \argmin{\vectheta,s^2}\left[
     \sum_{n=0}^{N-1} \frac{[y_{jn}-\vecv(\ell_n)\cdot\vectheta]^2}{\sigma^2_{jn}+s^2}
     + \sum_{n=0}^{N-1} \ln(\sigma^2_{jn}+s^2)
@@ -191,9 +191,11 @@ $\vectheta_j,s^2_j$ that optimize a penalized likelihood:
 where $\Lambda_j$ is a regularization parameter, and $Q(\vectheta)$ is a 
 regularizing function that encourages parameters to take on zero values.
 The regularizing function takes a $D$-vector as input and returns a
-scalar.
-We will adopt for $Q(\vectheta)$ a modification of L1 regularization,
-discussed below.
+scalar value.
+We call this penalized likelihood---the argument of the
+argmin in equation~(\ref{eq:train})---the \emph{training scalar}.
+We will adopt for the regularizing function $Q(\vectheta)$ in the training scalar a
+modification of L1 regularization, discussed below.
 Although the training-step optimization problem will not in general be
 convex, we can make choices for $Q(\vectheta)$ (and we will) to make the
 problem such that it would be convex at any fixed value of $s^2$; for
@@ -214,7 +216,7 @@ In the \emph{test step}, we fix the parameters $\vectheta_j,s^2_j$ at all
 wavelength pixels $j$.
 We seek, for each test-set star $m$, the $K$-list of labels $\ell_m$
 that optimizes the likelihood:
-\begin{eqnarray}
+\begin{eqnarray}\label{eq:test}
   \ell_m &\leftarrow& \argmin{\ell}\left[
     \sum_{j=0}^{J-1} \frac{[y_{jm}-\vecv(\ell)\cdot\vectheta_j]^2}{\sigma^2_{jm}+s^2_j}
     \right]
@@ -226,6 +228,8 @@ However, the fact that there are many pixels $j$ acting, each of which
 has a different functional dependence on the labels in the label list
 $\ell$, tends to make the optimization (in practice) find a good value
 for the label list $\ell$.
+We call this partial log likelihood---the argument of the
+argmin in equation~(\ref{eq:test})---the \emph{test scalar}.
 
 The model freedom of \TheCannon\ is set by the vectorizing function
 $\vecv(\ell)$---which takes the $K$-element label list $\ell$ and expands
