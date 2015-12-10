@@ -91,7 +91,7 @@ class BaseCannonModel(object):
     """
 
     _descriptive_attributes = ["_vectorizer"]
-    _trained_attributes = ["_scatter", "_theta"]
+    _trained_attributes = ["_s2", "_theta"]
     _data_attributes = ["labelled_set", "normalized_flux", "normalized_ivar"]
     
     def __init__(self, labelled_set, normalized_flux, normalized_ivar,
@@ -226,11 +226,14 @@ class BaseCannonModel(object):
         """
         Set the vectorizer for this Cannon model.
         """
+        if vectorizer is None:
+            self._vectorizer = None
+            return None
+
         if not isinstance(vectorizer, BaseVectorizer):
             raise TypeError("vectorizer must be "
                             "a sub-class of vectorizers.BaseVectorizer")
         self._vectorizer = vectorizer
-        self.reset() # Any trained attributes must be reset.
         return None
 
 
@@ -278,37 +281,40 @@ class BaseCannonModel(object):
 
 
     @property
-    def scatter(self):
-        return self._scatter
-
-
-    @scatter.setter
-    def scatter(self, scatter):
+    def s2(self):
         """
-        Set the scatter term for all pixels.
+        Return the intrinsic variance (s^2) for all pixels.
+        """
+        return self._s2
 
-        :param scatter:
-            A 1-d array of scatter values.
+
+    @s2.setter
+    def s2(self, s2):
+        """
+        Set the intrisic variance term for all pixels.
+
+        :param s2:
+            A 1-d array of s2 values.
         """
 
-        if scatter is None:
-            self._scatter = None
+        if s2 is None:
+            self._s2 = None
             return None
         
         # Some sanity checks..
-        scatter = np.array(scatter).flatten()
-        if scatter.size != len(self.dispersion):
-            raise ValueError("number of scatter values does not match "
+        s2 = np.array(s2).flatten()
+        if s2.size != len(self.dispersion):
+            raise ValueError("number of variance values does not match "
                              "the number of pixels ({0} != {1})".format(
-                                scatter.size, len(self.dispersion)))
+                                s2.size, len(self.dispersion)))
 
-        if np.any(scatter < 0):
-            raise ValueError("scatter terms must be positive")
+        if np.any(s2 < 0):
+            raise ValueError("variance terms must be positive")
 
-        if np.std(scatter) == 0:
+        if np.std(s2) == 0 and s2.size > 1:
             logger.warning("All pixels show the same level of variance!"
                            " (Something probably went very, very wrong)")
-        self._scatter = scatter
+        self._s2 = s2
         return None
 
 

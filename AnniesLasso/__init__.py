@@ -9,7 +9,7 @@ from warnings import simplefilter
 
 from .cannon import *
 from .regularized import *
-from . import (continuum, utils, vectorizer)
+from . import (continuum, diagnostics, utils, vectorizer)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)

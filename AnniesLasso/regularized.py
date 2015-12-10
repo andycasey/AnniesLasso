@@ -115,15 +115,20 @@ class RegularizedCannonModel(cannon.CannonModel):
 
 
     @model.requires_model_description
-    def train(self, **kwargs):
+    def train(self, fixed_scatter=False, **kwargs):
         """
         Train the model based on the labelled set using the given vectorizer and
         regularization terms.
+
+        :param fix_scatter: [optional]
+            Fix the scatter terms and do not solve for them during the training
+            phase. If set to `True`, the `s2` attribute must be already set.
         """
         
         # Initialise the required arrays.
         N_px = len(self.dispersion)
         design_matrix = self.design_matrix
+        
         scatter = np.nan * np.ones(N_px)
         theta = np.nan * np.ones((N_px, design_matrix.shape[1]))
 
@@ -159,18 +164,18 @@ class RegularizedCannonModel(cannon.CannonModel):
                 theta[pixel, :], scatter[pixel] = proc.get()
 
         # Save the trained data and finish up.
-        self.theta, self.scatter = theta, scatter
+        self.theta, self.s2 = theta, scatter**2
         return None
 
 
-def L1Norm(theta):
+def L1Norm(Q):
     """
-    Return the L1 normalization of theta.
+    Return the L1 normalization of Q.
 
-    :param theta:
+    :param Q:
         An array of finite values.
     """
-    return np.sum(np.abs(theta))
+    return np.sum(np.abs(Q))
 
 
 def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
@@ -196,18 +201,47 @@ def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
         The regularization term to scale the L1 norm of theta with.
     """
     scatter, theta = parameters[0], parameters[1:]
-    if 0 > scatter:
-        return np.inf
 
     residuals = np.dot(theta, design_matrix.T) - normalized_flux
     inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
-    return np.sum(inv_var * residuals**2) \
-        + np.sum(np.log(1./inv_var)) \
+    return np.sum(inv_var * residuals**2) - np.sum(np.log(inv_var)) \
+        + regularization * L1Norm(theta[1:])
+
+def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
+    normalized_flux, normalized_ivar, design_matrix, regularization, **kwargs):
+    """
+    Fit the normalized flux for a single pixel (across many stars) given the
+    theta parameters, a fixed scatter, and a fixed regularization term.
+
+    :param theta:
+        The theta parameters to solve for.
+
+    :param scatter:
+        The fixed scatter term to apply.
+
+    :param normalized_flux:
+        The normalized flux values for a single pixel across many stars.
+
+    :param normalized_ivar:
+        The inverse variance of the normalized flux values for a single pixel
+        across many stars.
+
+    :param design_matrix:
+        The design matrix for the model.
+
+    :param regularization:
+        The regularization term to scale the L1 norm of theta with.
+    """
+
+    residuals = np.dot(theta, design_matrix.T) - normalized_flux
+    inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
+    return np.sum(inv_var * residuals**2) - np.sum(np.log(inv_var)) \
         + regularization * L1Norm(theta[1:])
 
 
+
 def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, regularization,
-    **kwargs):
+    scatter=None, **kwargs):
     """
     Return the optimal vectorizer coefficients and variance term for a pixel
     given the normalized flux, the normalized inverse variance, and the design
@@ -229,61 +263,49 @@ def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, regularization,
     :returns:
         The optimised label vector coefficients and scatter for this pixel.
     """
-
-    # Get an initial guess of the pixel scatter.
-    p0_scatter = np.var(normalized_flux) - np.median(1.0/normalized_ivar)
-    p0_scatter = \
-        np.sqrt(p0_scatter) if p0_scatter >= 0 else np.std(normalized_flux)
-
-    if 0 > p0_scatter:
-        assert np.sum(normalized_ivar > 0) == 0
-        assert np.std(normalized_flux) == 0.
-        return (np.zeros(design_matrix.shape[1]), 0.0)
-
-    # Get an initial guess of the theta parameters, or just use zeros?
-    if kwargs.get("initialize_at_fiducials", True):
-        # If the initial guess is zero, because our theta values are scaled, we
-        # don't need to know them and we can just set theta as zero.
-        p0_theta = np.hstack([1., np.zeros(design_matrix.shape[1] - 1)])
-        logger.debug("Initializing {theta_0..D} = {1, 0, ..., 0}")
-    else:
-        p0_theta, _, __ = cannon._fit_theta(normalized_flux, normalized_ivar, 
-            p0_scatter, design_matrix)
-
-    # Build the initial guess.
-    p0 = np.hstack([p0_scatter, p0_theta])
-
-    # Optimise the model parameters (scatter, {theta})
-    # ISSUE: Do we have well-founded boundaries on the theta coefficients if the
-    #        vectorizer is scaled?
     kwds = {
-        "disp": 0,
-        "args": (normalized_flux, normalized_ivar, design_matrix, regularization),
-        "approx_grad": True,
-        #"bounds": [(0, None)] + [(None, None)] * p0_theta.size,
-        "bounds": None,
-        "m": 10, # Default
-        "factr": 10000000.0, # Default
-        "pgtol": 1e-05, # Default
-        "epsilon": 1e-08, # Default
-        "iprint": -1,
-        "maxfun": 15000, # Default
-        "maxiter": 15000, # Default
-        "callback": None
+        "disp": False,
+        "maxiter": np.inf,
+        "maxfun": np.inf,
+        "full_output": True,
+        "retall": False,
     }
-    op_parameters, fopt, info_dict = op.fmin_l_bfgs_b(
-        _fit_pixel_with_fixed_regularization, p0, **kwds)
 
-    if info_dict["warnflag"] > 0:
-        # Note: The writing and flushing is to print things nicely even if we
-        #       have a progressbar, which is likely during the optimization.
+    # TODO: allow initial theta to be given as a kwarg
+    fix_scatter = scatter is not None
+    if scatter is None:
+        initial_scatter = kwargs.get("initial_scatter", 0.01)
+        initial_theta, _, __ = cannon._fit_theta(normalized_flux, normalized_ivar, 
+            initial_scatter, design_matrix)
+
+        # Build the initial guess.
+        p0 = np.hstack([initial_scatter, initial_theta])
+        func = _fit_pixel_with_fixed_regularization
+        kwds["args"] = (normalized_flux, normalized_ivar, design_matrix, regularization)
+    
+
+    else:
+        func = _fit_pixel_with_fixed_regularization_and_fixed_scatter
+        initial_theta = cannon._fit_theta(normalized_flux, normalized_ivar, 
+            scatter, design_matrix)
+        p0 = initial_theta
+        kwds["args"] = (scatter, normlised_flux, normalized_ivar, design_matrix, regularization)
+
+
+    op_parameters, fopt, direc, n_iter, n_funcalls, warnflag = op.fmin_powell(
+        func, p0, **kwds)
+
+    if warnflag > 0:
         stdout.write("\r\n")
         stdout.flush()
         logger.warning("Optimization stopped prematurely: {}".format([
-            "too many function evaluations (>{0}) or iterations (>{1})".format(
-                kwds["maxfun"], kwds["maxiter"]),
-            "{}".format(info_dict.get("task", None))
-            ][info_dict["warnflag"] - 1]))
+            "Maximum number of function evaluations.",
+            "Maximum number of iterations."
+            ][warnflag - 1]))
 
-    scatter, theta = op_parameters[0], op_parameters[1:]
+    if fix_scatter:
+        theta = op_parameters
+    else:
+        scatter, theta = op_parameters[0], op_parameters[1:]
+
     return (theta, scatter)
