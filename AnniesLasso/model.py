@@ -17,6 +17,7 @@ import numpy as np
 from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime
+from multiprocessing import cpu_count
 from os import path
 from six.moves import cPickle as pickle
 from sys import maxsize
@@ -125,6 +126,8 @@ class BaseCannonModel(object):
         self._metadata = {
             "q": np.random.randint(0, maxsize, len(labelled_set))
         }
+        # Allow -1 to set the max number of threads.
+        threads = cpu_count() if threads == -1 else threads
         self.threads, self.pool = threads, pool \
             or (utils.InterruptiblePool(threads) if threads > 1 else None)
 

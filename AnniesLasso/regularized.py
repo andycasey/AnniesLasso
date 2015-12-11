@@ -118,7 +118,7 @@ class RegularizedCannonModel(cannon.CannonModel):
 
 
     @model.requires_model_description
-    def train(self, fixed_scatter=False, **kwargs):
+    def train(self, fixed_scatter=False, progressbar=True):
         """
         Train the model based on the labelled set using the given vectorizer and
         regularization terms.
@@ -140,7 +140,7 @@ class RegularizedCannonModel(cannon.CannonModel):
                        "with {1} pixels and a {2:.0e} mean regularization "
                        "factor".format(len(self.labelled_set), N_px,
                             np.mean(self.regularization)),
-            "size": 100 if kwargs.pop("progressbar", True) else -1
+            "size": 100 if progressbar else -1
         }
         if fixed_scatter is not None:
             if fixed_scatter is True:
@@ -160,7 +160,7 @@ class RegularizedCannonModel(cannon.CannonModel):
                     self.normalized_flux[:, pixel], 
                     self.normalized_ivar[:, pixel],
                     design_matrix, self.regularization[pixel], 
-                    initial_scatter[pixel])
+                    initial_scatter[pixel], pixel=pixel)
 
         else:
             # Not as nice as mapping, but necessary if we want a progress bar.
@@ -172,24 +172,21 @@ class RegularizedCannonModel(cannon.CannonModel):
                         design_matrix,
                         self.regularization[pixel],
                         initial_scatter[pixel]
-                    )) \
+                    ),
+                    kwds={"pixel": pixel}) \
                 for pixel in range(N_px) }
 
             for pixel, proc in utils.progressbar(process.items(), **pb_kwds):
                 logger.debug("At pixel {}".format(pixel))
-                try:
-                    theta[pixel, :], scatter[pixel] = proc.get(timeout=120)
-                except mp.TimeoutError:
-                    logger.exception("Time out error!")
-                    continue
+                theta[pixel, :], scatter[pixel] = proc.get()
 
         # Save the trained data and finish up.
         self.theta, self.s2 = theta, scatter**2
         return None
 
 
-    def validate_regularization(self, fixed_scatter=0.0, regularizations=None,
-        pixel_mask=None, mod=5, **kwargs):
+    def validate_regularization(self, fixed_scatter=0.0, Lambdas=None,
+        pixel_mask=None, mod=10, **kwargs):
         """
         Perform validation upon several regularization parameters for each pixel
         using a subset of the labelled data set.
@@ -198,8 +195,8 @@ class RegularizedCannonModel(cannon.CannonModel):
             Keep a fixed scatter term when doing the regularization validation.
             If set to `None`, then scatter will be solved at each step.
 
-        :param regularizations: [optional]
-            The regularization values to evaluate. If `None` is specified, a
+        :param Lambdas: [optional]
+            The regularization factors to evaluate. If `None` is specified, a
             sensible range will be automagically chosen.
 
         :param pixel_mask: [optional]
@@ -214,8 +211,8 @@ class RegularizedCannonModel(cannon.CannonModel):
             method.
         """
 
-        if regularizations is None:
-            regularizations = 10**np.arange(0, 10.1 + 0.1, 0.1)
+        if Lambdas is None:
+            Lambdas = 10**np.arange(0, 10.1 + 0.1, 0.1)
 
         if pixel_mask is None:
             pixel_mask = np.ones_like(self.dispersion, dtype=bool)
@@ -233,19 +230,19 @@ class RegularizedCannonModel(cannon.CannonModel):
         train_set, validate_set = (subsets > 0, subsets == 0)
         N_train, N_validate = map(sum, (train_set, validate_set))
 
-        N_px, N_regularizations = pixel_mask.sum(), len(regularizations)
+        N_px, N_Lambdas = pixel_mask.sum(), len(Lambdas)
 
         models = []
-        chi_sq = np.zeros((N_regularizations, N_px))
-        log_det = np.zeros((N_regularizations, N_px))
-        for i, regularization in enumerate(regularizations):
+        chi_sq = np.zeros((N_Lambdas, N_px))
+        log_det = np.zeros((N_Lambdas, N_px))
+        for i, Lambda in enumerate(Lambdas):
 
-            # Set up a model for this regularization test.
+            # Set up a model for this Lambda test.
             model = self.__class__(self.labelled_set[train_set],
                 normalized_flux[train_set], normalized_ivar[train_set],
                 dispersion=dispersion, threads=self.threads, copy=False)
             model.vectorizer = self.vectorizer
-            model.regularization = regularization
+            model.regularization = Lambda
 
             # We want to make sure that we have the same training set each time.
             model._metadata.update({
@@ -253,7 +250,7 @@ class RegularizedCannonModel(cannon.CannonModel):
                 "mod": mod
             })
 
-            model.train(**kwargs)
+            model.train(fixed_scatter=fixed_scatter)
             if model.pool is not None: model.pool.close()
 
             # Predict the fluxes in the validate set.
@@ -269,7 +266,7 @@ class RegularizedCannonModel(cannon.CannonModel):
             log_det[i, :] = _log_det(inv_var)
             models.append(model)
     
-        return (regularizations, chi_sq, log_det, models)
+        return (Lambdas, chi_sq, log_det, models)
 
 
 def L1Norm(Q):
@@ -357,7 +354,7 @@ def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
     :param regularization:
         The regularization term to scale the L1 norm of theta with.
     """
-    print(theta, scatter, regularization)
+
     inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
     return _chi_sq(theta, design_matrix, normalized_flux, inv_var) \
          + _log_det(inv_var) + regularization * L1Norm(theta[1:])
@@ -388,12 +385,11 @@ def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, regularization,
     """
     kwds = {
         "disp": False,
-        "maxiter": 100000,
-        "maxfun": 100000,
+        "maxiter": np.inf,
+        "maxfun": np.inf,
         "full_output": True,
         "retall": False,
     }
-
 
     #printing = kwargs.get("pixel", None) == 322
     #if printing:

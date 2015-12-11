@@ -63,7 +63,7 @@ class CannonModel(model.BaseCannonModel):
 
 
     @model.requires_model_description
-    def train(self, fix_scatter=False, **kwargs):
+    def train(self, fix_scatter=False, progressbar=True):
         """
         Train the model based on the labelled set using the given vectorizer.
 
@@ -87,7 +87,7 @@ class CannonModel(model.BaseCannonModel):
             "message": "Training {2} model from {0} stars with {1} pixels "
                        "each".format(len(self.labelled_set), N_px,
                             type(self).__name__),
-            "size": 100 if kwargs.pop("progressbar", True) else -1
+            "size": 100 if progressbar else -1
         }
         
         if self.pool is None:
@@ -95,7 +95,7 @@ class CannonModel(model.BaseCannonModel):
                 theta[pixel, :], s[pixel] = _fit_pixel(
                     self.normalized_flux[:, pixel], 
                     self.normalized_ivar[:, pixel],
-                    design_matrix, scatter_input[pixel], **kwargs)
+                    design_matrix, scatter_input[pixel])
 
         else:
             # Not as nice as mapping, but necessary if we want a progress bar.
@@ -105,8 +105,7 @@ class CannonModel(model.BaseCannonModel):
                         self.normalized_flux[:, pixel], 
                         self.normalized_ivar[:, pixel],
                         design_matrix, scatter_input[pixel]
-                    ),
-                    kwds=kwargs) \
+                    )) \
                 for pixel in range(N_px) }
 
             for pixel, proc in utils.progressbar(process.items(), **pb_kwds):

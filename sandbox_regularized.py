@@ -13,21 +13,21 @@ MEMMAP_FILE_FORMAT = "apogee-rc-{}.memmap"
 N = 500
 M = np.arange(0, 4.8, 0.1)
 RUN_TRAINING = False
-THREADS = 8
+THREADS = 1
 
 model_filename_format = "rc-sp-subset-regularized-order-{0:.1f}.pkl"
 
 # Load up the data and use just a N subset of it.
 labelled_set = Table.read(os.path.join(PATH, CATALOG))
-dispersion = np.array(np.memmap(
+dispersion = np.memmap(
     os.path.join(PATH, MEMMAP_FILE_FORMAT).format("dispersion"),
-    mode="c", dtype=float).flatten())
-normalized_flux = np.array(np.memmap(
+    mode="c", dtype=float).flatten()
+normalized_flux = np.memmap(
     os.path.join(PATH, MEMMAP_FILE_FORMAT).format("normalized-flux"),
-    mode="c", dtype=float).reshape((len(labelled_set), -1)))
-normalized_ivar = np.array(np.memmap(
+    mode="c", dtype=float).reshape((len(labelled_set), -1))
+normalized_ivar = np.memmap(
     os.path.join(PATH, MEMMAP_FILE_FORMAT).format("normalized-ivar"),
-    mode="c", dtype=float).reshape(normalized_flux.shape))
+    mode="c", dtype=float).reshape(normalized_flux.shape)
 
 model = tc.RegularizedCannonModel(labelled_set, normalized_flux,
     normalized_ivar, dispersion=dispersion, threads=THREADS)
@@ -36,23 +36,25 @@ model.vectorizer = tc.vectorizer.NormalizedPolynomialVectorizer(
     model.labelled_set, 
     tc.vectorizer.polynomial.terminator(["TEFF", "LOGG", "PARAM_M_H"], 2))
 
-regularizations, chi_sq, log_det, models = model.validate_regularization(
-    fixed_scatter=0, regularizations=10**np.arange(0, 10.5, 0.5))
+model_filename_format = "regularization-test-rc/model-{}.pkl"
+if not os.path.exists(model_filename_format.format(0)):
+        
+    regularizations, chi_sq, log_det, models = model.validate_regularization(
+        pixel_mask=(16812 > model.dispersion) * (model.dispersion > 16811),
+        fixed_scatter=0)
 
+    for i, model in enumerate(models):
+        model.save(model_filename_format.format(i), overwrite=True)
 
-for i, model in enumerate(models):
-    model.save("regularization-test-rc/model-{}.pkl".format(i), overwrite=True)
-
-print(len(models))
-raise a
-
-
-models = []
-for i in range(141):
+i, models = 0, []
+while os.path.exists(model_filename_format.format(i)):
     model = tc.RegularizedCannonModel(labelled_set, normalized_flux,
         normalized_ivar, dispersion=dispersion, threads=THREADS)
-    model.load("regularization-test-rc/model-{}.pkl".format(i))
+    model.load(model_filename_format.format(i))
     models.append(model)
+    i += 1
+
+raise a
 
 
 #tc.diagnostics.pixel_regularization_effectiveness(models,
