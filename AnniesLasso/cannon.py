@@ -250,7 +250,7 @@ def _fit_spectrum(vectorizer, theta, scatter, normalized_flux,
     
     kwds = {
         "p0": initial,
-        "maxfev": 10000,
+        "maxfev": np.inf,
         "sigma": np.sqrt(1.0/inv_var),
         "absolute_sigma": True
     }
@@ -300,7 +300,7 @@ def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, scatter,
     op_scatter, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
         _fit_pixel_with_fixed_scatter, scatter,
         args=(normalized_flux, normalized_ivar, design_matrix),
-        disp=False, full_output=True)
+        maxiter=np.inf, maxfun=np.inf, disp=False, full_output=True)
 
     if warnflag > 0:
         logger.warning("Warning: {}".format([
