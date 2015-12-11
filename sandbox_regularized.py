@@ -13,21 +13,21 @@ MEMMAP_FILE_FORMAT = "apogee-rc-{}.memmap"
 N = 500
 M = np.arange(0, 4.8, 0.1)
 RUN_TRAINING = False
-THREADS = 1
+THREADS = 8
 
 model_filename_format = "rc-sp-subset-regularized-order-{0:.1f}.pkl"
 
 # Load up the data and use just a N subset of it.
 labelled_set = Table.read(os.path.join(PATH, CATALOG))
-dispersion = np.memmap(
+dispersion = np.array(np.memmap(
     os.path.join(PATH, MEMMAP_FILE_FORMAT).format("dispersion"),
-    mode="c", dtype=float).flatten()
-normalized_flux = np.memmap(
+    mode="c", dtype=float).flatten())
+normalized_flux = np.array(np.memmap(
     os.path.join(PATH, MEMMAP_FILE_FORMAT).format("normalized-flux"),
-    mode="c", dtype=float).reshape((len(labelled_set), -1))
-normalized_ivar = np.memmap(
+    mode="c", dtype=float).reshape((len(labelled_set), -1)))
+normalized_ivar = np.array(np.memmap(
     os.path.join(PATH, MEMMAP_FILE_FORMAT).format("normalized-ivar"),
-    mode="c", dtype=float).reshape(normalized_flux.shape)
+    mode="c", dtype=float).reshape(normalized_flux.shape))
 
 model = tc.RegularizedCannonModel(labelled_set, normalized_flux,
     normalized_ivar, dispersion=dispersion, threads=THREADS)
@@ -35,6 +35,36 @@ model = tc.RegularizedCannonModel(labelled_set, normalized_flux,
 model.vectorizer = tc.vectorizer.NormalizedPolynomialVectorizer(
     model.labelled_set, 
     tc.vectorizer.polynomial.terminator(["TEFF", "LOGG", "PARAM_M_H"], 2))
+
+regularizations, chi_sq, log_det, models = model.validate_regularization(
+    fixed_scatter=0, regularizations=10**np.arange(0, 10.5, 0.5))
+
+
+for i, model in enumerate(models):
+    model.save("regularization-test-rc/model-{}.pkl".format(i), overwrite=True)
+
+print(len(models))
+raise a
+
+
+models = []
+for i in range(141):
+    model = tc.RegularizedCannonModel(labelled_set, normalized_flux,
+        normalized_ivar, dispersion=dispersion, threads=THREADS)
+    model.load("regularization-test-rc/model-{}.pkl".format(i))
+    models.append(model)
+
+
+#tc.diagnostics.pixel_regularization_effectiveness(models,
+#    wavelengths=[15339.03364362,  15339.24556167,  15339.45748264,  15339.66940654,
+#        15339.88133337],
+#    latex_labels=[r"{T_{\rm eff}}", r"\log{g}", r"{\rm [M/H]}"])
+
+tc.diagnostics.pixel_regularization_validation(models,
+    wavelengths=[15339.03364362,  15339.24556167,  15339.45748264,  15339.66940654,
+        15339.88133337])
+
+raise a
 
 
 fig = tc.diagnostics.regularization_effectiveness(model, wavelengths=[16811.5],

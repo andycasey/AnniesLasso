@@ -12,7 +12,7 @@ from .regularized import *
 from . import (continuum, diagnostics, utils, vectorizer)
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.DEBUG) # TODO: Remove this when stable.
 
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter(
@@ -25,6 +25,54 @@ logger.addHandler(handler)
 
 simplefilter("ignore", RankWarning)
 simplefilter("ignore", RuntimeWarning)
+
+
+def load_model(filename, **kwargs):
+    """
+    Load a Cannon model from an existing filename, regardless of the kind of
+    Cannon model sub-class.
+
+    :param filename:
+        The path where the model has been saved. This saved model must include
+        a labelled data set.
+    """
+    from six.moves import cPickle as pickle # I know.
+
+    with open(filename, "rb") as fp:
+        contents = pickle.load(fp)
+
+    class_factory = contents["metadata"]["model_name"]
+    if not class_factory.endswith("CannonModel"):
+        raise TypeError("Cannon model factory class '{}' not recognised".format(
+            class_factory))
+
+    _class = eval(class_factory)
+    has_data = (contents["metadata"]["data_attributes"][0] in contents)
+    if not has_data:
+        contents.update({
+            "labelled_set": {},
+            "normalized_flux": [],
+            "normalized_ivar": []
+        })
+
+    # Initiate the class.
+    kwds = { "verify": False }
+    kwds.update(**kwargs)
+
+    model = _class(
+        *[contents[attr] for attr in contents["metadata"]["data_attributes"]],
+        **kwds)
+
+    # Update information.
+    model._metadata.update(contents["metadata"].get("metadata", {}))
+    attributes = contents["metadata"]["descriptive_attributes"] \
+               + contents["metadata"]["trained_attributes"]
+
+    for attribute in attributes:
+        setattr(model, "_{}".format(attribute), contents[attribute])
+
+    return model
+
 
 # Clean up the top-level namespace for this module.
 del handler, logger, logging, RankWarning, simplefilter

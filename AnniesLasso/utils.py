@@ -56,7 +56,7 @@ def progressbar(iterable, message=None, size=100):
     def _update(i, t=None):
         if 0 >= size: return
         increment = max(1, int(count / 100))
-        if i % increment == 0 or i in (0, count):
+        if i % increment == 0 or i in (0, count) and count > 0:
             sys.stdout.write("\r[{done}{not_done}] {percent:3.0f}%{t}".format(
                 done="=" * int(i/increment),
                 not_done=" " * int((count - i)/increment),

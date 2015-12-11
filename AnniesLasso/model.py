@@ -15,9 +15,11 @@ __all__ = [
 import logging
 import numpy as np
 from collections import OrderedDict
+from copy import deepcopy
 from datetime import datetime
 from os import path
 from six.moves import cPickle as pickle
+from sys import maxsize
 
 from .vectorizer.base import BaseVectorizer
 from . import (utils, __version__ as code_version)
@@ -39,7 +41,6 @@ def requires_training_wheels(method):
 def requires_model_description(method):
     """
     A decorator for model methods that require a full model description.
-    (That is, none of the _descriptive_attributes are None)
     """
     def wrapper(model, *args, **kwargs):
         for descriptive_attribute in model._descriptive_attributes:
@@ -59,7 +60,7 @@ class BaseCannonModel(object):
         columns as labels, and stars/objects as rows.
 
     :type labelled_set:
-        :class:`~astropy.table.Table`, numpy structured array
+        :class:`~astropy.table.Table` or a numpy structured array
 
     :param normalized_flux:
         An array of normalised fluxes for stars in the labelled set, given as
@@ -88,6 +89,10 @@ class BaseCannonModel(object):
     :param pool: [optional]
         Specify an optional multiprocessing pool to map jobs onto.
         This argument is only used if specified and if `threads > 1`.
+
+    :param copy: [optional]
+        Make deep copies of the `labelled_set`, `normalized_flux`,
+        `normalized_ivar`, and the `dispersion` (when applicable).
     """
 
     _descriptive_attributes = ["_vectorizer"]
@@ -95,20 +100,31 @@ class BaseCannonModel(object):
     _data_attributes = ["labelled_set", "normalized_flux", "normalized_ivar"]
     
     def __init__(self, labelled_set, normalized_flux, normalized_ivar,
-        dispersion=None, threads=1, pool=None):
+        dispersion=None, threads=1, pool=None, copy=False, verify=True):
 
         self._labelled_set = labelled_set
         self._normalized_flux = np.atleast_2d(normalized_flux)
         self._normalized_ivar = np.atleast_2d(normalized_ivar)
-        self._dispersion = dispersion if dispersion is not None \
-            else np.arange(normalized_flux.shape[1], dtype=int)
-            
+        self._dispersion = np.array(dispersion).flatten() \
+            if dispersion is not None \
+            else np.arange(self._normalized_flux.shape[1], dtype=int)
+
+        if copy:
+            self._labelled_set, self._dispersion \
+                = map(deepcopy, (self._labelled_set, self._dispersion))
+            self._normalized_flux, self._normalized_ivar, \
+                = map(deepcopy, (self._normalized_flux, self._normalized_ivar))
+
         # Initialise descriptive attributes for the model and verify the data.
         for attribute in self._descriptive_attributes:
             setattr(self, attribute, None)
-        self._verify_training_data()
+        if verify: self._verify_training_data()
         self.reset()
 
+        # Initialize a random integer for each object.
+        self._metadata = {
+            "q": np.random.randint(0, maxsize, len(labelled_set))
+        }
         self.threads, self.pool = threads, pool \
             or (utils.InterruptiblePool(threads) if threads > 1 else None)
 
@@ -124,6 +140,21 @@ class BaseCannonModel(object):
     def __repr__(self):
         return "<{0}.{1} object at {2}>".format(self.__module__, 
             type(self).__name__, hex(id(self)))
+
+
+    def copy(self):
+        """
+        Create a copy of the current model.
+        """
+
+        model = self.__class__(
+            self.labelled_set, self._normalized_flux, self._normalized_ivar,
+            dispersion=self.dispersion, threads=self.threads)
+        attributes = ["_metadata"] + \
+            self._descriptive_attributes + self._trained_attributes
+        for attribute in attributes:
+            setattr(model, attribute, deepcopy(getattr(self, attribute, None)))
+        return model
 
 
     def reset(self):
@@ -307,13 +338,9 @@ class BaseCannonModel(object):
             raise ValueError("number of variance values does not match "
                              "the number of pixels ({0} != {1})".format(
                                 s2.size, len(self.dispersion)))
-
         if np.any(s2 < 0):
-            raise ValueError("variance terms must be positive")
+            raise ValueError("the intrinsic variance terms must be positive")
 
-        if np.std(s2) == 0 and s2.size > 1:
-            logger.warning("All pixels show the same level of variance!"
-                           " (Something probably went very, very wrong)")
         self._s2 = s2
         return None
 
@@ -339,7 +366,6 @@ class BaseCannonModel(object):
                                   "implemented by subclasses")
 
 
-    # I/O
     @requires_training_wheels
     def save(self, filename, include_training_data=False, overwrite=False):
         """
@@ -363,7 +389,7 @@ class BaseCannonModel(object):
         attributes = list(self._descriptive_attributes) \
             + list(self._trained_attributes) \
             + list(self._data_attributes)
-        if "metadata" in attributes:
+        if "metadata" in attributes or "_metadata" in attributes:
             raise ValueError("'metadata' is a protected attribute and cannot "
                              "be used in the _*_attributes in a class")
 
@@ -380,6 +406,7 @@ class BaseCannonModel(object):
 
         contents["metadata"] = {
             "version": code_version,
+            "metadata": getattr(self, "_metadata", {}),
             "model_name": type(self).__name__, 
             "modified": str(datetime.now()),
             "data_attributes": \
@@ -442,7 +469,9 @@ class BaseCannonModel(object):
         for attribute in contents["metadata"]["trained_attributes"]:
             setattr(self, "_{}".format(attribute), contents[attribute])
 
-        return None
+        # And update the metadata.
+        setattr(self, "_metadata", contents["metadata"].get("metadata", {}))
+        return self
 
 
     @property
@@ -470,21 +499,17 @@ class BaseCannonModel(object):
             for label_name in self.vectorizer.label_names]).T
 
 
-    # Residuals in labels in the training data set.
     @requires_training_wheels
-    def get_training_label_residuals(self):
+    def fit_labelled_set(self):
         """
-        Return the residuals (model - training) between the parameters that the
-        model returns for each star in the labelled set.
+        Return the predicted labels of the stars in the labelled set.
         """
-        predicted_labels = self.fit(self.normalized_flux, self.normalized_ivar,
+        return self.fit(self.normalized_flux, self.normalized_ivar,
             full_output=False)
-
-        return predicted_labels - self.labels_array
 
 
     @requires_model_description
-    def cross_validate(self, pre_train=None, **kwargs):
+    def loo_cross_validation(self, pre_train=None, **kwargs):
         """
         Perform leave-one-out cross-validation on the labelled set.
         """
@@ -533,74 +558,4 @@ class BaseCannonModel(object):
                 break
 
         return inferred[:N_stop_at, :]
-
-
-    @requires_training_wheels
-    def define_continuum_mask(self, baseline_flux=None, tolerances=None,
-        percentiles=None, absolute_percentiles=None):
-        """
-        Define a continuum mask based on constraints on the baseline flux values
-        and the percentiles or absolute percentiles of theta theta. The
-        resulting continuum mask is taken for whatever pixels meet all the given
-        constraints.
-
-        :param baseline_flux: [optional]
-            The `(lower, upper`) range of acceptable baseline flux values to be 
-            considered as continuum.
-
-        :param percentiles: [optional]
-            A dictionary containing the label vector description as keys and
-            acceptable percentile ranges `(lower, upper)` for each corresponding
-            label vector term.
-
-        :param absolute_percentiles: [optional]
-            The same as `percentiles`, except these are calculated on the
-            absolute values of the model theta.
-        """
-
-        mask = np.ones_like(self.dispersion, dtype=bool)
-        if baseline_flux is not None:
-            if len(baseline_flux) != 2:
-                raise ValueError("baseline flux constraints must be given as "
-                                 "(lower, upper)")
-            mask *= (max(baseline_flux) >= self.theta[:, 0]) \
-                  * (self.theta[:, 0] >= min(baseline_flux))
-
-        for term, constraints in (tolerances or {}).items():
-            if len(constraints) != 2:
-                raise ValueError("{} tolerance must be given as (lower, upper)"\
-                    .format(term))
-
-            p_term = utils.parse_label_vector(term)[0]
-            if p_term not in self.label_vector:
-                logger.warn("Term {0} ({1}) is not in the label vector, "
-                            "and is therefore being ignored".format(
-                                term, p_term))
-                continue
-
-            a = self.theta[:, 1 + self.label_vector.index(p_term)]
-            mask *= (max(constraints) >= a) * (a >= min(constraints))
-
-        for qs, use_abs in zip([percentiles, absolute_percentiles], [0, 1]):
-            if qs is None: continue
-
-            for term, constraints in qs.items():
-                if len(constraints) != 2:
-                    raise ValueError("{} constraints must be given as "
-                                     "(lower, upper)".format(term))
-
-                p_term = utils.parse_label_vector(term)[0]
-                if p_term not in self.label_vector:
-                    logger.warn("Term {0} ({1}) is not in the label vector, "
-                                "and is therefore being ignored".format(
-                                    term, p_term))
-                    continue
-
-                a = self.theta[:, 1 + self.label_vector.index(p_term)]
-                if use_abs: a = np.abs(a)
-
-                p = np.percentile(a, constraints)
-                mask *= (max(p) >= a) * (a >= min(p))
-
-        return mask
 

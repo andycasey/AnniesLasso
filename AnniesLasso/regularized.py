@@ -20,6 +20,8 @@ from . import (cannon, model, utils)
 logger = logging.getLogger(__name__)
 
 
+
+
 class RegularizedCannonModel(cannon.CannonModel):
     """
     A L1-regularized edition of The Cannon model for the estimation of arbitrary
@@ -139,13 +141,25 @@ class RegularizedCannonModel(cannon.CannonModel):
                             np.mean(self.regularization)),
             "size": 100 if kwargs.pop("progressbar", True) else -1
         }
+        if fixed_scatter is not None:
+            if fixed_scatter is True:
+                initial_scatter = np.sqrt(self.s2)
+            else:
+                initial_scatter = np.ones_like(self.dispersion) * fixed_scatter
+            logger.debug("Using fixed scatter = {}".format(initial_scatter))
+
+        else:
+            logger.debug("Solving {theta, scatter} simultaneously at each pixel")
+            initial_scatter = [None] * N_px
         
         if self.pool is None:
             for pixel in utils.progressbar(range(N_px), **pb_kwds):
+                logger.debug("At pixel {}".format(pixel))
                 theta[pixel, :], scatter[pixel] = _fit_pixel(
                     self.normalized_flux[:, pixel], 
                     self.normalized_ivar[:, pixel],
-                    design_matrix, self.regularization[pixel], **kwargs)
+                    design_matrix, self.regularization[pixel], 
+                    initial_scatter[pixel])
 
         else:
             # Not as nice as mapping, but necessary if we want a progress bar.
@@ -156,16 +170,101 @@ class RegularizedCannonModel(cannon.CannonModel):
                         self.normalized_ivar[:, pixel],
                         design_matrix,
                         self.regularization[pixel],
-                    ),
-                    kwds=kwargs) \
+                        initial_scatter[pixel]
+                    )) \
                 for pixel in range(N_px) }
 
             for pixel, proc in utils.progressbar(process.items(), **pb_kwds):
+                logger.debug("At pixel {}".format(pixel))
                 theta[pixel, :], scatter[pixel] = proc.get()
 
         # Save the trained data and finish up.
         self.theta, self.s2 = theta, scatter**2
         return None
+
+
+    def validate_regularization(self, fixed_scatter=0.0, regularizations=None,
+        pixel_mask=None, mod=5, **kwargs):
+        """
+        Perform validation upon several regularization parameters for each pixel
+        using a subset of the labelled data set.
+
+        :param fixed_scatter: [optional]
+            Keep a fixed scatter term when doing the regularization validation.
+            If set to `None`, then scatter will be solved at each step.
+
+        :param regularizations: [optional]
+            The regularization values to evaluate. If `None` is specified, a
+            sensible range will be automagically chosen.
+
+        :param pixel_mask: [optional]
+            An optional mask to only perform the regularization validation on.
+            If given, a `False` entry indicates a pixel will not be evaluated.
+
+        :param mod: [optional]
+            The number of components to split the labelled set up into.
+
+        :param kwargs: [optional]   
+            These keyword arguments will be passed directly to the `train()`
+            method.
+        """
+
+        if regularizations is None:
+            regularizations = 10**np.arange(0, 10.1 + 0.1, 0.1)
+
+        if pixel_mask is None:
+            pixel_mask = np.ones_like(self.dispersion, dtype=bool)
+            normalized_flux, normalized_ivar, dispersion = \
+                (self.normalized_flux, self.normalized_ivar, self.dispersion)
+
+        else:
+            # Apply pixel masks now so we don't have to N_regularization times
+            dispersion = self.dispersion[pixel_mask]
+            normalized_flux = self.normalized_flux[:, pixel_mask]
+            normalized_ivar = self.normalized_ivar[:, pixel_mask]
+            
+        # Determine the train and validate component masks.
+        subsets = self._metadata["q"] % mod
+        train_set, validate_set = (subsets > 0, subsets == 0)
+        N_train, N_validate = map(sum, (train_set, validate_set))
+
+        N_px, N_regularizations = pixel_mask.sum(), len(regularizations)
+
+        models = []
+        chi_sq = np.zeros((N_regularizations, N_px))
+        log_det = np.zeros((N_regularizations, N_px))
+        for i, regularization in enumerate(regularizations):
+
+            # Set up a model for this regularization test.
+            model = self.__class__(self.labelled_set[train_set],
+                normalized_flux[train_set], normalized_ivar[train_set],
+                dispersion=dispersion, threads=self.threads, copy=False)
+            model.vectorizer = self.vectorizer
+            model.regularization = regularization
+
+            # We want to make sure that we have the same training set each time.
+            model._metadata.update({
+                "q": self._metadata["q"],
+                "mod": mod
+            })
+
+            model.train(**kwargs)
+            if model.pool is not None: model.pool.close()
+
+            # Predict the fluxes in the validate set.
+            inv_var = normalized_ivar[validate_set] / \
+                (1. + normalized_ivar[validate_set] * model.s2)
+            design_matrix = model.vectorizer(np.vstack(
+                [self.labelled_set[label_name][validate_set] \
+                    for label_name in self.vectorizer.label_names]).T)
+
+            # Save everything.
+            chi_sq[i, :] = _chi_sq(model.theta, design_matrix,
+                normalized_flux[validate_set].T, inv_var.T, axis=1)
+            log_det[i, :] = _log_det(inv_var)
+            models.append(model)
+    
+        return (regularizations, chi_sq, log_det, models)
 
 
 def L1Norm(Q):
@@ -176,6 +275,27 @@ def L1Norm(Q):
         An array of finite values.
     """
     return np.sum(np.abs(Q))
+
+
+class L1RegularizedCannonModel(cannon.CannonModel):
+
+    regularizer = lambda theta: L1Norm(theta[:1])
+
+    def __init__(self, *args, **kwargs):
+        super(L1RegularizedCannonModel, self).__init__(self, *args, **kwargs)
+
+
+
+
+def _chi_sq(theta, design_matrix, normalized_flux, inv_var, axis=None):
+    residuals = np.dot(theta, design_matrix.T) - normalized_flux
+    return np.sum(inv_var * residuals**2, axis=axis)
+
+def _log_det(inv_var):
+    return -np.sum(np.log(inv_var))
+
+
+
 
 
 def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
@@ -201,11 +321,11 @@ def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
         The regularization term to scale the L1 norm of theta with.
     """
     scatter, theta = parameters[0], parameters[1:]
-
-    residuals = np.dot(theta, design_matrix.T) - normalized_flux
     inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
-    return np.sum(inv_var * residuals**2) - np.sum(np.log(inv_var)) \
-        + regularization * L1Norm(theta[1:])
+    
+    return _chi_sq(theta, design_matrix, normalized_flux, inv_var) \
+         + _log_det(inv_var) + regularization * L1Norm(theta[1:])
+
 
 def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
     normalized_flux, normalized_ivar, design_matrix, regularization, **kwargs):
@@ -233,11 +353,9 @@ def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
         The regularization term to scale the L1 norm of theta with.
     """
 
-    residuals = np.dot(theta, design_matrix.T) - normalized_flux
     inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
-    return np.sum(inv_var * residuals**2) - np.sum(np.log(inv_var)) \
-        + regularization * L1Norm(theta[1:])
-
+    return _chi_sq(theta, design_matrix, normalized_flux, inv_var) \
+         + _log_det(inv_var) + regularization * L1Norm(theta[1:])
 
 
 def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, regularization,
@@ -265,18 +383,27 @@ def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, regularization,
     """
     kwds = {
         "disp": False,
-        "maxiter": np.inf,
-        "maxfun": np.inf,
+        "maxiter": 100000,
+        "maxfun": 100000,
         "full_output": True,
         "retall": False,
     }
 
+
+    #printing = kwargs.get("pixel", None) == 322
+    #if printing:
+    #    print("scat", scatter)
     # TODO: allow initial theta to be given as a kwarg
     fix_scatter = scatter is not None
+    failed_response = (np.hstack([1., np.zeros(design_matrix.shape[1] - 1)]), 0.)
     if scatter is None:
         initial_scatter = kwargs.get("initial_scatter", 0.01)
-        initial_theta, _, __ = cannon._fit_theta(normalized_flux, normalized_ivar, 
-            initial_scatter, design_matrix)
+        try:
+            initial_theta, _, __ = cannon._fit_theta(normalized_flux, normalized_ivar, 
+                initial_scatter, design_matrix)
+        except np.linalg.linalg.LinAlgError:
+            if kwargs.get("debug", False): raise
+            return failed_response
 
         # Build the initial guess.
         p0 = np.hstack([initial_scatter, initial_theta])
@@ -286,14 +413,28 @@ def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, regularization,
 
     else:
         func = _fit_pixel_with_fixed_regularization_and_fixed_scatter
-        initial_theta = cannon._fit_theta(normalized_flux, normalized_ivar, 
-            scatter, design_matrix)
-        p0 = initial_theta
-        kwds["args"] = (scatter, normlised_flux, normalized_ivar, design_matrix, regularization)
+        try:
+            initial_theta, _, __ = cannon._fit_theta(normalized_flux, normalized_ivar, 
+                scatter, design_matrix)
+        except np.linalg.linalg.LinAlgError:
+            if kwargs.get("debug", False): raise
+            return failed_response
 
+    #    if printing:
+    #        print("theta", initial_theta)
+
+        p0 = initial_theta
+        kwds["args"] = (scatter, normalized_flux, normalized_ivar, design_matrix, regularization)
+
+    #if printing:
+    #    print(fix_scatter, p0, scatter, normalized_flux, normalized_ivar, regularization)
 
     op_parameters, fopt, direc, n_iter, n_funcalls, warnflag = op.fmin_powell(
         func, p0, **kwds)
+
+    #if printing:
+    #    print("DONE: {}".format(op_parameters))
+
 
     if warnflag > 0:
         stdout.write("\r\n")

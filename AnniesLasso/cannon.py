@@ -177,6 +177,14 @@ class CannonModel(model.BaseCannonModel):
         return labels
 
 
+def _chi_sq(theta, design_matrix, normalized_flux, inv_var, axis=None):
+    residuals = np.dot(theta, design_matrix.T) - normalized_flux
+    return np.sum(inv_var * residuals**2, axis=axis)
+
+def _log_det(inv_var):
+    return -np.sum(np.log(inv_var))
+
+
 def _estimate_label_vector(theta, scatter, normalized_flux, normalized_ivar,
     **kwargs):
     """
@@ -337,9 +345,8 @@ def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
 
     # If you're wondering, we take inv_var back from _fit_theta because it is 
     # the same quantity we wish to calculate, and it saves us one operation.
-    residuals = np.dot(theta, design_matrix.T) - normalized_flux
-
-    return np.sum(inv_var * residuals**2) - np.sum(np.log(inv_var))
+    return _chi_sq(theta, design_matrix, normalized_flux, inv_var) \
+         + _log_det(inv_var)
 
 
 def _fit_theta(normalized_flux, normalized_ivar, scatter, design_matrix):
