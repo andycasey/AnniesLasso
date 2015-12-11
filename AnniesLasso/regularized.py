@@ -12,6 +12,7 @@ __all__ = ["RegularizedCannonModel"]
 
 import logging
 import numpy as np
+import multiprocessing as mp
 import scipy.optimize as op
 from sys import stdout
 
@@ -176,7 +177,11 @@ class RegularizedCannonModel(cannon.CannonModel):
 
             for pixel, proc in utils.progressbar(process.items(), **pb_kwds):
                 logger.debug("At pixel {}".format(pixel))
-                theta[pixel, :], scatter[pixel] = proc.get()
+                try:
+                    theta[pixel, :], scatter[pixel] = proc.get(timeout=120)
+                except mp.TimeoutError:
+                    logger.exception("Time out error!")
+                    continue
 
         # Save the trained data and finish up.
         self.theta, self.s2 = theta, scatter**2
@@ -352,7 +357,7 @@ def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
     :param regularization:
         The regularization term to scale the L1 norm of theta with.
     """
-
+    print(theta, scatter, regularization)
     inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
     return _chi_sq(theta, design_matrix, normalized_flux, inv_var) \
          + _log_det(inv_var) + regularization * L1Norm(theta[1:])
