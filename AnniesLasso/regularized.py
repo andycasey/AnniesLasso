@@ -211,6 +211,8 @@ class RegularizedCannonModel(cannon.CannonModel):
             method.
         """
 
+        model_filename_format = kwargs.pop("model_filename_format", None)
+
         if Lambdas is None:
             Lambdas = 10**np.arange(0, 10.1 + 0.1, 0.1)
 
@@ -252,6 +254,9 @@ class RegularizedCannonModel(cannon.CannonModel):
 
             model.train(fixed_scatter=fixed_scatter)
             if model.pool is not None: model.pool.close()
+
+            if model_filename_format is not None:
+                model.save(model_filename_format.format(i), **kwargs)
 
             # Predict the fluxes in the validate set.
             inv_var = normalized_ivar[validate_set] / \

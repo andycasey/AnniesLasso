@@ -31,16 +31,13 @@ normalized_ivar = normalized_ivar.reshape((len(labelled_set), -1))
 
 
 model = tc.RegularizedCannonModel(labelled_set, normalized_flux,
-    normalized_ivar, dispersion=dispersion, threads=-1)
+    normalized_ivar, dispersion=dispersion, threads=10)
 
 model.vectorizer = tc.vectorizer.NormalizedPolynomialVectorizer(labelled_set,
     tc.vectorizer.polynomial.terminator(["TEFF", "LOGG", "PARAM_M_H"], 2))
 
 Lambdas, chi_sq, log_det, models = model.validate_regularization(
-    fixed_scatter=0, Lambdas=10**np.arange(2, 8.5, 0.5))
-
-model_filename_format = "Ness_2015_L1_validation_{}.pkl"
-for i, model in enumerate(models):
-    model.save(model_filename_format.format(i), overwrite=True)
+    fixed_scatter=0, Lambdas=10**np.arange(2, 8.5, 0.5),
+    model_filename_format="Ness_2015_L1_validation_{}.pkl", overwrite=True)
 
 raise a
