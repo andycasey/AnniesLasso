@@ -63,58 +63,53 @@ class CannonModel(model.BaseCannonModel):
 
 
     @model.requires_model_description
-    def train(self, fix_scatter=False, progressbar=True):
+    def train(self, fixed_scatter=False, progressbar=True, **kwargs):
         """
         Train the model based on the labelled set using the given vectorizer.
 
-        :param fix_scatter: [optional]
+        :param fixed_scatter: [optional]
             Fix the scatter terms and do not solve for them during the training
             phase. If set to `True`, the `s2` attribute must be already set.
+
+        :param progressbar: [optional]
+            Show a progress bar.
         """
         
-        if fix_scatter and self.s2 is None:
+        if fixed_scatter and self.s2 is None:
             raise ValueError("scatter attribute (s2) must be set "
-                             "before training if fix_scatter is set to True")
+                             "before training if fixed_scatter is set to True")
 
-        N_px = len(self.dispersion)
-        scatter_input = np.sqrt(self.s2) if fix_scatter else [None] * N_px
-        design_matrix = self.design_matrix
-        
-        s = np.zeros(N_px)
-        theta = np.zeros((N_px, design_matrix.shape[1]))
+        # Initialize the scatter.
+        p0_scatter = np.sqrt(self.s2) if fixed_scatter \
+            else 0.01 * np.ones_like(self.dispersion)
 
-        pb_kwds = {
-            "message": "Training {2} model from {0} stars with {1} pixels "
-                       "each".format(len(self.labelled_set), N_px,
-                            type(self).__name__),
-            "size": 100 if progressbar else -1
+        # Prepare details about any progressbar to show.
+        M, N = self.normalized_flux.shape
+        message = None if not progressbar else \
+            "Training {0} with {1} stars and {2} pixels/star".format(
+                type(self).__name__, M, N)
+
+        # Prepare the method and arguments.
+        fitter = kwargs.pop("function", _fit_pixel)
+        args = [self.normalized_flux.T, self.normalized_ivar.T, p0_scatter]
+        args.extend(kwargs.pop("additional_args", []))
+        kwds = {
+            "fixed_scatter": fixed_scatter,
+            "design_matrix": self.design_matrix
         }
-        
-        if self.pool is None:
-            for pixel in utils.progressbar(range(N_px), **pb_kwds):
-                theta[pixel, :], s[pixel] = _fit_pixel(
-                    self.normalized_flux[:, pixel], 
-                    self.normalized_ivar[:, pixel],
-                    design_matrix, scatter_input[pixel])
+        kwds.update(kwargs)
 
-        else:
-            # Not as nice as mapping, but necessary if we want a progress bar.
-            process = { pixel: self.pool.apply_async(
-                    _fit_pixel,
-                    args=(
-                        self.normalized_flux[:, pixel], 
-                        self.normalized_ivar[:, pixel],
-                        design_matrix, scatter_input[pixel]
-                    )) \
-                for pixel in range(N_px) }
+        # Wrap the function so we can parallelize it out.
+        f = utils.wrapper(fitter, None, kwds, N, message=message)
 
-            for pixel, proc in utils.progressbar(process.items(), **pb_kwds):
-                theta[pixel, :], s[pixel] = proc.get()
+        # Time for work.
+        mapper = map if self.pool is None else self.pool.map
+        results = np.array(mapper(f, [row for row in zip(*args)]))
 
-        # Save the trained data and finish up.
-        self.theta, self.s2 = (theta, s**2)
+        # Unpack the results.
+        self.theta, self.s2 = (results[:, :-1], results[:, -1]**2)
         return None
-        
+
 
     @model.requires_training_wheels
     def predict(self, labels, **kwargs):
@@ -176,12 +171,6 @@ class CannonModel(model.BaseCannonModel):
         return labels
 
 
-def _chi_sq(theta, design_matrix, normalized_flux, inv_var, axis=None):
-    residuals = np.dot(theta, design_matrix.T) - normalized_flux
-    return np.sum(inv_var * residuals**2, axis=axis)
-
-def _log_det(inv_var):
-    return -np.sum(np.log(inv_var))
 
 
 def _estimate_label_vector(theta, scatter, normalized_flux, normalized_ivar,
@@ -261,8 +250,8 @@ def _fit_spectrum(vectorizer, theta, scatter, normalized_flux,
     return (labels, cov)
 
 
-def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, scatter,
-    **kwargs):
+def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
+    fixed_scatter=False, **kwargs):
     """
     Return the optimal vectorizer coefficients and variance term for a pixel
     given the normalized flux, the normalized inverse variance, and the design
@@ -286,15 +275,15 @@ def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, scatter,
         The optimised label vector coefficients and scatter for this pixel, even
         if it was supplied by the user.
     """
+    logger.debug("Fitting pixel")
 
-    if scatter is not None:
-        theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
-            scatter, design_matrix)
-        return (theta, scatter)
+    theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
+        scatter, design_matrix)
 
-    scatter = kwargs.get("initial_scatter", 0.01)
-    # Alternatively: scatter = np.std(normalized_flux)
-    
+    # Singular matrix or fixed scatter?
+    if ATCiAinv is None or fixed_scatter:
+        return np.hstack([theta, scatter if fixed_scatter else np.inf])
+
     # Optimise the pixel scatter, and at each pixel scatter value we will 
     # calculate the optimal vector coefficients for that pixel scatter value.
     op_scatter, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
@@ -310,8 +299,8 @@ def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, scatter,
 
     theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
         op_scatter, design_matrix)
-
-    return (theta, op_scatter)
+    logger.debug("Returning {0} {1}".format(theta, op_scatter))
+    return np.hstack([theta, op_scatter])
 
 
 def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
@@ -334,18 +323,18 @@ def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
         The design matrix for the model.
     """
 
-    try:
-        theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
-            scatter, design_matrix)
+    theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
+        scatter, design_matrix)
 
-    except np.linalg.linalg.LinAlgError:
-        if kwargs.get("debug", False): raise
-        return np.inf
+    return_theta = kwargs.get("__return_theta", False)
+    if ATCiAinv is None:
+        return np.inf if not return_theta else (np.inf, theta)
 
-    # If you're wondering, we take inv_var back from _fit_theta because it is 
-    # the same quantity we wish to calculate, and it saves us one operation.
-    return _chi_sq(theta, design_matrix, normalized_flux, inv_var) \
-         + _log_det(inv_var)
+    # We take inv_var back from _fit_theta because it is the same quantity we 
+    # need to calculate, and it saves us one operation.
+    Q   = model._chi_sq(theta, design_matrix, normalized_flux, inv_var) \
+        + model._log_det(inv_var)
+    return (Q, theta) if return_theta else Q
 
 
 def _fit_theta(normalized_flux, normalized_ivar, scatter, design_matrix):
@@ -370,11 +359,15 @@ def _fit_theta(normalized_flux, normalized_ivar, scatter, design_matrix):
         and the total inverse variance.
     """
 
-    inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
-    CiA = design_matrix * np.tile(inv_var, (design_matrix.shape[1], 1)).T
-    ATCiAinv = np.linalg.inv(np.dot(design_matrix.T, CiA))
+    ivar = normalized_ivar/(1. + normalized_ivar * scatter**2)
+    CiA = design_matrix * np.tile(ivar, (design_matrix.shape[1], 1)).T
+    try:
+        ATCiAinv = np.linalg.inv(np.dot(design_matrix.T, CiA))
+    except np.linalg.linalg.LinAlgError:
+        #if logger.getEffectiveLevel() == logging.DEBUG: raise
+        return (np.hstack([1, [0] * (design_matrix.shape[1] - 1)]), None, ivar)
 
-    ATY = np.dot(design_matrix.T, normalized_flux * inv_var)
+    ATY = np.dot(design_matrix.T, normalized_flux * ivar)
     theta = np.dot(ATCiAinv, ATY)
 
-    return (theta, ATCiAinv, inv_var)
+    return (theta, ATCiAinv, ivar)

@@ -21,9 +21,7 @@ from . import (cannon, model, utils)
 logger = logging.getLogger(__name__)
 
 
-
-
-class RegularizedCannonModel(cannon.CannonModel):
+class L1RegularizedCannonModel(cannon.CannonModel):
     """
     A L1-regularized edition of The Cannon model for the estimation of arbitrary
     stellar labels.
@@ -117,8 +115,25 @@ class RegularizedCannonModel(cannon.CannonModel):
         return None
 
 
-    @model.requires_model_description
-    def train(self, fixed_scatter=False, progressbar=True):
+    def train(self, fixed_scatter=False, progressbar=True, **kwargs):
+        """
+        Train the model based on the labelled set using the given vectorizer.
+
+        :param fixed_scatter: [optional]
+            Fix the scatter terms and do not solve for them during the training
+            phase. If set to `True`, the `s2` attribute must be already set.
+
+        :param progressbar: [optional]
+            Show a progress bar.
+        """
+
+        super(RegularizedCannonModel, self).train(
+            fixed_scatter=fixed_scatter, progressbar=progressbar,
+            function=_fit_pixel, additional_args=[self.regularization],
+            **kwargs)
+
+
+    def old_train(self, fixed_scatter=False, progressbar=True):
         """
         Train the model based on the labelled set using the given vectorizer and
         regularization terms.
@@ -266,9 +281,9 @@ class RegularizedCannonModel(cannon.CannonModel):
                     for label_name in self.vectorizer.label_names]).T)
 
             # Save everything.
-            chi_sq[i, :] = _chi_sq(model.theta, design_matrix,
+            chi_sq[i, :] = model._chi_sq(model.theta, design_matrix,
                 normalized_flux[validate_set].T, inv_var.T, axis=1)
-            log_det[i, :] = _log_det(inv_var)
+            log_det[i, :] = model._log_det(inv_var)
             models.append(model)
     
         return (Lambdas, chi_sq, log_det, models)
@@ -284,58 +299,10 @@ def L1Norm(Q):
     return np.sum(np.abs(Q))
 
 
-class L1RegularizedCannonModel(cannon.CannonModel):
 
-    regularizer = lambda theta: L1Norm(theta[:1])
-
-    def __init__(self, *args, **kwargs):
-        super(L1RegularizedCannonModel, self).__init__(self, *args, **kwargs)
-
-
-
-
-def _chi_sq(theta, design_matrix, normalized_flux, inv_var, axis=None):
-    residuals = np.dot(theta, design_matrix.T) - normalized_flux
-    return np.sum(inv_var * residuals**2, axis=axis)
-
-def _log_det(inv_var):
-    return -np.sum(np.log(inv_var))
-
-
-
-
-
-def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
-    normalized_ivar, design_matrix, regularization, **kwargs):
-    """
-    Fit the normalized flux for a single pixel (across many stars) given the
-    parameters (scatter, theta) and a fixed regularization term.
-
-    :param parameters:
-        The parameters `(scatter, *theta)` to employ.
-
-    :param normalized_flux:
-        The normalized flux values for a single pixel across many stars.
-
-    :param normalized_ivar:
-        The inverse variance of the normalized flux values for a single pixel
-        across many stars.
-
-    :param design_matrix:
-        The design matrix for the model.
-
-    :param regularization:
-        The regularization term to scale the L1 norm of theta with.
-    """
-    scatter, theta = parameters[0], parameters[1:]
-    inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
-    
-    return _chi_sq(theta, design_matrix, normalized_flux, inv_var) \
-         + _log_det(inv_var) + regularization * L1Norm(theta[1:])
-
-
-def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
-    normalized_flux, normalized_ivar, design_matrix, regularization, **kwargs):
+def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta,
+    normalized_flux, normalized_ivar, scatter, regularization,
+    design_matrix, **kwargs):
     """
     Fit the normalized flux for a single pixel (across many stars) given the
     theta parameters, a fixed scatter, and a fixed regularization term.
@@ -360,13 +327,42 @@ def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
         The regularization term to scale the L1 norm of theta with.
     """
 
-    inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
-    return _chi_sq(theta, design_matrix, normalized_flux, inv_var) \
-         + _log_det(inv_var) + regularization * L1Norm(theta[1:])
+    Q, theta = cannon._fit_pixel_with_fixed_scatter(scatter, normalized_flux,
+        normalized_ivar, design_matrix, __return_theta=True, **kwargs)
+    return Q + regularization * L1Norm(theta[1:])
 
 
-def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, regularization,
-    scatter=None, **kwargs):
+
+def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
+    normalized_ivar, regularization, design_matrix, **kwargs):
+    """
+    Fit the normalized flux for a single pixel (across many stars) given the
+    parameters (scatter, theta) and a fixed regularization term.
+
+    :param parameters:
+        The parameters `(scatter, *theta)` to employ.
+
+    :param normalized_flux:
+        The normalized flux values for a single pixel across many stars.
+
+    :param normalized_ivar:
+        The inverse variance of the normalized flux values for a single pixel
+        across many stars.
+
+    :param design_matrix:
+        The design matrix for the model.
+
+    :param regularization:
+        The regularization term to scale the L1 norm of theta with.
+    """
+    scatter, theta = parameters[0], parameters[1:]
+    return _fit_pixel_with_fixed_regularization_and_fixed_scatter(
+        theta, normalized_flux, normalized_ivar, scatter, regularization,
+        design_matrix, **kwargs)
+
+
+def _fit_pixel(normalized_flux, normalized_ivar, scatter, regularization,
+    design_matrix, fixed_scatter=False, **kwargs):
     """
     Return the optimal vectorizer coefficients and variance term for a pixel
     given the normalized flux, the normalized inverse variance, and the design
@@ -388,59 +384,30 @@ def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, regularization,
     :returns:
         The optimised label vector coefficients and scatter for this pixel.
     """
-    kwds = {
-        "disp": False,
-        "maxiter": np.inf,
-        "maxfun": np.inf,
-        "full_output": True,
-        "retall": False,
-    }
 
-    #printing = kwargs.get("pixel", None) == 322
-    #if printing:
-    #    print("scat", scatter)
-    # TODO: allow initial theta to be given as a kwarg
-    fix_scatter = scatter is not None
-    failed_response = (np.hstack([1., np.zeros(design_matrix.shape[1] - 1)]), 0.)
-    if scatter is None:
-        initial_scatter = kwargs.get("initial_scatter", 0.01)
-        try:
-            initial_theta, _, __ = cannon._fit_theta(normalized_flux, normalized_ivar, 
-                initial_scatter, design_matrix)
-        except np.linalg.linalg.LinAlgError:
-            if kwargs.get("debug", False): raise
-            return failed_response
+    theta, ATCiAinv, inv_var = cannon._fit_theta(
+        normalized_flux, normalized_ivar, scatter, design_matrix)
 
-        # Build the initial guess.
-        p0 = np.hstack([initial_scatter, initial_theta])
-        func = _fit_pixel_with_fixed_regularization
-        kwds["args"] = (normalized_flux, normalized_ivar, design_matrix, regularization)
-    
+    # Singular matrix or fixed scatter?
+    if ATCiAinv is None:
+        return np.hstack([theta, scatter if fixed_scatter else np.inf])
 
-    else:
+    # TODO: Allow initial theta to be given as a kwarg?
+    if fixed_scatter:
+        p0 = theta
         func = _fit_pixel_with_fixed_regularization_and_fixed_scatter
-        try:
-            initial_theta, _, __ = cannon._fit_theta(normalized_flux, normalized_ivar, 
-                scatter, design_matrix)
-        except np.linalg.linalg.LinAlgError:
-            if kwargs.get("debug", False): raise
-            return failed_response
+        args = (normalized_flux, normalized_ivar, scatter, regularization,
+            design_matrix)
+    else:
+        p0 = np.hstack([scatter, theta])
+        func = _fit_pixel_with_fixed_regularization
+        args = (normalized_flux, normalized_ivar, regularization, design_matrix)
 
-    #    if printing:
-    #        print("theta", initial_theta)
+    kwds = { "disp": False, "maxiter": np.inf, "maxfun": np.inf }
+    kwds.update(kwargs)
 
-        p0 = initial_theta
-        kwds["args"] = (scatter, normalized_flux, normalized_ivar, design_matrix, regularization)
-
-    #if printing:
-    #    print(fix_scatter, p0, scatter, normalized_flux, normalized_ivar, regularization)
-
-    op_parameters, fopt, direc, n_iter, n_funcalls, warnflag = op.fmin_powell(
-        func, p0, **kwds)
-
-    #if printing:
-    #    print("DONE: {}".format(op_parameters))
-
+    parameters, fopt, direc, n_iter, n_funcalls, warnflag = op.fmin_powell(
+        func, p0, args=args, full_output=True, retall=False, **kwds)
 
     if warnflag > 0:
         stdout.write("\r\n")
@@ -450,9 +417,8 @@ def _fit_pixel(normalized_flux, normalized_ivar, design_matrix, regularization,
             "Maximum number of iterations."
             ][warnflag - 1]))
 
-    if fix_scatter:
-        theta = op_parameters
-    else:
-        scatter, theta = op_parameters[0], op_parameters[1:]
+    logger.debug("Fitted pixel (scatter, theta): {0}, {1}".format(
+        parameters, scatter))
 
-    return (theta, scatter)
+    return np.hstack([parameters, scatter]) if fixed_scatter else parameters
+

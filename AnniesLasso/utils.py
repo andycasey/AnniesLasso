@@ -5,7 +5,7 @@
 General utility functions.
 """
 
-__all__ = ["InterruptiblePool", "progressbar", "short_hash"]
+__all__ = ["InterruptiblePool", "progressbar", "short_hash", "wrapper"]
 
 import functools
 import logging
@@ -15,24 +15,76 @@ from time import time
 from collections import Iterable
 from hashlib import md5
 from multiprocessing.pool import Pool
-from multiprocessing import TimeoutError
+from multiprocessing import Lock, TimeoutError, Value
 
 logger = logging.getLogger(__name__)
+_counter = Value('i', 0)
+_counter_lock = Lock()
 
-def short_hash(contents):
+class wrapper(object):
     """
-    Return a short hash string of some iterable content.
-
-    :param contents:
-        The contents to calculate a hash for.
-
-    :returns:
-        A concatenated string of 10-character length hashes for all items in the
-        contents provided.
+    A generic wrapper with a progressbar that allows functions to be in parallel.
     """
-    if not isinstance(contents, Iterable): contents = [contents]
-    return "".join([str(md5(str(item).encode("utf-8")).hexdigest())[:10] \
-        for item in contents])
+    def __init__(self, f, args, kwargs, N, message=None, size=100):
+        self.f = f
+        self.args = list(args if args is not None else [])
+        self.kwargs = kwargs
+
+        self._init_progressbar(message, N)
+
+
+    def _init_progressbar(self, message, N):
+        """
+        Initialise a progressbar.
+        """
+        self.N = N
+        self.t_init = time()
+        self.message = message
+        if message is not None:
+            logger.info(message.rstrip())
+            sys.stdout.flush()
+
+            with _counter_lock:
+                _counter.value = 0
+
+
+    def _update_progressbar(self):
+        
+        global _counter, _counter_lock
+        with _counter_lock:
+            _counter.value += 1
+
+        index = _counter.value
+        if self.message is None: return
+        
+        t = time() if index >= self.N else None
+
+        increment = max(1, int(self.N/100))
+        if index % increment == 0 or index in (0, self.N) and self.N > 0:
+            sys.stdout.write("\r[{done}{not_done}] {percent:3.0f}%{t}".format(
+                done="=" * int(index/increment),
+                not_done=" " * int((self.N - index)/increment),
+                percent=100. * index/self.N,
+                t="" if t is None else " ({0:.0f}s)".format(t-self.t_init)))
+            sys.stdout.flush()
+
+        if t is not None:
+            sys.stdout.write("\r\n")
+            sys.stdout.flush()
+
+    def __call__(self, x):
+
+        try:
+            result = self.f(*(list(x) + self.args), **self.kwargs)
+        except:
+            logger.exception("Exception within wrapped function")
+            raise
+
+        self._update_progressbar()
+        return result
+        
+
+
 
 
 def progressbar(iterable, message=None, size=100):
@@ -79,6 +131,22 @@ def progressbar(iterable, message=None, size=100):
         _update(count, time())
         sys.stdout.write("\r\n")
         sys.stdout.flush()
+
+
+def short_hash(contents):
+    """
+    Return a short hash string of some iterable content.
+
+    :param contents:
+        The contents to calculate a hash for.
+
+    :returns:
+        A concatenated string of 10-character length hashes for all items in the
+        contents provided.
+    """
+    if not isinstance(contents, Iterable): contents = [contents]
+    return "".join([str(md5(str(item).encode("utf-8")).hexdigest())[:10] \
+        for item in contents])
 
 """
 Python's multiprocessing.Pool class doesn't interact well with

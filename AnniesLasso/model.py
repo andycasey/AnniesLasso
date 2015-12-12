@@ -17,7 +17,7 @@ import numpy as np
 from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime
-from multiprocessing import cpu_count
+from multiprocessing import Value
 from os import path
 from six.moves import cPickle as pickle
 from sys import maxsize
@@ -26,7 +26,6 @@ from .vectorizer.base import BaseVectorizer
 from . import (utils, __version__ as code_version)
 
 logger = logging.getLogger(__name__)
-
 
 def requires_training_wheels(method):
     """
@@ -126,11 +125,18 @@ class BaseCannonModel(object):
         self._metadata = {
             "q": np.random.randint(0, maxsize, len(labelled_set))
         }
-        # Allow -1 to set the max number of threads.
-        threads = cpu_count() if threads == -1 else threads
-        self.threads, self.pool = threads, pool \
-            or (utils.InterruptiblePool(threads) if threads > 1 else None)
+        if threads == 1:
+            self.pool = None
+        else:
+            # Allow a negative to set the max number of threads.
+            threads = None if threads < 0 else threads
 
+            def init(args):
+                global _counter
+                _counter = args
+
+            self.pool = pool or utils.InterruptiblePool(threads,
+                initializer=init, initargs=(utils._counter,))
 
     def __str__(self):
         return "<{module}.{name} {trained}using a training set of {N} stars "\
@@ -337,7 +343,9 @@ class BaseCannonModel(object):
         
         # Some sanity checks..
         s2 = np.array(s2).flatten()
-        if s2.size != len(self.dispersion):
+        if s2.size == 1:
+            s2 = np.ones_like(self.dispersion) * s2[0]
+        elif s2.size != len(self.dispersion):
             raise ValueError("number of variance values does not match "
                              "the number of pixels ({0} != {1})".format(
                                 s2.size, len(self.dispersion)))
@@ -561,4 +569,19 @@ class BaseCannonModel(object):
                 break
 
         return inferred[:N_stop_at, :]
+
+
+def _chi_sq(theta, design_matrix, normalized_flux, inv_var, axis=None):
+    """
+    Calculate the chi-squared difference between the spectral model and data.
+    """
+    residuals = np.dot(theta, design_matrix.T) - normalized_flux
+    return np.sum(inv_var * residuals**2, axis=axis)
+
+
+def _log_det(inv_var):
+    """
+    Return the log determinant of the variance.
+    """
+    return -np.sum(np.log(inv_var))
 
