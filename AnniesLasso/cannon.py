@@ -18,7 +18,6 @@ from . import (model, utils)
 
 logger = logging.getLogger(__name__)
 
-
 class CannonModel(model.BaseCannonModel):
     """
     A generalised Cannon model for the estimation of arbitrary stellar labels.
@@ -93,19 +92,46 @@ class CannonModel(model.BaseCannonModel):
         fitter = kwargs.pop("function", _fit_pixel)
         args = [self.normalized_flux.T, self.normalized_ivar.T, p0_scatter]
         args.extend(kwargs.pop("additional_args", []))
+
         kwds = {
             "fixed_scatter": fixed_scatter,
             "design_matrix": self.design_matrix
         }
         kwds.update(kwargs)
+        """
+        if self.pool is not None:
+
+            # Sometimes the design matrix is *huge*, so we need to store it as
+            # a shared memory array to prevent the multiprocessing pool from
+            # completely hanging.
+
+            def _init(dm):
+                global design_matrix
+                design_matrix = dm
+
+            dm = self.design_matrix.flatten()
+            _ = np.ctypeslib.as_ctypes(dm)
+            shared_design_matrix \
+                = mp.sharedctypes.Array(_._type_, _, lock=False)
+            shared_design_matrix[:] = dm.copy()
+            pool = self.pool.__class__(self.pool._processes,
+                initializer=_init, initargs=(shared_design_matrix, ))
+            self.pool.close()
+            self.pool = pool
+            mapper = self.pool.map
+
+        else:
+            mapper = map
+            kwds["design_matrix"] = self.design_matrix
+        """
 
         # Wrap the function so we can parallelize it out.
+        mapper = map if self.pool is None else self.pool.map
         f = utils.wrapper(fitter, None, kwds, N, message=message)
 
         # Time for work.
-        mapper = map if self.pool is None else self.pool.map
         results = np.array(mapper(f, [row for row in zip(*args)]))
-
+        
         # Unpack the results.
         self.theta, self.s2 = (results[:, :-1], results[:, -1]**2)
         return None
@@ -240,9 +266,22 @@ def _fit_spectrum(normalized_flux, normalized_ivar, vectorizer, theta, s2,
     
     f = lambda t, *l: np.dot(t, vectorizer(l).T).flatten()
     labels, cov = op.curve_fit(f, theta[use], normalized_flux[use], **kwds)
-    logger.debug("Spectrum fit result: {}".format(labels))
     return (labels, cov)
 
+
+def _get_design_matrix(N, **kwargs):
+
+    try:
+        _ = kwargs.pop("design_matrix")
+        return (_, kwargs)
+    except KeyError:
+        global design_matrix
+        try:
+            design_matrix.ndim
+        except AttributeError:
+            design_matrix = np.ctypeslib.as_array(design_matrix).reshape((N, -1))
+
+    return (design_matrix, kwargs)
 
 def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
     fixed_scatter=False, **kwargs):
@@ -269,8 +308,9 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
         The optimised label vector coefficients and scatter for this pixel, even
         if it was supplied by the user.
     """
-    logger.debug("Fitting pixel")
 
+    #design_matrix, kwargs = _get_design_matrix(normalized_flux.shape[0], **kwargs)
+            
     theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
         scatter, design_matrix)
 
@@ -293,7 +333,6 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
 
     theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
         op_scatter, design_matrix)
-    logger.debug("Returning {0} {1}".format(theta, op_scatter))
     return np.hstack([theta, op_scatter])
 
 

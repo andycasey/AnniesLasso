@@ -35,26 +35,33 @@ normalized_ivar = normalized_ivar[valid]
 
 # Specify the model.
 model = tc.L1RegularizedCannonModel(labelled_set, normalized_flux[:, :N],
-    normalized_ivar[:, :N], dispersion=dispersion[:N], threads=10)
+    normalized_ivar[:, :N], dispersion=dispersion[:N], threads=1)
 
 model.vectorizer = tc.vectorizer.NormalizedPolynomialVectorizer(labelled_set,
     tc.vectorizer.polynomial.terminator(["TEFF", "LOGG", "PARAM_M_H"], 2))
 
-model.regularization = 0
+model.s2 = 0.05
+
+Lambdas, chi_sq, log_det, models = model.validate_regularization(
+    fixed_scatter=True, 
+    model_filename_format="Ness_2015_L1_validation_{}.pkl", overwrite=True,
+    include_training_data=True)
+
+import cPickle as pickle
+with open("Ness_2015_all.pkl", "wb") as fp:
+    pickle.dump((Lambdas, chi_sq, log_det), fp, -1)
+
 
 raise a
-"""
-Lambdas, chi_sq, log_det, models = model.validate_regularization(
-    fixed_scatter=0, Lambdas=10**np.arange(2, 8.5, 0.5),
-    model_filename_format="Ness_2015_L1_validation_{}.pkl", overwrite=True)
-"""
 
-models = \
-    [model.load(filename) for filename in glob("Ness_2015_L1_validation_*.pkl")]
+# TODO: ISSUE WHEN LOADING MODELS: Are regularization values being updated???
+models = map(tc.load_model, glob("Ness_2015_L1_validation_*.pkl"))
 
-wavelengths = [15339.0, 16811.5, 15221.5, dispersion[7700]]
 fig = tc.diagnostics.pixel_regularization_effectiveness(models,
     wavelengths=wavelengths,
     latex_labels=[r"{T_{\rm eff}}", r"\log{g}", r"{\rm [M/H]}"])
+
+fig2 = tc.diagnostics.pixel_regularization_validation(models, False)
+fig3 = tc.diagnostics.pixel_regularization_validation(models, True)
 
 raise a

@@ -12,7 +12,7 @@ from .regularized import *
 from . import (continuum, diagnostics, utils, vectorizer)
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG) # TODO: Remove this when stable.
+logger.setLevel(logging.INFO) # TODO: Remove this when stable.
 
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter(

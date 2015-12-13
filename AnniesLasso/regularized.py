@@ -15,6 +15,7 @@ import numpy as np
 import multiprocessing as mp
 import scipy.optimize as op
 from sys import stdout
+from six import string_types
 
 from . import (cannon, model, utils)
 
@@ -131,7 +132,7 @@ class L1RegularizedCannonModel(cannon.CannonModel):
         super(L1RegularizedCannonModel, self).train(**kwds)
 
 
-    def validate_regularization(self, fixed_scatter=0.0, Lambdas=None,
+    def validate_regularization(self, fixed_scatter=False, Lambdas=None,
         pixel_mask=None, mod=10, **kwargs):
         """
         Perform validation upon several regularization parameters for each pixel
@@ -139,7 +140,6 @@ class L1RegularizedCannonModel(cannon.CannonModel):
 
         :param fixed_scatter: [optional]
             Keep a fixed scatter term when doing the regularization validation.
-            If set to `None`, then scatter will be solved at each step.
 
         :param Lambdas: [optional]
             The regularization factors to evaluate. If `None` is specified, a
@@ -157,10 +157,14 @@ class L1RegularizedCannonModel(cannon.CannonModel):
             method.
         """
 
+        if fixed_scatter and self.s2 is None:
+            raise ValueError("intrinsic pixel variance (s2) must be set "
+                             "before training if fixed_scatter is set to True")
+
         model_filename_format = kwargs.pop("model_filename_format", None)
 
         if Lambdas is None:
-            Lambdas = 10**np.arange(0, 10.1 + 0.1, 0.1)
+            Lambdas = np.hstack([0, 10**np.arange(0, 10.1, 0.1)])
 
         if pixel_mask is None:
             pixel_mask = np.ones_like(self.dispersion, dtype=bool)
@@ -178,41 +182,56 @@ class L1RegularizedCannonModel(cannon.CannonModel):
         train_set, validate_set = (subsets > 0, subsets == 0)
         N_train, N_validate = map(sum, (train_set, validate_set))
 
-        N_px, N_Lambdas = pixel_mask.sum(), len(Lambdas)
+        train_labelled_set = self.labelled_set[train_set]
+        train_normalized_flux = normalized_flux[train_set]
+        train_normalized_ivar = normalized_ivar[train_set]
+
+        validate_normalized_flux = normalized_flux[validate_set]
+        validate_normalized_ivar = normalized_ivar[validate_set]
+        
+        N_px, N_Lambdas = dispersion.size, len(Lambdas)
 
         models = []
         chi_sq = np.zeros((N_Lambdas, N_px))
         log_det = np.zeros((N_Lambdas, N_px))
         for i, Lambda in enumerate(Lambdas):
+            logger.info("Setting Lambda = {0}".format(Lambda))
 
             # Set up a model for this Lambda test.
-            model = self.__class__(self.labelled_set[train_set],
-                normalized_flux[train_set], normalized_ivar[train_set],
-                dispersion=dispersion, threads=self.threads, copy=False)
-            model.vectorizer = self.vectorizer
-            model.regularization = Lambda
+            m = self.__class__(train_labelled_set, train_normalized_flux, 
+                train_normalized_ivar, dispersion=dispersion, copy=False,
+                threads=1 if self.pool is None else self.pool._processes)
+            m.vectorizer = self.vectorizer
+            m.regularization = Lambda
+            if fixed_scatter:
+                m.s2 = self.s2[pixel_mask]
 
             # We want to make sure that we have the same training set each time.
-            model._metadata.update({ "q": self._metadata["q"], "mod": mod })
+            m._metadata.update({ "q": self._metadata["q"], "mod": mod })
 
-            model.train(fixed_scatter=fixed_scatter)
-            if model.pool is not None: model.pool.close()
+            m.train(fixed_scatter=fixed_scatter)
+            if m.pool is not None: m.pool.close()
 
             if model_filename_format is not None:
-                model.save(model_filename_format.format(i), **kwargs)
+                # Update the model to include train + validate in case we save
+                # it with the data..
+                m._normalized_flux = normalized_flux
+                m._normalized_ivar = normalized_ivar
+                m._labelled_set = self.labelled_set
+                m.save(model_filename_format.format(i), **kwargs)
 
             # Predict the fluxes in the validate set.
-            inv_var = normalized_ivar[validate_set] / \
-                (1. + normalized_ivar[validate_set] * model.s2)
-            design_matrix = model.vectorizer(np.vstack(
+            inv_var = validate_normalized_ivar / \
+                (1. + validate_normalized_ivar * m.s2)
+            design_matrix = m.vectorizer(np.vstack(
                 [self.labelled_set[label_name][validate_set] \
                     for label_name in self.vectorizer.label_names]).T)
 
             # Save everything.
-            chi_sq[i, :] = model._chi_sq(model.theta, design_matrix,
-                normalized_flux[validate_set].T, inv_var.T, axis=1)
+            chi_sq[i, :] = model._chi_sq(m.theta, design_matrix,
+                validate_normalized_flux.T, inv_var.T, axis=1)
             log_det[i, :] = model._log_det(inv_var)
-            models.append(model)
+            models.append(m)
     
         return (Lambdas, chi_sq, log_det, models)
 
@@ -228,7 +247,7 @@ def L1Norm(Q):
 
 
 def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta,
-    normalized_flux, normalized_ivar, scatter, regularization,
+    normalized_flux, inv_var, scatter, regularization,
     design_matrix, **kwargs):
     """
     Fit the normalized flux for a single pixel (across many stars) given the
@@ -253,9 +272,10 @@ def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta,
     :param regularization:
         The regularization term to scale the L1 norm of theta with.
     """
-    inv_var = normalized_flux/(1. + normalized_ivar * scatter**2)
+    
     return model._chi_sq(theta, design_matrix, normalized_flux, inv_var) \
-         + model._log_det(inv_var) + regularization * L1Norm(theta[1:])
+        +  model._log_det(inv_var) \
+        +  regularization * L1Norm(theta[1:])
 
 
 def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
@@ -281,8 +301,9 @@ def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
         The regularization term to scale the L1 norm of theta with.
     """
     scatter, theta = parameters[0], parameters[1:]
+    inv_var = normalized_flux/(1. + normalized_ivar * scatter**2)
     return _fit_pixel_with_fixed_regularization_and_fixed_scatter(
-        theta, normalized_flux, normalized_ivar, scatter, regularization,
+        theta, normalized_flux, inv_var, scatter, regularization,
         design_matrix, **kwargs)
 
 
@@ -309,6 +330,9 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
     :returns:
         The optimised label vector coefficients and scatter for this pixel.
     """
+
+    #design_matrix, kwargs = cannon._get_design_matrix(normalized_flux.shape[0], **kwargs)
+
     theta, ATCiAinv, inv_var = cannon._fit_theta(
         normalized_flux, normalized_ivar, scatter, design_matrix)
 
@@ -317,9 +341,9 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
         return np.hstack([theta, scatter if fixed_scatter else np.inf])
 
     if fixed_scatter:
-        p0 = theta.copy()
+        p0 = theta
         func = _fit_pixel_with_fixed_regularization_and_fixed_scatter
-        args = (normalized_flux, normalized_ivar, scatter, regularization,
+        args = (normalized_flux, inv_var, scatter, regularization,
             design_matrix)
     else:
         p0 = np.hstack([scatter, theta])
@@ -329,7 +353,8 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
     kwds = { "disp": False, "maxiter": np.inf, "maxfun": np.inf }
     kwds.update(kwargs)
 
-    logger.debug("Optimizing pixel..")
+    logger.debug("Optimizing pixel from {0} {1} (fixed_scatter = {2})".format(
+        scatter, theta, fixed_scatter))
     parameters, fopt, direc, n_iter, n_funcalls, warnflag = op.fmin_powell(
         func, p0, args=args, full_output=True, retall=False, **kwds)
     if not fixed_scatter: scatter, parameters = parameters[0], parameters[1:]
@@ -344,5 +369,6 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
 
     logger.debug("Optimized result: {0} {1} (fixed_scatter = {2})".format(
         parameters, scatter, fixed_scatter))
+
     return np.hstack([parameters, scatter])
 

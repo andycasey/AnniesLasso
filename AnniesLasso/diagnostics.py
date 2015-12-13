@@ -1,11 +1,12 @@
 
 import numpy as np
 import matplotlib
-matplotlib.rcParams["text.usetex"] = True
+#matplotlib.rcParams["text.usetex"] = True
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
-from . import RegularizedCannonModel
+from . import L1RegularizedCannonModel
+from . import model
 
 def _get_pixel_mask(model, wavelengths=None, pixels=None):
 
@@ -28,7 +29,7 @@ def Lambda_lambda(models):
     wavelength lambda.
 
     :param models:
-        A list of trained RegularizedCannonModel objects for comparison which
+        A list of trained L1RegularizedCannonModel objects for comparison which
         have only been trained on a subset of the labelled set.
     """
 
@@ -131,13 +132,48 @@ def sparsity(models, cutoff, latex_labels=None):
     raise NotImplementedError
 
 
+def label_residuals(model):
+    """
+    Plot the difference between the expected and inferred labels for the stars
+    in the labelled set.
+
+    :param model:
+        The model to show the labelled residuals for.
+    """
+
+    label_names = model.vectorizer.label_names
+    N_labels = len(label_names)
+
+    fitted_labels = model.fit_labelled_set()
+
+    fig, axes = plt.subplots(N_labels)
+    for i, (ax, label_name) in enumerate(zip(axes, label_names)):
+
+        ax.scatter(model.labelled_set[label_name], fitted_labels[:, i],
+            facecolor='k')
+        lims = [
+            [_[0] for _ in ax.get_xlim()],
+            [_[1] for _ in ax.get_xlim()]
+        ]
+        ax.set_xlim(lims)
+        ax.set_ylim(lims)
+        ax.plot(lims, lims, c="#666666", zorder=-1)
+
+        ax.set_xlabel(label_name)
+        ax.set_ylabel("{} (fitted)".format(label_name))
+
+    fig.tight_layout()
+    return fig
+
+
+
 def pixel_regularization_effectiveness(models, wavelengths, latex_labels=None,
     show_legend=True):
     """
     Visualize the effectiveness of the regularization on a single pixel.
 
     :param models:
-        A list of trained RegularizedCannonModel objects for comparison.
+        A list of trained L1RegularizedCannonModel objects for comparison.
 
     :param wavelengths:
         The wavelengths to show the pixel regularization at.
@@ -153,9 +189,9 @@ def pixel_regularization_effectiveness(models, wavelengths, latex_labels=None,
         raise ValueError("must provide more than a single model for comparison")
 
     for model in models:
-        if not isinstance(model, RegularizedCannonModel):
+        if not isinstance(model, L1RegularizedCannonModel):
             raise TypeError("models should be a list of trained "
-                            "RegularizedCannonModel objects")
+                            "L1RegularizedCannonModel objects")
 
     if latex_labels is not None:
         label_names = models[0].vectorizer.get_human_readable_label_vector(
@@ -169,25 +205,29 @@ def pixel_regularization_effectiveness(models, wavelengths, latex_labels=None,
 
     # Sort the models by their regularization value.
     N = models[0].theta.shape[1]
-    x = np.array([np.mean(model.regularization) for model in models])
-    models = [models[xi] for xi in np.argsort(x)]
-
+    Lambdas = np.array([model.regularization for model in models])
+    
     s2 = np.array([model.s2 for model in models])
     theta = np.array([model.theta for model in models])
 
     colours = ("#4C72B0", "#55A868", "#C44E52", "#8172B2", "#64B5CD")
-    xlims = np.log10(x[[0, -1]])
+    xlims = np.log10([np.min(Lambdas), np.max(Lambdas)])
 
     fig, axes = plt.subplots(N + 1, figsize=(8, 8))
     for i, ax in enumerate(axes[:-1]):
 
         for j, (wavelength, pixel) in enumerate(zip(wavelengths, pixels)):
-            y = theta[:, pixel, i]
-            ax.plot(np.log10(x), y, label=wavelength, c=colours[j])
+            
+            x = np.log10(Lambdas[:, j])
+            y = theta[:, j, i]
+
+            _ = np.argsort(x)
+            x, y = x[_], y[_]
+            ax.plot(x, y, label=wavelength, lw=2, c=colours[j])
 
             # Do the fill between.
             if not ax.is_first_row():
-                ax.fill_between(np.log10(x), y, facecolor=colours[j], alpha=0.25)
+                ax.fill_between(x, y, facecolor=colours[j], alpha=0.25)
 
         if ax.is_first_row():
             ax.yaxis.set_major_locator(MaxNLocator(2))
@@ -218,7 +258,11 @@ def pixel_regularization_effectiveness(models, wavelengths, latex_labels=None,
     
     ax = axes[-1]
     for j, (wavelength, pixel) in enumerate(zip(wavelengths, pixels)):
-        ax.plot(np.log10(x), s2[:, j], c=colours[j],
+        x = np.log10(Lambdas[:, j])
+        y = s2[:, j]
+        _ = np.argsort(x)
+        x, y = x[_], y[_]
+        ax.plot(x, y, c=colours[j], lw=2,
             label=r"$%0.1f\,{\rm \AA}$" % (wavelength, ))
         ax.set_xlim(xlims)
 
@@ -248,14 +292,8 @@ def pixel_regularization_effectiveness(models, wavelengths, latex_labels=None,
 
 
 
-def _chi_sq(theta, design_matrix, normalized_flux, inv_var, axis=None):
-    residuals = np.dot(theta, design_matrix.T) - normalized_flux
-    return np.sum(inv_var * residuals**2, axis=axis)
 
-def _log_det(inv_var):
-    return -np.sum(np.log(inv_var))
-
-def pixel_regularization_validation(models, wavelengths, show_legend=True):
+def pixel_regularization_validation(models, chi_only=False, show_legend=True):
     """
     Show the balance between model prediction and regularization for given
     pixels.
@@ -263,47 +301,48 @@ def pixel_regularization_validation(models, wavelengths, show_legend=True):
 
     # Do the prediction for some spectra.
 
-    pixel_mask = np.searchsorted(models[0].dispersion, wavelengths)
-    normalized_ivar = models[0].normalized_ivar[:, pixel_mask]
-    normalized_flux = models[0].normalized_flux[:, pixel_mask]
-    N_px, N_models = (pixel_mask.size, len(models))
+    N_px, N_models = (models[0].theta.shape[0], len(models))
 
     validation_scalar = np.zeros((N_models, N_px))
     validate_set = \
         (models[0]._metadata["q"] % models[0]._metadata.get("mod", 5)) == 0
 
-    for i, model in enumerate(models):
+    x = np.hstack([0, 10**np.arange(-10, 10)])
+    for i, m in enumerate(models):
         
         # Predict the fluxes in the validate set.
-        inv_var = normalized_ivar[validate_set] / \
-            (1. + normalized_ivar[validate_set] * model.s2)
-        design_matrix = model.vectorizer(np.vstack(
-            [model.labelled_set[label_name][validate_set] \
-                for label_name in model.vectorizer.label_names]).T)
+        inv_var = m.normalized_ivar[validate_set] / \
+            (1. + m.normalized_ivar[validate_set] * m.s2)
+        design_matrix = m.vectorizer(np.vstack(
+            [m.labelled_set[label_name][validate_set] \
+                for label_name in m.vectorizer.label_names]).T)
 
         # Calculate the validation scalar.
-        validation_scalar[i, :] = \
-            _chi_sq(model.theta, design_matrix, normalized_flux[validate_set].T,
-                inv_var.T, axis=1) \
-          + _log_det(inv_var)
+        validation_scalar[i, :] = model._chi_sq(m.theta, design_matrix, 
+            m.normalized_flux[validate_set].T, inv_var.T, axis=1)
+        if not chi_only:
+            validation_scalar[i, :] += model._log_det(inv_var)
 
     # Get regularization parameters.
-    x = np.array([model.regularization for model in models])
-
+    
     scaled_validation_scalar = validation_scalar - validation_scalar[0, :]
-    scaled_validation_scalar = scaled_validation_scalar/validate_set.sum()
+    #scaled_validation_scalar = scaled_validation_scalar/validate_set.sum()
 
     fig, ax = plt.subplots()
     ax.axhline(0, c='k', zorder=-1)
     colours = ("#4C72B0", "#55A868", "#C44E52", "#8172B2", "#64B5CD")
-    for pixel, (wavelength, colour) in enumerate(zip(wavelengths, colours)):
+    for pixel, (wavelength, colour) in enumerate(zip(m.dispersion, colours)):
 
-        xi = np.log10(x[:, pixel])
+        xi = np.log10(x)
+        #xi = x[:, pixel]
         yi = scaled_validation_scalar[:, pixel]
 
         _ = np.argsort(xi)
         xi, yi = xi[_], yi[_]
+        raise a
         ax.plot(xi, yi, lw=2, c=colour, label=r"$%0.1f\,{\rm \AA}$" % wavelength)
+
+    raise a
 
     if show_legend:
         ax.legend(loc="lower left", frameon=False)
@@ -358,7 +397,7 @@ def regularization_validation(model, wavelengths=None, pixels=None,
     for i, regularization in enumerate(regularizations):
 
         # Ignore the first component and train on the rest.
-        new_model = RegularizedCannonModel(
+        new_model = L1RegularizedCannonModel(
             model.labelled_set[train_component],
             model.normalized_flux[train_component, pixel_mask].reshape(-1, N_pixels),
             model.normalized_ivar[train_component, pixel_mask].reshape(-1, N_pixels),
