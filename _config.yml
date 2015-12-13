@@ -1,7 +1,7 @@
-title:            Blog Title
-description:      Describe your website here.
+title:            The Cannon
+description:      A data-driven approach to stellar label determination. 
 disqus_shortname: neohpstrtheme
-reading_time:     true
+reading_time:     false 
 words_per_minute: 200
 logo:             images/logo.png
 # Your site's domain goes here (eg: //mmistakes.github.io, http://mademistakes.com, etc)
@@ -10,49 +10,48 @@ logo:             images/logo.png
 url: http://andycasey.github.io/AnniesLasso
 
 menu:
-  - title: 'Home'
-    url: '/'
-  - title: 'About'
-    url: '/about'
-  - title: 'Tags'
-    url: '/tags'
-  - title: 'Categories'
-    url: '/categories'
-    type: 'categories'
-  - title: 'Favorites'
-    url: '#'
+#  - title: 'Home'
+#    url: '/'
+  - title: 'Geting started'
+    url: '/getting-started'
+  - title: 'Documentation'
+    url: '/docs'
+  - title: 'Projects'
+    url: '/projects'
     submenu:
-      - title: 'highlighter'
-        url: '/code-highlighting-post/'
-      - title: 'intro'
-        url: '/readability-post/'
+      - title: 'Category 1'
+      - url: '/projects/categ'
+#    type: 'categories'
+#  - title: 'Favorites'
+#    url: '#'
+#    submenu:
+#      - title: 'highlighter'
+#        url: '/code-highlighting-post/'
+#      - title: 'intro'
+#        url: '/readability-post/'
 
 # Owner/author information
 owner:
   name:           Your name
-  site:           http://aronbordin.com
+  site:           
   avatar:         images/avatar.jpg
   bio:            "Your bio goes here. It shouldn't be super long but a good two sentences or two should suffice."
   email:          you@email.com
   # Social networking links used in footer. Update and remove as you like.
-  twitter: aron_bordin
+  twitter: 
   facebook:
-  github: aron-bordin
+  github:
   stackexchange:
   linkedin:
   instagram:
   flickr:
   tumblr:
   # google plus id, include the '+', eg +AronBordin
-  google_plus:    +yourid
+  google_plus:    
 
 social:
   - title: "github"
-    url: "https://github.com/aron-bordin"
-  - title: "linkedin"
-    url: "https://br.linkedin.com/in/aronbordin"
-  - title: "youtube"
-    url: "https://www.youtube.com/channel/UCfnSek-9HPWOx5e2pH7VFgg"
+    url: "https://github.com/andycasey/AnniesLasso"
 # Background image to be tiled on all pages
 background:
 
