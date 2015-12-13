@@ -42,7 +42,7 @@ owner:
   # Social networking links used in footer. Update and remove as you like.
   twitter: 
   facebook:
-  github:
+  github: 
   stackexchange:
   linkedin:
   instagram:
@@ -51,9 +51,10 @@ owner:
   # google plus id, include the '+', eg +AronBordin
   google_plus:    
 
+
 social:
-  - title: "github"
-    url: "https://github.com/andycasey/AnniesLasso"
+  github: "https://github.com/andycasey/AnniesLasso"
+
 # Background image to be tiled on all pages
 background:
 
