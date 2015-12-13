@@ -140,37 +140,27 @@ class CannonModel(model.BaseCannonModel):
         :returns:
             The labels.
         """
-
         normalized_flux = np.atleast_2d(normalized_flux)
         normalized_ivar = np.atleast_2d(normalized_ivar)
 
-        N = normalized_flux.shape[0]
-        pb_kwds = {
-            "message": "Fitting spectra to {} stars".format(N),
-            "size": 100 if kwargs.pop("progressbar", True) and N > 10 else -1
+        # Prepare the wrapper function and data.
+        N_spectra = normalized_flux.shape[0]
+        message = None if not kwargs.pop("progressbar", True) \
+            else "Fitting {0} spectra".format(N_spectra)
+        kwds = {
+            "vectorizer": self.vectorizer,
+            "theta": self.theta,
+            "s2": self.s2
         }
+        args = [normalized_flux, normalized_ivar]
         
-        labels = np.nan * np.ones((N, len(self.vectorizer.label_names)))
-        # ISSUE: TODO: parallelism breaks.
-        #if self.pool is None:
-        for i in utils.progressbar(range(N), **pb_kwds):
-            labels[i], _ = _fit_spectrum(
-                self.vectorizer, self.theta, self.s2,
-                normalized_flux[i], normalized_ivar[i], **kwargs)
-        """
-        else:
-            processes = { i: self.pool.apply_async(_fit_spectrum,
-                    args=(self.vectorizer, self.theta, self.s2,
-                        normalized_flux[i], normalized_ivar[i]),
-                    kwds=kwargs) \
-                for i in range(N) }
+        f = utils.wrapper(_fit_spectrum, None, kwds, N_spectra, message=message)
 
-            for i, process in utils.progressbar(processes.items(), **pb_kwds):
-                labels[i], _ = process.get()
-        """
-        return labels
+        # Do the grunt work.
+        mapper = map if self.pool is None else self.pool.map
+        labels, cov = map(np.array, zip(*mapper(f, [r for r in zip(*args)])))
 
-
+        return (labels, cov) if kwargs.get("full_output", False) else labels
 
 
 def _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar,
@@ -200,10 +190,18 @@ def _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar,
     return np.linalg.solve(A, B)
 
 
-def _fit_spectrum(vectorizer, theta, s2, normalized_flux,
-    normalized_ivar, **kwargs):
+def _fit_spectrum(normalized_flux, normalized_ivar, vectorizer, theta, s2,
+    **kwargs):
     """
     Solve the labels for given pixel fluxes and uncertainties for a single star.
+
+    :param normalized_flux:
+        The normalized fluxes. These should be on the same dispersion scale
+        as the trained data.
+
+    :param normalized_ivar:
+        The 1-sigma uncertainties in the fluxes. This should have the same
+        shape as `normalized_flux`.
 
     :param vectorizer:
         The model vectorizer.
@@ -213,14 +211,6 @@ def _fit_spectrum(vectorizer, theta, s2, normalized_flux,
 
     :param s2:
         The intrinsic pixel variance.
-
-    :param normalized_flux:
-        The normalized fluxes. These should be on the same dispersion scale
-        as the trained data.
-
-    :param normalized_ivar:
-        The 1-sigma uncertainties in the fluxes. This should have the same
-        shape as `normalized_flux`.
 
     :returns:
         The labels and covariance matrix.
@@ -249,9 +239,9 @@ def _fit_spectrum(vectorizer, theta, s2, normalized_flux,
     kwds.update(kwargs)
     
     f = lambda t, *l: np.dot(t, vectorizer(l).T).flatten()
-    result = op.curve_fit(f, theta[use], normalized_flux[use], **kwds)
-    logger.debug("Spectrum fit result: {}".format(result[0]))
-    return result
+    labels, cov = op.curve_fit(f, theta[use], normalized_flux[use], **kwds)
+    logger.debug("Spectrum fit result: {}".format(labels))
+    return (labels, cov)
 
 
 def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
