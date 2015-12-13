@@ -24,7 +24,7 @@ menu:
       - title: 'Category 1'
         url: '/projects/categ'
       - title: 'Category 2'
-      - url: 'Something..'
+      - title: 'Something..'
 #    type: 'categories'
 #  - title: 'Favorites'
 #    url: '#'
