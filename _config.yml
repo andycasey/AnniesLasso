@@ -12,8 +12,10 @@ url: http://andycasey.github.io/AnniesLasso
 menu:
 #  - title: 'Home'
 #    url: '/'
-  - title: 'Geting started'
-    url: '/getting-started'
+  - title: 'Install'
+    url: '/install'
+  - title: 'Examples'
+    url: '/examples'
   - title: 'Documentation'
     url: '/docs'
   - title: 'Projects'
@@ -32,11 +34,11 @@ menu:
 
 # Owner/author information
 owner:
-  name:           Your name
+  name:           
   site:           
   avatar:         images/avatar.jpg
   bio:            "Your bio goes here. It shouldn't be super long but a good two sentences or two should suffice."
-  email:          you@email.com
+  email:          arc@ast.cam.ac.uk 
   # Social networking links used in footer. Update and remove as you like.
   twitter: 
   facebook:
