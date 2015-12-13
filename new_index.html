@@ -25,17 +25,9 @@ share: false
     </p>
     <p>The code can be installed using the following terminal commands:</p>
 
-
-{% highlight html %}
+{% highlight bash %}
 {% raw %}
-<nav class="pagination" role="navigation">
-    {% if page.previous %}
-        <a href="{{ site.url }}{{ page.previous.url }}" class="btn" title="{{ page.previous.title }}">Previous article</a>
-    {% endif %}
-    {% if page.next %}
-        <a href="{{ site.url }}{{ page.next.url }}" class="btn" title="{{ page.next.title }}">Next article</a>
-    {% endif %}
-</nav><!-- /.pagination -->
+pip install https://github.com/andycasey/AnniesLasso/archive/master.zip
 {% endraw %}
 {% endhighlight %}
 
@@ -53,8 +45,48 @@ share: false
 
     <h1>License &amp; Attribution</h1>
 
+      <p><a href="https://github.com/andycasey/AnniesLasso/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a></p>
 
-      [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/andycasey/AnniesLasso/blob/master/LICENSE)
+    <p>This code is released under a modified MIT license. If you use this code for scientific research then you must cite the following papers:
+
+      <ol>
+        <li>http://adsabs.harvard.edu/abs/2015ApJ...808...16N
+</li>
+</ol>
+    </p>
+
+    <p>The BibTeX is shown below for convenience.
+
+{% highlight bibtex %}
+{% raw %}
+
+@ARTICLE{2015ApJ...808...16N,
+   author = {{Ness}, M. and {Hogg}, D.~W. and {Rix}, H.-W. and {Ho}, A.~Y.~Q. and 
+  {Zasowski}, G.},
+    title = "{The Cannon: A Data-driven Approach to Stellar Label Determination}",
+  journal = {\apj},
+archivePrefix = "arXiv",
+   eprint = {1501.07604},
+ primaryClass = "astro-ph.SR",
+ keywords = {methods: data analysis, methods: statistical, stars: abundances, stars: fundamental parameters, surveys, techniques: spectroscopic},
+     year = 2015,
+    month = jul,
+   volume = 808,
+      eid = {16},
+    pages = {16},
+      doi = {10.1088/0004-637X/808/1/16},
+   adsurl = {http://adsabs.harvard.edu/abs/2015ApJ...808...16N},
+  adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+}
+
+{% endraw %}
+{% endhighlight %}
+    </p>
+
+    <p>If you are interested in reviewing or citing other papers using <i>The Cannon</i>,
+      please view the publications page.</p>
+
+
 
 
 
