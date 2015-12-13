@@ -40,16 +40,16 @@ owner:
   bio:            "Your bio goes here. It shouldn't be super long but a good two sentences or two should suffice."
   email:          arc@ast.cam.ac.uk 
   # Social networking links used in footer. Update and remove as you like.
-  twitter: 
-  facebook:
-  github: 
-  stackexchange:
-  linkedin:
-  instagram:
-  flickr:
-  tumblr:
+#  twitter: 
+#  facebook:
+#  github: 
+#  stackexchange:
+#  linkedin:
+#  instagram:
+#  flickr:
+#  tumblr:
   # google plus id, include the '+', eg +AronBordin
-  google_plus:    
+ # google_plus:    
 
 
 social:
