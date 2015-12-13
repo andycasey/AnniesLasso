@@ -18,6 +18,8 @@ from . import (model, utils)
 
 logger = logging.getLogger(__name__)
 
+design_matrix = None
+
 class CannonModel(model.BaseCannonModel):
     """
     A generalised Cannon model for the estimation of arbitrary stellar labels.
@@ -95,7 +97,7 @@ class CannonModel(model.BaseCannonModel):
 
         kwds = {
             "fixed_scatter": fixed_scatter,
-            "design_matrix": self.design_matrix
+        #    "design_matrix": self.design_matrix
         }
         kwds.update(kwargs)
         """
@@ -124,7 +126,19 @@ class CannonModel(model.BaseCannonModel):
             mapper = map
             kwds["design_matrix"] = self.design_matrix
         """
+        def _init(dm):
+            global design_matrix
+            design_matrix = dm
 
+        global design_matrix
+        design_matrix = self.design_matrix.copy()
+        
+        if self.pool is not None:
+            self.pool.close()
+            self.pool = self.pool.__class__(self.pool._processes,
+                initializer=_init, initargs=(self.design_matrix, ))
+
+        
         # Wrap the function so we can parallelize it out.
         mapper = map if self.pool is None else self.pool.map
         f = utils.wrapper(fitter, None, kwds, N, message=message)
@@ -283,8 +297,7 @@ def _get_design_matrix(N, **kwargs):
 
     return (design_matrix, kwargs)
 
-def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
-    fixed_scatter=False, **kwargs):
+def _fit_pixel(normalized_flux, normalized_ivar, scatter, fixed_scatter=False, **kwargs):
     """
     Return the optimal vectorizer coefficients and variance term for a pixel
     given the normalized flux, the normalized inverse variance, and the design
@@ -311,8 +324,8 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
 
     #design_matrix, kwargs = _get_design_matrix(normalized_flux.shape[0], **kwargs)
             
-    theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
-        scatter, design_matrix)
+    theta, ATCiAinv, inv_var, design_matrix = _fit_theta(normalized_flux, normalized_ivar,
+        scatter)
 
     # Singular matrix or fixed scatter?
     if ATCiAinv is None or fixed_scatter:
@@ -331,8 +344,8 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
             "Maximum number of iterations made during optimisation."
             ][warnflag - 1]))
 
-    theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
-        op_scatter, design_matrix)
+    theta, ATCiAinv, inv_var, _ = _fit_theta(normalized_flux, normalized_ivar,
+        op_scatter)
     return np.hstack([theta, op_scatter])
 
 
@@ -356,8 +369,8 @@ def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
         The design matrix for the model.
     """
 
-    theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
-        scatter, design_matrix)
+    theta, ATCiAinv, inv_var, design_matrix = _fit_theta(normalized_flux, normalized_ivar,
+        scatter)
 
     return_theta = kwargs.get("__return_theta", False)
     if ATCiAinv is None:
@@ -370,7 +383,7 @@ def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
     return (Q, theta) if return_theta else Q
 
 
-def _fit_theta(normalized_flux, normalized_ivar, scatter, design_matrix):
+def _fit_theta(normalized_flux, normalized_ivar, scatter):
     """
     Fit theta coefficients to a set of normalized fluxes for a single pixel.
 
@@ -392,15 +405,18 @@ def _fit_theta(normalized_flux, normalized_ivar, scatter, design_matrix):
         and the total inverse variance.
     """
 
+    global design_matrix
     ivar = normalized_ivar/(1. + normalized_ivar * scatter**2)
     CiA = design_matrix * np.tile(ivar, (design_matrix.shape[1], 1)).T
     try:
         ATCiAinv = np.linalg.inv(np.dot(design_matrix.T, CiA))
     except np.linalg.linalg.LinAlgError:
         #if logger.getEffectiveLevel() == logging.DEBUG: raise
-        return (np.hstack([1, [0] * (design_matrix.shape[1] - 1)]), None, ivar)
+        return (np.hstack([1, [0] * (design_matrix.shape[1] - 1)]), None, ivar,
+            design_matrix)
 
     ATY = np.dot(design_matrix.T, normalized_flux * ivar)
     theta = np.dot(ATCiAinv, ATY)
 
-    return (theta, ATCiAinv, ivar)
+    return (theta, ATCiAinv, ivar, design_matrix)
+

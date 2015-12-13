@@ -25,6 +25,7 @@ from sys import maxsize
 from .vectorizer.base import BaseVectorizer
 from . import (utils, __version__ as code_version)
 
+np.random.seed(123)
 logger = logging.getLogger(__name__)
 
 def requires_training_wheels(method):

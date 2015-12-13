@@ -1,7 +1,7 @@
 
 import numpy as np
 import matplotlib
-#matplotlib.rcParams["text.usetex"] = True
+matplotlib.rcParams["text.usetex"] = True
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
@@ -167,7 +167,8 @@ def label_residuals(model):
 
 
 
-def pixel_regularization_effectiveness(models, wavelengths, latex_labels=None,
+def pixel_regularization_effectiveness(models, wavelengths, label_names=None,
+    latex_labels=None, same_limits=False,
     show_legend=True):
     """
     Visualize the effectiveness of the regularization on a single pixel.
@@ -184,6 +185,9 @@ def pixel_regularization_effectiveness(models, wavelengths, latex_labels=None,
     :param show_legend: [optional]
         Toggle legend display.
     """
+
+    if label_names is None:
+        label_names = models[0].vectorizer.get_human_readable_label_vector()
 
     if 2 > len(models):
         raise ValueError("must provide more than a single model for comparison")
@@ -205,7 +209,7 @@ def pixel_regularization_effectiveness(models, wavelengths, latex_labels=None,
 
     # Sort the models by their regularization value.
     N = models[0].theta.shape[1]
-    Lambdas = np.array([model.regularization for model in models])
+    Lambdas = 1. + np.array([model.regularization for model in models])
     
     s2 = np.array([model.s2 for model in models])
     theta = np.array([model.theta for model in models])
@@ -213,9 +217,21 @@ def pixel_regularization_effectiveness(models, wavelengths, latex_labels=None,
     colours = ("#4C72B0", "#55A868", "#C44E52", "#8172B2", "#64B5CD")
     xlims = np.log10([np.min(Lambdas), np.max(Lambdas)])
 
-    fig, axes = plt.subplots(N + 1, figsize=(8, 8))
+    if N > 10:
+        M = int(np.ceil((N + 1)/10.))
+        figs = []
+        for m in range(M):
+            fig, axes = plt.subplots(10, figsize=(8, 8))
+            figs.append(fig)
+
+    else:
+        fig, axes = plt.subplots(N + 1, figsize=(8, 8))
+        figs = [fig]
+
+    axes = np.array([fig.axes for fig in figs]).flatten()
     for i, ax in enumerate(axes[:-1]):
 
+        if i >= theta.shape[2]: break
         for j, (wavelength, pixel) in enumerate(zip(wavelengths, pixels)):
             
             x = np.log10(Lambdas[:, j])
@@ -226,7 +242,7 @@ def pixel_regularization_effectiveness(models, wavelengths, latex_labels=None,
             ax.plot(x, y, label=wavelength, lw=2, c=colours[j])
 
             # Do the fill between.
-            if not ax.is_first_row():
+            if i != 0:
                 ax.fill_between(x, y, facecolor=colours[j], alpha=0.25)
 
         if ax.is_first_row():
@@ -246,7 +262,6 @@ def pixel_regularization_effectiveness(models, wavelengths, latex_labels=None,
 
         ax.xaxis.set_major_locator(MaxNLocator(8))
         
-
         ax.set_ylabel(r"$\theta_{{{0}}}$".format(i))
 
         ax_twin = ax.twinx()
@@ -257,13 +272,14 @@ def pixel_regularization_effectiveness(models, wavelengths, latex_labels=None,
 
     
     ax = axes[-1]
+    lines = []
     for j, (wavelength, pixel) in enumerate(zip(wavelengths, pixels)):
         x = np.log10(Lambdas[:, j])
         y = s2[:, j]
         _ = np.argsort(x)
         x, y = x[_], y[_]
-        ax.plot(x, y, c=colours[j], lw=2,
-            label=r"$%0.1f\,{\rm \AA}$" % (wavelength, ))
+        lines.append(ax.plot(x, y, c=colours[j], lw=2,
+            label=r"$%0.1f\,{\rm \AA}$" % (wavelength, )))
         ax.set_xlim(xlims)
 
     ax.set_xlim(xlims)    
@@ -275,25 +291,36 @@ def pixel_regularization_effectiveness(models, wavelengths, latex_labels=None,
     ax.locator_params(axis='y', nbins=3)
     ax.set_ylabel(r"$s^2$")
 
-    ylim = np.max(np.abs([ax.get_ylim() for ax in axes[1:-1]]))
-    for ax in axes[1:-1]:
-        ax.set_ylim(-ylim, +ylim)
-        ax.set_yticks([-ylim/2., +ylim/2.])
+    if same_limits:
+        ylim = np.max(np.abs([ax.get_ylim() for ax in axes[1:-1]]))
+        for ax in axes[1:-1]:
+            ax.set_ylim(-ylim, +ylim)
+            ax.set_yticks([-ylim/2., +ylim/2.])
+    else:
 
+        for ax in axes[1:-1]:
+            ylim = np.max(np.abs(ax.get_ylim()))
+            ax.set_ylim(-ylim, +ylim)
+            ax.set_yticks([-ylim/2., +ylim/2.])
+           
     if show_legend:
-        axes[-1].legend(frameon=False, loc="upper left", fontsize=10)
-            
-    fig.tight_layout()
-    fig.subplots_adjust(wspace=0.05, hspace=0.05, right=0.86)
+        fig.legend(fig.axes[0].lines, 
+            [r"$%0.1f\,{\rm \AA}$" % _ for _ in wavelengths],
+            bbox_to_anchor=(0.5, 1.00),
+            loc="upper center", frameon=False, ncol=len(wavelengths))
 
-    return fig
+    for fig in figs:        
+        fig.tight_layout()
+        fig.subplots_adjust(wspace=0.05, hspace=0.05, right=0.86, top=0.95)
+
+    return figs
 
 
 
 
 
 
-def pixel_regularization_validation(models, chi_only=False, show_legend=True):
+def pixel_regularization_validation(models, wavelengths, show_legend=True):
     """
     Show the balance between model prediction and regularization for given
     pixels.
@@ -311,17 +338,16 @@ def pixel_regularization_validation(models, chi_only=False, show_legend=True):
     for i, m in enumerate(models):
         
         # Predict the fluxes in the validate set.
-        inv_var = m.normalized_ivar[validate_set] / \
-            (1. + m.normalized_ivar[validate_set] * m.s2)
+        inv_var = models[0].normalized_ivar[validate_set] / \
+            (1. + models[0].normalized_ivar[validate_set] * m.s2)
         design_matrix = m.vectorizer(np.vstack(
-            [m.labelled_set[label_name][validate_set] \
+            [models[0].labelled_set[label_name][validate_set] \
                 for label_name in m.vectorizer.label_names]).T)
 
         # Calculate the validation scalar.
         validation_scalar[i, :] = model._chi_sq(m.theta, design_matrix, 
-            m.normalized_flux[validate_set].T, inv_var.T, axis=1)
-        if not chi_only:
-            validation_scalar[i, :] += model._log_det(inv_var)
+            models[0].normalized_flux[validate_set].T, inv_var.T, axis=1)
+        validation_scalar[i, :] += model._log_det(inv_var)
 
     # Get regularization parameters.
     
@@ -331,7 +357,7 @@ def pixel_regularization_validation(models, chi_only=False, show_legend=True):
     fig, ax = plt.subplots()
     ax.axhline(0, c='k', zorder=-1)
     colours = ("#4C72B0", "#55A868", "#C44E52", "#8172B2", "#64B5CD")
-    for pixel, (wavelength, colour) in enumerate(zip(m.dispersion, colours)):
+    for pixel, (wavelength, colour) in enumerate(zip(wavelengths, colours)):
 
         xi = np.log10(x)
         #xi = x[:, pixel]
@@ -339,10 +365,7 @@ def pixel_regularization_validation(models, chi_only=False, show_legend=True):
 
         _ = np.argsort(xi)
         xi, yi = xi[_], yi[_]
-        raise a
         ax.plot(xi, yi, lw=2, c=colour, label=r"$%0.1f\,{\rm \AA}$" % wavelength)
-
-    raise a
 
     if show_legend:
         ax.legend(loc="lower left", frameon=False)

@@ -9,11 +9,9 @@ PATH = "/Users/arc/research/apogee/"
 CATALOG = "apogee-rc-DR12.fits"
 MEMMAP_FILE_FORMAT = "apogee-rc-{}.memmap"
 
+from glob import glob
 
-N = 500
-M = np.arange(0, 4.8, 0.1)
-RUN_TRAINING = False
-THREADS = 1
+N = None
 
 model_filename_format = "rc-sp-subset-regularized-order-{0:.1f}.pkl"
 
@@ -29,30 +27,68 @@ normalized_ivar = np.memmap(
     os.path.join(PATH, MEMMAP_FILE_FORMAT).format("normalized-ivar"),
     mode="c", dtype=float).reshape(normalized_flux.shape)
 
-model = tc.RegularizedCannonModel(labelled_set, normalized_flux,
-    normalized_ivar, dispersion=dispersion, threads=THREADS)
+#labelled_set = labelled_set[:2000]
+#normalized_flux = normalized_flux[:2000]
+#normalized_ivar = normalized_ivar[:2000]
+
+model = tc.L1RegularizedCannonModel(labelled_set, normalized_flux[:, :N],
+    normalized_ivar[:, :N], dispersion=dispersion[:N], threads=1)
 
 model.vectorizer = tc.vectorizer.NormalizedPolynomialVectorizer(
     model.labelled_set, 
     tc.vectorizer.polynomial.terminator(["TEFF", "LOGG", "PARAM_M_H"], 2))
 
-model_filename_format = "regularization-test-rc/model-{}.pkl"
-if not os.path.exists(model_filename_format.format(0)):
-        
-    regularizations, chi_sq, log_det, models = model.validate_regularization(
-        pixel_mask=(16812 > model.dispersion) * (model.dispersion > 16811),
-        fixed_scatter=0)
 
-    for i, model in enumerate(models):
-        model.save(model_filename_format.format(i), overwrite=True)
+model.s2 = 0
 
-i, models = 0, []
-while os.path.exists(model_filename_format.format(i)):
-    model = tc.RegularizedCannonModel(labelled_set, normalized_flux,
-        normalized_ivar, dispersion=dispersion, threads=THREADS)
-    model.load(model_filename_format.format(i))
-    models.append(model)
-    i += 1
+wavelengths = [model.dispersion[7700], 15339.0, 16811.5]
+regularizations, chi_sq, log_det, models = model.validate_regularization(
+    pixel_mask=np.searchsorted(model.dispersion, wavelengths),
+    Lambdas=np.hstack([1e-6, 10**np.arange(0, 10.05, 0.05)]),
+    fixed_scatter=True)
+Q = chi_sq + log_det
+Q = Q - Q[0]
+fig, ax = plt.subplots()
+for i in range(2):
+    ax.plot(np.log10(1 + regularizations), Q)
+
+
+
+fig = tc.diagnostics.pixel_regularization_effectiveness(models,
+    wavelengths=wavelengths, same_limits=True,
+    latex_labels=[r"{T_{\rm eff}}", r"\log{g}", r"{\rm [M/H]}"])
+
+
+fig2 = tc.diagnostics.pixel_regularization_effectiveness(models,
+    wavelengths=wavelengths, same_limits=False,
+    latex_labels=[r"{T_{\rm eff}}", r"\log{g}", r"{\rm [M/H]}"])
+
+raise a
+
+
+pixels = np.searchsorted(model.dispersion, wavelengths)
+models[0]._labelled_set = model.labelled_set
+models[0]._dispersion = model.dispersion[pixels]
+models[0]._normalized_flux = model.normalized_flux[:, pixels]
+models[0]._normalized_ivar = model.normalized_ivar[:, pixels]
+
+fig3 = tc.diagnostics.pixel_regularization_validation(models, wavelengths)
+
+raise a
+
+
+models = map(tc.load_model, glob(model_filename_format.format("*")))
+
+
+
+raise a
+
+
+#    wavelengths=model.dispersion[(16812 > model.dispersion) * (model.dispersion > 16811)],
+
+
+fig, ax = plt.subplots()
+ax.scatter(regularizations, chi_sq)
 
 raise a
 

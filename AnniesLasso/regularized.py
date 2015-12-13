@@ -301,14 +301,14 @@ def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
         The regularization term to scale the L1 norm of theta with.
     """
     scatter, theta = parameters[0], parameters[1:]
-    inv_var = normalized_flux/(1. + normalized_ivar * scatter**2)
+    inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
     return _fit_pixel_with_fixed_regularization_and_fixed_scatter(
         theta, normalized_flux, inv_var, scatter, regularization,
         design_matrix, **kwargs)
 
 
 def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter, 
-    regularization, design_matrix, fixed_scatter=False, **kwargs):
+    regularization, fixed_scatter=False, **kwargs):
     """
     Return the optimal vectorizer coefficients and variance term for a pixel
     given the normalized flux, the normalized inverse variance, and the design
@@ -333,8 +333,8 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
 
     #design_matrix, kwargs = cannon._get_design_matrix(normalized_flux.shape[0], **kwargs)
 
-    theta, ATCiAinv, inv_var = cannon._fit_theta(
-        normalized_flux, normalized_ivar, scatter, design_matrix)
+    theta, ATCiAinv, inv_var, design_matrix = cannon._fit_theta(
+        normalized_flux, normalized_ivar, scatter)
 
     # Singular matrix?
     if ATCiAinv is None:
