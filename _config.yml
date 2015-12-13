@@ -22,7 +22,9 @@ menu:
     url: '/projects'
     submenu:
       - title: 'Category 1'
-      - url: '/projects/categ'
+        url: '/projects/categ'
+      - title: 'Category 2'
+      - url: 'Something..'
 #    type: 'categories'
 #  - title: 'Favorites'
 #    url: '#'
