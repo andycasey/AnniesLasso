@@ -1,6 +1,6 @@
 ---
 layout: post-index
-title: "The Cannon 2"
+title: "The Cannon 2: Compressed-sensing edition"
 description: "Compressed-sensing edition"
 tags:
 comments: false
@@ -14,19 +14,49 @@ share: false
   <div class="entry-content">
 
     <p1><i>The Cannon</i> is a data-driven approach to stellar label determination.</p>
-      
+    
+
 
     <h1>Installation</h1>
 
-    <p>Foo bar</p>
+    <p>
+      <a href="https://travis-ci.org/andycasey/AnniesLasso"><img src="https://img.shields.io/travis/andycasey/AnniesLasso/master.svg" alt="Build status" /></a>
+      <a href="https://coveralls.io/github/andycasey/AnniesLasso?branch=master"><img src="https://img.shields.io/coveralls/andycasey/AnniesLasso/master.svg" alt="Coverage status" /></a>
+    </p>
+    <p>The code can be installed using the following terminal commands:</p>
+
+
+{% highlight html %}
+{% raw %}
+<nav class="pagination" role="navigation">
+    {% if page.previous %}
+        <a href="{{ site.url }}{{ page.previous.url }}" class="btn" title="{{ page.previous.title }}">Previous article</a>
+    {% endif %}
+    {% if page.next %}
+        <a href="{{ site.url }}{{ page.next.url }}" class="btn" title="{{ page.next.title }}">Next article</a>
+    {% endif %}
+</nav><!-- /.pagination -->
+{% endraw %}
+{% endhighlight %}
+
+    <p>(This will be on the PyPI repository when stable)</p>
 
 
     <h1>Basic Usage</h1>
 
+    <p>Some example here that grabs the Ness et al. 2015 data in the right format
+    and shows how to set up a standard Cannon model</p>
+
+    # Include a code gist.
 
 
 
-    <h1>Attribution</h1>
+    <h1>License &amp; Attribution</h1>
+
+
+      [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/andycasey/AnniesLasso/blob/master/LICENSE)
+
+
 
 
 
