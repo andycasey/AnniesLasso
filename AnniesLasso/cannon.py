@@ -76,7 +76,7 @@ class CannonModel(model.BaseCannonModel):
         """
         
         if fixed_scatter and self.s2 is None:
-            raise ValueError("scatter attribute (s2) must be set "
+            raise ValueError("intrinsic pixel variance (s2) must be set "
                              "before training if fixed_scatter is set to True")
 
         # Initialize the scatter.
@@ -239,15 +239,14 @@ def _fit_spectrum(vectorizer, theta, scatter, normalized_flux,
     
     kwds = {
         "p0": initial,
-        "maxfev": np.inf,
+        "maxfev": 100000,
         "sigma": np.sqrt(1.0/inv_var),
         "absolute_sigma": True
     }
     kwds.update(kwargs)
 
-    function = lambda t, *l: np.dot(t, vectorizer(l).T).T.flatten()
-    labels, cov = op.curve_fit(function, theta, normalized_flux, **kwds)
-    return (labels, cov)
+    function = lambda t, *l: np.dot(t, vectorizer(l).T).flatten()
+    return op.curve_fit(function, theta, normalized_flux, **kwds)
 
 
 def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
@@ -282,7 +281,7 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
 
     # Singular matrix or fixed scatter?
     if ATCiAinv is None or fixed_scatter:
-        return np.hstack([theta, scatter if fixed_scatter else np.inf])
+        return np.hstack([theta, scatter if fixed_scatter else 0.0])
 
     # Optimise the pixel scatter, and at each pixel scatter value we will 
     # calculate the optimal vector coefficients for that pixel scatter value.
@@ -328,7 +327,7 @@ def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
 
     return_theta = kwargs.get("__return_theta", False)
     if ATCiAinv is None:
-        return np.inf if not return_theta else (np.inf, theta)
+        return 0.0 if not return_theta else (0.0, theta)
 
     # We take inv_var back from _fit_theta because it is the same quantity we 
     # need to calculate, and it saves us one operation.

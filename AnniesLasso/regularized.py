@@ -8,7 +8,7 @@ A regularized (compressed sensing) version of The Cannon.
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
-__all__ = ["RegularizedCannonModel"]
+__all__ = ["L1RegularizedCannonModel"]
 
 import logging
 import numpy as np
@@ -65,7 +65,7 @@ class L1RegularizedCannonModel(cannon.CannonModel):
     _descriptive_attributes = ["_vectorizer", "_regularization"]
     
     def __init__(self, *args, **kwargs):
-        super(RegularizedCannonModel, self).__init__(*args, **kwargs)
+        super(L1RegularizedCannonModel, self).__init__(*args, **kwargs)
 
 
     @property
@@ -90,27 +90,20 @@ class L1RegularizedCannonModel(cannon.CannonModel):
             self._regularization = None
             return None
         
-        # Can be positive float, or positive values for all pixels.
-        try:
-            regularization = float(regularization)
-        except (TypeError, ValueError):
-            regularization = np.array(regularization).flatten()
+        regularization = np.array(regularization).flatten()
+        if regularization.size == 1:
+            regularization = np.ones_like(self.dispersion) * regularization[0]
 
-            if regularization.size != len(self.dispersion):
-                raise ValueError("regularization must be a positive value or "
-                                 "an array of positive values for each pixel "
-                                 "({0} != {1})".format(regularization.size,
-                                    len(self.dispersion)))
+        elif regularization.size != len(self.dispersion):
+            raise ValueError("regularization must be a positive value or "
+                             "an array of positive values for each pixel "
+                             "({0} != {1})".format(regularization.size,
+                                len(self.dispersion)))
 
-            if any(0 > regularization) \
-            or not np.all(np.isfinite(regularization)):
-                raise ValueError("regularization terms must be "
-                                 "positive and finite")
-        else:
-            if 0 > regularization or not np.isfinite(regularization):
-                raise ValueError("regularization term must be "
-                                 "positive and finite")
-            regularization = np.ones_like(self.dispersion) * regularization
+        if any(0 > regularization) \
+        or not np.all(np.isfinite(regularization)):
+            raise ValueError("regularization terms must be "
+                             "positive and finite")
         self._regularization = regularization
         return None
 
@@ -126,78 +119,16 @@ class L1RegularizedCannonModel(cannon.CannonModel):
         :param progressbar: [optional]
             Show a progress bar.
         """
+        kwds = { "fixed_scatter": fixed_scatter, "progressbar": progressbar }
+        kwds.update(kwargs)
 
-        super(RegularizedCannonModel, self).train(
-            fixed_scatter=fixed_scatter, progressbar=progressbar,
-            function=_fit_pixel, additional_args=[self.regularization],
-            **kwargs)
-
-
-    def old_train(self, fixed_scatter=False, progressbar=True):
-        """
-        Train the model based on the labelled set using the given vectorizer and
-        regularization terms.
-
-        :param fix_scatter: [optional]
-            Fix the scatter terms and do not solve for them during the training
-            phase. If set to `True`, the `s2` attribute must be already set.
-        """
-        
-        # Initialise the required arrays.
-        N_px = len(self.dispersion)
-        design_matrix = self.design_matrix
-        
-        scatter = np.nan * np.ones(N_px)
-        theta = np.nan * np.ones((N_px, design_matrix.shape[1]))
-
-        pb_kwds = {
-            "message": "Training L1-regularized Cannon model from {0} stars "
-                       "with {1} pixels and a {2:.0e} mean regularization "
-                       "factor".format(len(self.labelled_set), N_px,
-                            np.mean(self.regularization)),
-            "size": 100 if progressbar else -1
-        }
-        if fixed_scatter is not None:
-            if fixed_scatter is True:
-                initial_scatter = np.sqrt(self.s2)
-            else:
-                initial_scatter = np.ones_like(self.dispersion) * fixed_scatter
-            logger.debug("Using fixed scatter = {}".format(initial_scatter))
-
-        else:
-            logger.debug("Solving {theta, scatter} simultaneously at each pixel")
-            initial_scatter = [None] * N_px
-        
-        if self.pool is None:
-            for pixel in utils.progressbar(range(N_px), **pb_kwds):
-                logger.debug("At pixel {}".format(pixel))
-                theta[pixel, :], scatter[pixel] = _fit_pixel(
-                    self.normalized_flux[:, pixel], 
-                    self.normalized_ivar[:, pixel],
-                    design_matrix, self.regularization[pixel], 
-                    initial_scatter[pixel], pixel=pixel)
-
-        else:
-            # Not as nice as mapping, but necessary if we want a progress bar.
-            process = { pixel: self.pool.apply_async(
-                    _fit_pixel,
-                    args=(
-                        self.normalized_flux[:, pixel], 
-                        self.normalized_ivar[:, pixel],
-                        design_matrix,
-                        self.regularization[pixel],
-                        initial_scatter[pixel]
-                    ),
-                    kwds={"pixel": pixel}) \
-                for pixel in range(N_px) }
-
-            for pixel, proc in utils.progressbar(process.items(), **pb_kwds):
-                logger.debug("At pixel {}".format(pixel))
-                theta[pixel, :], scatter[pixel] = proc.get()
-
-        # Save the trained data and finish up.
-        self.theta, self.s2 = theta, scatter**2
-        return None
+        # This is a hack for speed: if regularization is zero, things are fast!
+        if not np.all(self.regularization == 0):
+            kwds.update({
+                "function": _fit_regularized_pixel,
+                "additional_args": [self.regularization]
+            })
+        super(L1RegularizedCannonModel, self).train(**kwds)
 
 
     def validate_regularization(self, fixed_scatter=0.0, Lambdas=None,
@@ -262,10 +193,7 @@ class L1RegularizedCannonModel(cannon.CannonModel):
             model.regularization = Lambda
 
             # We want to make sure that we have the same training set each time.
-            model._metadata.update({
-                "q": self._metadata["q"],
-                "mod": mod
-            })
+            model._metadata.update({ "q": self._metadata["q"], "mod": mod })
 
             model.train(fixed_scatter=fixed_scatter)
             if model.pool is not None: model.pool.close()
@@ -299,7 +227,6 @@ def L1Norm(Q):
     return np.sum(np.abs(Q))
 
 
-
 def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta,
     normalized_flux, normalized_ivar, scatter, regularization,
     design_matrix, **kwargs):
@@ -326,11 +253,9 @@ def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta,
     :param regularization:
         The regularization term to scale the L1 norm of theta with.
     """
-
-    Q, theta = cannon._fit_pixel_with_fixed_scatter(scatter, normalized_flux,
-        normalized_ivar, design_matrix, __return_theta=True, **kwargs)
-    return Q + regularization * L1Norm(theta[1:])
-
+    inv_var = normalized_flux/(1. + normalized_ivar * scatter**2)
+    return model._chi_sq(theta, design_matrix, normalized_flux, inv_var) \
+         + model._log_det(inv_var) + regularization * L1Norm(theta[1:])
 
 
 def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
@@ -361,8 +286,8 @@ def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
         design_matrix, **kwargs)
 
 
-def _fit_pixel(normalized_flux, normalized_ivar, scatter, regularization,
-    design_matrix, fixed_scatter=False, **kwargs):
+def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter, 
+    regularization, design_matrix, fixed_scatter=False, **kwargs):
     """
     Return the optimal vectorizer coefficients and variance term for a pixel
     given the normalized flux, the normalized inverse variance, and the design
@@ -384,17 +309,15 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, regularization,
     :returns:
         The optimised label vector coefficients and scatter for this pixel.
     """
-
     theta, ATCiAinv, inv_var = cannon._fit_theta(
         normalized_flux, normalized_ivar, scatter, design_matrix)
 
-    # Singular matrix or fixed scatter?
+    # Singular matrix?
     if ATCiAinv is None:
         return np.hstack([theta, scatter if fixed_scatter else np.inf])
 
-    # TODO: Allow initial theta to be given as a kwarg?
     if fixed_scatter:
-        p0 = theta
+        p0 = theta.copy()
         func = _fit_pixel_with_fixed_regularization_and_fixed_scatter
         args = (normalized_flux, normalized_ivar, scatter, regularization,
             design_matrix)
@@ -406,9 +329,11 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, regularization,
     kwds = { "disp": False, "maxiter": np.inf, "maxfun": np.inf }
     kwds.update(kwargs)
 
+    logger.debug("Optimizing pixel..")
     parameters, fopt, direc, n_iter, n_funcalls, warnflag = op.fmin_powell(
         func, p0, args=args, full_output=True, retall=False, **kwds)
-
+    if not fixed_scatter: scatter, parameters = parameters[0], parameters[1:]
+    
     if warnflag > 0:
         stdout.write("\r\n")
         stdout.flush()
@@ -417,8 +342,7 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, regularization,
             "Maximum number of iterations."
             ][warnflag - 1]))
 
-    logger.debug("Fitted pixel (scatter, theta): {0}, {1}".format(
-        parameters, scatter))
-
-    return np.hstack([parameters, scatter]) if fixed_scatter else parameters
+    logger.debug("Optimized result: {0} {1} (fixed_scatter = {2})".format(
+        parameters, scatter, fixed_scatter))
+    return np.hstack([parameters, scatter])
 
