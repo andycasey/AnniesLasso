@@ -209,7 +209,7 @@ def pixel_regularization_effectiveness(models, wavelengths, label_names=None,
 
     # Sort the models by their regularization value.
     N = models[0].theta.shape[1]
-    Lambdas = 1. + np.array([model.regularization for model in models])
+    Lambdas = np.array([model.regularization for model in models])
     
     s2 = np.array([model.s2 for model in models])
     theta = np.array([model.theta for model in models])
@@ -234,8 +234,8 @@ def pixel_regularization_effectiveness(models, wavelengths, label_names=None,
         if i >= theta.shape[2]: break
         for j, (wavelength, pixel) in enumerate(zip(wavelengths, pixels)):
             
-            x = np.log10(Lambdas[:, j])
-            y = theta[:, j, i]
+            x = np.log10(Lambdas[:, pixel])
+            y = theta[:, pixel, i]
 
             _ = np.argsort(x)
             x, y = x[_], y[_]
@@ -260,7 +260,7 @@ def pixel_regularization_effectiveness(models, wavelengths, label_names=None,
         ax.set_xlim(xlims)
         ax.set_xticklabels([])
 
-        ax.xaxis.set_major_locator(MaxNLocator(8))
+        ax.xaxis.set_major_locator(MaxNLocator(6))
         
         ax.set_ylabel(r"$\theta_{{{0}}}$".format(i))
 
@@ -274,8 +274,8 @@ def pixel_regularization_effectiveness(models, wavelengths, label_names=None,
     ax = axes[-1]
     lines = []
     for j, (wavelength, pixel) in enumerate(zip(wavelengths, pixels)):
-        x = np.log10(Lambdas[:, j])
-        y = s2[:, j]
+        x = np.log10(Lambdas[:, pixel])
+        y = s2[:, pixel]
         _ = np.argsort(x)
         x, y = x[_], y[_]
         lines.append(ax.plot(x, y, c=colours[j], lw=2,
