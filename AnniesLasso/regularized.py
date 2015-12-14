@@ -236,6 +236,172 @@ class L1RegularizedCannonModel(cannon.CannonModel):
         return (Lambdas, chi_sq, log_det, models)
 
 
+    def cross_validate_regularization(self, Lambdas, fixed_scatter=False,
+        pixel_mask=None, mod=10, **kwargs):
+        # Leave out 2/10ths of the data.
+
+        # do the lambdas on 7/10ths of the data.
+        
+        # chose the best lambda per pixel using the predictions from 1/10th of
+        # the data
+
+        # fix those lambdas and train the model using 7/10ths of the data.
+        # predict the labels for the remaining 1/10th of the data.
+
+        # fix lambda = 0 and train a normal model using 7/10ths of the data.
+        # predict the labels for the remaining 1/10th of the data.
+
+        if fixed_scatter and self.s2 is None:
+            raise ValueError("intrinsic pixel variance (s2) must be set "
+                             "before training if fixed_scatter is set to True")
+
+        if pixel_mask is None:
+            pixel_mask = np.ones_like(self.dispersion, dtype=bool)
+            normalized_flux, normalized_ivar, dispersion = \
+                (self.normalized_flux, self.normalized_ivar, self.dispersion)
+
+        else:
+            # Apply pixel masks now so we don't have to N_regularization times
+            dispersion = self.dispersion[pixel_mask]
+            normalized_flux = self.normalized_flux[:, pixel_mask]
+            normalized_ivar = self.normalized_ivar[:, pixel_mask]
+
+        # Should we save progress?
+        model_filename_format = kwargs.pop("model_filename_format", None)
+        overwrite = kwargs.pop("overwrite", False)
+        include_training_data = kwargs.pop("include_training_data", False)
+
+
+        # Determine the train and validate component masks.
+        subsets = self._metadata["q"] % mod
+        validate_set = (subset == 0)
+        train_set = (subset > 0) * (subset < (mod - 1))
+        test_set = (subset == (mod - 1))
+
+        N_train, N_validate, N_test = map(sum, (train_set, validate_set, test_set))
+
+        train_labelled_set = self.labelled_set[train_set]
+        train_normalized_flux = normalized_flux[train_set]
+        train_normalized_ivar = normalized_ivar[train_set]
+
+        validate_normalized_flux = normalized_flux[validate_set]
+        validate_normalized_ivar = normalized_ivar[validate_set]
+        
+        N_Lambdas = len(Lambdas), len(dispersion)
+
+        models = []
+        Q = np.zeros((N_Lambdas, N_px))
+        
+        for i, Lambda in enumerate(Lambdas):
+            logger.info("Setting Lambda = {0}".format(Lambda))
+
+            # Set up a model for this Lambda test.
+            m = self.__class__(train_labelled_set, train_normalized_flux, 
+                train_normalized_ivar, dispersion=dispersion, copy=False,
+                threads=1 if self.pool is None else self.pool._processes)
+            m.vectorizer = self.vectorizer
+            m.regularization = Lambda
+            if fixed_scatter:
+                m.s2 = self.s2[pixel_mask]
+
+            # We want to make sure that we have the same training set each time.
+            m._metadata.update({ "q": self._metadata["q"], "mod": mod })
+
+            m.train(fixed_scatter=fixed_scatter)
+            if m.pool is not None: m.pool.close()
+
+            if model_filename_format is not None:
+                # Update the model to include train + validate in case we save
+                # it with the data..
+                m._dispersion = dispersion
+                m._normalized_flux = normalized_flux
+                m._normalized_ivar = normalized_ivar
+                m._labelled_set = self.labelled_set
+                m.save(model_filename_format.format(i),
+                    overwrite=overwrite, include_training_data=include_training_data)
+
+            # Predict the fluxes in the validate set.
+            inv_var = validate_normalized_ivar / \
+                (1. + validate_normalized_ivar * m.s2)
+            design_matrix = m.vectorizer(np.vstack(
+                [self.labelled_set[label_name][validate_set] \
+                    for label_name in self.vectorizer.label_names]).T)
+
+            # Save everything.
+            Q[i, :] = model._chi_sq(m.theta, design_matrix,
+                validate_normalized_flux.T, inv_var.T, axis=1) \
+                + model._log_det(inv_var)
+            models.append(m)
+
+        Q = Q - Q[0]
+        Q /= validate_set.sum()
+
+        # Get the best Lambda value at each Q.
+        indices = np.argmin(Q, axis=1)
+        Lambda_opt = Lambda[indices]
+        logger.debug("Lambda_opt: {}".format(Lambda_opt))
+
+        # Train a model with the train data using the best Lambda value for each
+        # pixel.
+        regularized_model = self.__class__(
+            train_labelled_set, train_normalized_flux, train_normalized_ivar,
+            dispersion=dispersion, copy=False,
+            threads=1 if self.pool is None else self.pool._processes)
+        regularized_model.vectorizer = self.vectorizer
+        regularized_model.regularization = Lambda_opt
+        regularized_model.train()
+
+        # Train a model with the train data using no regularization.
+        unregularized_model = self.__class__(
+            train_labelled_set, train_normalized_flux, train_normalized_ivar,
+            dispersion=dispersion, copy=False,
+            threads=1 if self.pool is None else self.pool._processes)
+        unregularized_model.vectorizer = self.vectorizer
+        unregularized_model.regularization = 0.0
+        unregularized_model.train()
+
+        # Predict the labels for stars in the test step using both models.
+        regularized_predicted_labels = regularized_model.fit(
+            self.normalized_flux[test_set],
+            self.normalized_ivar[test_set])
+
+        unregularized_predicted_labels = regularized_model.fit(
+            self.normalized_flux[test_set],
+            self.normalized_ivar[test_set])
+
+        # How do they compare to the actual labels?
+        expected_labels = self.labels_array[test_set]
+
+        # SAVE EVERYTHING
+        dumpfile = kwargs.pop("dumpfile", "CV_REGULARIZATION_DUMP_FILE.PKL")
+        with open(dumpfile, "wb") as fp:
+            pickle.dump((self, Lambda, Q, regularized_model, unregularized_model,
+                regularized_predicted_labels, unregularized_predicted_labels,
+                expected_labels))
+
+        logger.info("Unregularized model:")
+        difference = unregularized_predicted_labels - expected_labels
+        for i, label_name in enumerate(self.vectorizer.label_names):
+            l, m, u = np.percentile(difference[:, i])
+            logger.info("DELTA({0}): {1:.3f} ({2:.3f}, {3:.3f})".format(
+                label_name, m, m - l, u - m))
+
+        logger.info("Regularized model:")
+        difference = regularized_predicted_labels - expected_labels
+        for i, label_name in enumerate(self.vectorizer.label_names):
+            l, m, u = np.percentile(difference[:, i])
+            logger.info("DELTA({0}): {1:.3f} ({2:.3f}, {3:.3f})".format(
+                label_name, m, m - l, u - m))
+        
+
+        raise a
+
+
+
+
+
+
+
 def L1Norm(Q):
     """
     Return the L1 normalization of Q.

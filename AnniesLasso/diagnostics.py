@@ -1,7 +1,7 @@
 
 import numpy as np
 import matplotlib
-matplotlib.rcParams["text.usetex"] = True
+#matplotlib.rcParams["text.usetex"] = True
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
@@ -106,7 +106,7 @@ def Lambda_lambda(models):
     ax.set_xlabel(r"$\lambda$") # I bet Tufte would have *hated* astronomers.
     ax.set_ylabel(r"$\Lambda$")
 
-    ax.xaxis.set_major_locator(MaxNLocator(6))
+    ax.xaxis.set_major_locator(MaxNLocator(4))
     ax.yaxis.set_major_locator(MaxNLocator(8))
 
     ax.set_yticklabels([r"$10^{%.0f}$" % _ for _ in ax.get_yticks()])
@@ -169,7 +169,7 @@ def label_residuals(model):
 
 def pixel_regularization_effectiveness(models, wavelengths, label_names=None,
     latex_labels=None, same_limits=False,
-    show_legend=True):
+    show_legend=True, **kwargs):
     """
     Visualize the effectiveness of the regularization on a single pixel.
 
@@ -199,13 +199,14 @@ def pixel_regularization_effectiveness(models, wavelengths, label_names=None,
 
     if latex_labels is not None:
         label_names = models[0].vectorizer.get_human_readable_label_vector(
-            latex_labels, mul="\cdot")
+            latex_labels, mul=kwargs.pop("mul", "\cdot"))
     else:
         label_names = models[0].vectorizer.get_human_readable_label_vector()
 
     # Make some checks that the models are the same, etc.
     # same dispersion, q values, etc.
     pixels = np.searchsorted(models[0].dispersion, wavelengths)
+    #pixels = np.array([0, 1])
 
     # Sort the models by their regularization value.
     N = models[0].theta.shape[1]
@@ -215,7 +216,7 @@ def pixel_regularization_effectiveness(models, wavelengths, label_names=None,
     theta = np.array([model.theta for model in models])
 
     colours = ("#4C72B0", "#55A868", "#C44E52", "#8172B2", "#64B5CD")
-    xlims = np.log10([np.min(Lambdas), np.max(Lambdas)])
+    xlims = np.log10([np.nanmin(Lambdas), np.nanmax(Lambdas)])
 
     if N > 10:
         M = int(np.ceil((N + 1)/10.))
@@ -260,7 +261,7 @@ def pixel_regularization_effectiveness(models, wavelengths, label_names=None,
         ax.set_xlim(xlims)
         ax.set_xticklabels([])
 
-        ax.xaxis.set_major_locator(MaxNLocator(6))
+        ax.xaxis.set_major_locator(MaxNLocator(4))
         
         ax.set_ylabel(r"$\theta_{{{0}}}$".format(i))
 
@@ -282,26 +283,38 @@ def pixel_regularization_effectiveness(models, wavelengths, label_names=None,
             label=r"$%0.1f\,{\rm \AA}$" % (wavelength, )))
         ax.set_xlim(xlims)
 
-    ax.set_xlim(xlims)    
-    ax.xaxis.set_major_locator(MaxNLocator(8))
-    ax.set_xlabel(r"$\Lambda$")    
-    ax.set_xticklabels([r"$10^{%.0f}$" % _ for _ in ax.get_xticks()])
-
+    
     ax.set_ylim(0, ax.get_ylim()[1])
     ax.locator_params(axis='y', nbins=3)
     ax.set_ylabel(r"$s^2$")
 
     if same_limits:
-        ylim = np.max(np.abs([ax.get_ylim() for ax in axes[1:-1]]))
+        ylim = np.max(np.abs([ax.get_ylim() for ax in axes[1:-1] if len(ax.lines) > 0]))
         for ax in axes[1:-1]:
             ax.set_ylim(-ylim, +ylim)
             ax.set_yticks([-ylim/2., +ylim/2.])
+
+            ax.set_xlim(xlims)    
+            ax.xaxis.set_major_locator(MaxNLocator(4))
+
+            if ax.is_last_row():
+                ax.set_xlabel(r"$\Lambda$")    
+                ax.set_xticklabels([r"$10^{%.0f}$" % _ for _ in ax.get_xticks()])
+
     else:
 
         for ax in axes[1:-1]:
             ylim = np.max(np.abs(ax.get_ylim()))
             ax.set_ylim(-ylim, +ylim)
             ax.set_yticks([-ylim/2., +ylim/2.])
+
+            ax.set_xlim(xlims)    
+            ax.xaxis.set_major_locator(MaxNLocator(4))
+
+            if ax.is_last_row():
+                ax.set_xlabel(r"$\Lambda$")    
+                ax.set_xticklabels([r"$10^{%.0f}$" % _ for _ in ax.get_xticks()])
+
            
     if show_legend:
         fig.legend(fig.axes[0].lines, 
@@ -316,6 +329,17 @@ def pixel_regularization_effectiveness(models, wavelengths, label_names=None,
     return figs
 
 
+def calculate_optimal_lambda(Lambda, Q, tolerance=0.1, full_output=False):
+    # Return just the minimum:
+    #return Lambda[np.argmin(Q)]
+    if full_output:
+        return (Lambda[np.argmin(Q)], np.argmin(Q))
+
+    # Return max({Lambda: Q(Lambda) < Q_min + tolerance })
+    index = np.where(Q < np.min(Q) + tolerance)[0][-1]
+    if full_output:
+        return (Lambda[index], index)
+    return Lambda[index]
 
 
 
@@ -334,7 +358,6 @@ def pixel_regularization_validation(models, wavelengths, show_legend=True):
     validate_set = \
         (models[0]._metadata["q"] % models[0]._metadata.get("mod", 5)) == 0
 
-    x = np.hstack([0, 10**np.arange(-10, 10)])
     for i, m in enumerate(models):
         
         # Predict the fluxes in the validate set.
@@ -350,29 +373,33 @@ def pixel_regularization_validation(models, wavelengths, show_legend=True):
         validation_scalar[i, :] += model._log_det(inv_var)
 
     # Get regularization parameters.
-    
+    Lambda = np.array([m.regularization[0] for m in models])
     scaled_validation_scalar = validation_scalar - validation_scalar[0, :]
-    #scaled_validation_scalar = scaled_validation_scalar/validate_set.sum()
+    scaled_validation_scalar = scaled_validation_scalar/validate_set.sum()
 
     fig, ax = plt.subplots()
     ax.axhline(0, c='k', zorder=-1)
     colours = ("#4C72B0", "#55A868", "#C44E52", "#8172B2", "#64B5CD")
     for pixel, (wavelength, colour) in enumerate(zip(wavelengths, colours)):
 
-        xi = np.log10(x)
-        #xi = x[:, pixel]
+        xi = np.log10(Lambda)
         yi = scaled_validation_scalar[:, pixel]
 
         _ = np.argsort(xi)
         xi, yi = xi[_], yi[_]
         ax.plot(xi, yi, lw=2, c=colour, label=r"$%0.1f\,{\rm \AA}$" % wavelength)
 
+        l, j = calculate_optimal_lambda(Lambda, yi, full_output=True)
+        ax.scatter([np.log10(l)], [yi[j]], facecolor=colour, linewidths=2,
+            edgecolor="k", s=100, zorder=100)
+
+
     if show_legend:
         ax.legend(loc="lower left", frameon=False)
 
     ax.set_xlabel(r"$\Lambda$")
-    ax.set_xlim(np.log10(np.min(x)), np.log10(np.max(x)))
-    ax.xaxis.set_major_locator(MaxNLocator(8))
+    ax.set_xlim(np.log10(np.min(Lambda)), np.log10(np.max(Lambda)))
+    ax.xaxis.set_major_locator(MaxNLocator(4))
     ax.set_xticklabels([r"$10^{%.0f}$" % _ for _ in ax.get_xticks()])
 
     ymin = scaled_validation_scalar.min()
@@ -455,7 +482,7 @@ def regularization_validation(model, wavelengths=None, pixels=None,
     # X-axis stuff.
     ax.set_xlim(regularizations[0], regularizations[-1])
     ax.set_ylim(y.min() - 1, 2)
-    ax.xaxis.set_major_locator(MaxNLocator(8))
+    ax.xaxis.set_major_locator(MaxNLocator(4))
     ax.set_xlabel(r"$\Lambda$")
     ax.set_xticklabels([r"$10^{%.0f}$" % _ for _ in ax.get_xticks()])
 
