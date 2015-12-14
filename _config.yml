@@ -7,7 +7,7 @@ logo:             images/cannon-logo.png
 # Your site's domain goes here (eg: //mmistakes.github.io, http://mademistakes.com, etc)
 # When testing locally leave blank or use http://localhost:4000
 # url: http://aronbordin.com/neo-hpstr-jekyll-theme
-url: http://andycasey.github.io/AnniesLasso
+url: http://thecannon.io
 
 menu:
 #  - title: 'Home'
@@ -17,7 +17,7 @@ menu:
   - title: 'Examples'
     url: '/examples'
   - title: 'Documentation'
-    url: '/docs'
+    url: 'https://annieslasso.readthedocs.org/en/latest/'
   - title: 'Projects'
     url: '/projects'
     submenu:
