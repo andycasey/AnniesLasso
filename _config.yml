@@ -17,7 +17,7 @@ menu:
   - title: 'Examples'
     url: '/examples'
   - title: 'Documentation'
-    url: 'https://annieslasso.readthedocs.org/en/latest/'
+    url: 'http://annieslasso.readthedocs.org/en/latest/'
   - title: 'Projects'
     url: '/projects'
     submenu:
