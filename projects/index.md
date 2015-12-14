@@ -6,7 +6,7 @@ tags: [Jekyll, theme, themes, responsive, blog, modern]
 comments: false
 ---
 
-{% for post in site.categories.projects %}
+{% for post in site.categories.project %}
 <article class="hentry">
   <header>
     {% if post.image.feature %}
