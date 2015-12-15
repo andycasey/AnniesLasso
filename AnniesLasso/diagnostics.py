@@ -23,10 +23,6 @@ def _get_pixel_mask(model, wavelengths=None, pixels=None):
     return pixels, pixel_mask
 
 
-def compare_model_predictions(A, B, latex_labels=None, **kwargs):
-
-    raise NotImplementedError
-
 def compare_derivatives(models, model_names, latex_labels=None, **kwargs):
     """
     Compare the model derivatives (theta coefficients) for multiple models.

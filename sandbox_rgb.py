@@ -15,7 +15,7 @@ import AnniesLasso as tc
 np.random.seed(123) # For reproducibility.
 
 # Some "configurable" options..
-threads = 1
+threads = 10
 mod = 10
 
 # Data.
