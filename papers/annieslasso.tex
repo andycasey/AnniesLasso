@@ -24,6 +24,7 @@
 \newcommand{\aspcap}{\project{\acronym{ASPCAP}}}
 \newcommand{\dr}{\acronym{DRXX}}
 \newcommand{\logg}{\log g}
+\newcommand{\mh}{\mathrm{[M/H]}}
 \newcommand{\Teff}{T_{\mathrm{eff}}}
 \newcommand{\Dvector}[1]{\boldsymbol{#1}}
 \newcommand{\vectheta}{\Dvector{\theta}}
@@ -40,7 +41,7 @@
 % context
 In previous work, we have shown that it is possible to train a generative
 probabilistic model for stellar spectra using a training set of stars, each with known
-parameters ($\logg$ and $\Teff$) and metallicity, and then use that model to infer labels for
+parameters ($\Teff$, $\logg$, and $\mh$) and metallicity, and then use that model to infer labels for
 unlabeled stars, even stars with lower signal-to-noise observations.
 % aims
 Here we ask whether this is possible when the dimensionality of the chemical
@@ -94,7 +95,7 @@ correctly order stellar spectra in temperature order (and who did so
 by looking at the data, and without any use of physics-based models).
 
 In all that follows, we will call stellar parameters ($\Teff$ and
-$\logg$) and the full set of 15 [CHECK] chemical abundances
+$\logg$) and the full set of 15 chemical abundances
 collectively ``labels''.
 This unifies and collapses the ``stellar parameters and chemical
 abundances'' phrase to a word, and also connects to the terminology
@@ -113,7 +114,7 @@ This means that it can transfer labels from high signal-to-noise training-set
 stars to low signal-to-noise test-set stars; that is, the training set and 
 the test set do not need to be statistically identical.
 This is related to the fact that \TheCannon\ is an interpretable model;
-the internals of the model are the dependencies of the spectral expetation
+the internals of the model are the dependencies of the spectral expectation
 and variance on wavelength and physical parameters of the star.
 
 DWH: Should we be saying things about the fact that the model is probabilistic?
@@ -136,7 +137,7 @@ using the smooth polynomial model as a kind of regularizer.
 DWH: Here we exploit this to the fullest.
 We consider the \emph{entire} 17-dimensional label spece produced by
 the \apogee\ \aspcap\ pipeline.
-We (for very good reasons) believe the \aspcap\ labels for the highest
+We accept the \aspcap\ labels for the highest
 signal-to-noise stars, and adopt these stars and their labels as the
 training set.
 We show, by cross-validation, that we can transfer these
