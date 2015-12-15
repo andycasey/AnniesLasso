@@ -139,7 +139,7 @@ the \apogee\ \aspcap\ pipeline.
 We (for very good reasons) believe the \aspcap\ labels for the highest
 signal-to-noise stars, and adopt these stars and their labels as the
 training set.
-We show, by very conservative cross-validation, that we can transfer these
+We show, by cross-validation, that we can transfer these
 labels to much lower signal-to-noise stars, with reduced precision but no
 strong biases.
 We then use the system to label all of the stars in the \apogee\ \dr\ data set.
@@ -150,7 +150,35 @@ DWH: Etc!
 
 \section{Method}
 
-DWH: What are we going to assume?
+The assumptions of \TheCannon\ are the following:
+\begin{itemize}
+\item
+Stars with similar labels (parameters and abundances) have similar
+spectra.
+\item
+The expectation of the spectrum of a star is a smooth function of the
+values of the labels for that star.  Further than this, we assume that
+the function is so smooth it is reasonably approximated with a
+quadratic form in label space.
+\item
+The resolution of all \apogee\ spectra are identical, all spectra are
+calibrated to the same rest wavelength grid, the noise is Gaussian and
+independent from pixel to pixel (with correctly known variances at the
+pixel level), and continuum normalization is consistent.  Importantly,
+we are \emph{not} assuming that different stars have similar noise
+variances, nor that the training, test, and prediction sets have the
+same noise model.
+\item
+We have a training set of stars with accurate labels, where
+``accurate'' is defined by the accuracy requirements of the output
+labels.  It might be more accurate to say that we are assuming that
+the training-set stars have \emph{consistent} labels (consistent with
+the assumptions of smoothness, above).
+\item
+The training set is representative, in the sense that the training-set
+stars span the label space similarly to how any test or prediction set
+spans the label space.
+\end{itemize}
 
 The model is
 \begin{eqnarray}
@@ -180,7 +208,7 @@ In the \emph{training step}, we fix the $K$-lists of labels $\ell_n$
 for all training-set stars $n$.
 We seek, at each wavelength pixel $j$, the $[D+1]$ parameters
 $\vectheta_j,s^2_j$ that optimize a penalized likelihood:
-\begin{eqnarray}
+\begin{eqnarray}\label{eq:train}
   \vectheta_j,s^2_j &\leftarrow& \argmin{\vectheta,s^2}\left[
     \sum_{n=0}^{N-1} \frac{[y_{jn}-\vecv(\ell_n)\cdot\vectheta]^2}{\sigma^2_{jn}+s^2}
     + \sum_{n=0}^{N-1} \ln(\sigma^2_{jn}+s^2)
@@ -191,9 +219,11 @@ $\vectheta_j,s^2_j$ that optimize a penalized likelihood:
 where $\Lambda_j$ is a regularization parameter, and $Q(\vectheta)$ is a 
 regularizing function that encourages parameters to take on zero values.
 The regularizing function takes a $D$-vector as input and returns a
-scalar.
-We will adopt for $Q(\vectheta)$ a modification of L1 regularization,
-discussed below.
+scalar value.
+We call this penalized likelihood---the argument of the
+argmin in equation~(\ref{eq:train})---the \emph{training scalar}.
+We will adopt for the regularizing function $Q(\vectheta)$ in the training scalar a
+modification of L1 regularization, discussed below.
 Although the training-step optimization problem will not in general be
 convex, we can make choices for $Q(\vectheta)$ (and we will) to make the
 problem such that it would be convex at any fixed value of $s^2$; for
@@ -207,14 +237,13 @@ general we can set it differently at every wavelength.
 This makes sense, because different wavelengths have very different
 dependences on different components of the label list $\ell$.
 In what follows, we will set the value of the $\Lambda_j$ by
-validation or cross-validation or possibly based on physical arguments
-about what matters!
+a simple validation test.
 
 In the \emph{test step}, we fix the parameters $\vectheta_j,s^2_j$ at all
 wavelength pixels $j$.
 We seek, for each test-set star $m$, the $K$-list of labels $\ell_m$
 that optimizes the likelihood:
-\begin{eqnarray}
+\begin{eqnarray}\label{eq:test}
   \ell_m &\leftarrow& \argmin{\ell}\left[
     \sum_{j=0}^{J-1} \frac{[y_{jm}-\vecv(\ell)\cdot\vectheta_j]^2}{\sigma^2_{jm}+s^2_j}
     \right]
@@ -226,6 +255,8 @@ However, the fact that there are many pixels $j$ acting, each of which
 has a different functional dependence on the labels in the label list
 $\ell$, tends to make the optimization (in practice) find a good value
 for the label list $\ell$.
+We call this partial log likelihood---the argument of the
+argmin in equation~(\ref{eq:test})---the \emph{test scalar}.
 
 The model freedom of \TheCannon\ is set by the vectorizing function
 $\vecv(\ell)$---which takes the $K$-element label list $\ell$ and expands
@@ -267,19 +298,27 @@ L1 regularization encourages parameters to vanish precisely but
 doesn't break convexity for convex problems.
 
 DWH: To set the amplitude $\Lambda_j$ at each wavelength pixel $j$, we
-employ cross-validation...
+employ a validation of the following form:...
+
+DWH: Scaling argument that, in general, the best value of $\Lambda_j$
+should be on the same order as the number of stars in the training
+set....
 
 \section{Training, validation, and test data}
 
 MKN: Describe \apogee\ data here.
 
 MKN: What is different about our continuum normalization from everyone else's?
+Why is it so important and why is it better?
 
-DWH: Define the set of ``labeled'' stars and the set of ``unlabeled''
-stars, for our purposes.  Any training set must be a subset of the
+DWH: Define the various possible sets of ``labeled'' stars and the set of ``unlabeled''
+stars, for our various purposes.
+
+DWH: Any training set must be a subset of the
 labeled stars.
 We are going to use different subsets for different trainings of \TheCannon.
 
+DWH: THIS PARAGRAPH MAY BE OUT:
 To demonstrate the predictive power and accuracy of the method, we
 will (below) perform a conservative cross-validation using cyclic
 training, validation, and test subsets of the labeled data:
@@ -300,25 +339,63 @@ set into the training.
 When \TheCannon\ is used to label the full unlabeled set, we train on
 the entire unlabled data set (the largest possible training set) and
 use values for the hyper-parameters $\Lambda_j$ derived from the
-10-fold cross-validation experiment, as we will describe below.
+validation experiments, as we will describe below.
+
+\paragraph{Implementation notes:}
+ARC: Say what you want about the implementation and structure here.  Keep it brief!
+
+DWH: Note that our optimizer is not fast; there is lots of literature
+on optimizing these convex problems (CITE THINGS); we should have looked at it.
 
 \section{Experiments}
 
-\paragraph{Conservative cross-validation:}
+\paragraph{Validation for hyper-parameter selection:}
 Hello World!
 
-\paragraph{Full train-and-test:}
+\paragraph{Three-label case:}
 Hello World!
 
-\paragraph{Low signal-to-noise test:}
+\paragraph{Seventeen-label case:}
 Hello World!
+
+\paragraph{Label recovery as a function of signal-to-noise:}
+Hello World!
+
+\section{Results}
+
+DWH: Do we need this section?
+
+DWh: What can we say about chemical abundance precision and accuracy?
+
+DWH: What can we say about chemical abundance space?
+
+DWH: What can we say about the promise of chemical tagging?
 
 \section{Discussion}
 
-DWh:  Hello World!  What were our assumptions and how would things have
-changed if we had changed or relaxed them?
+DWH: What have we achieved and why is it important?
+
+DWh: Go through the assumptions.
+What were our assumptions and how would things have changed if we had
+changed or relaxed them?
 
 DWH:  What is bad or limited about what we have done?
+
+\TheCannon\ is a prediction system: It is designed to predict the
+labels for stars.
+It has a fundamental assumption that the training set is statistically
+identical to the prediction/test set.
+If there are covariances in the label space---that is, if stars in the
+training set are high in label $X$ whenever they are also high in
+label $Y$---then there will be opportunities for \TheCannon\ to get
+information about $Y$ from considering data aspects that depend on
+$X$ (which, according to the training set, is reliably connected to $Y$).
+For this reason, we expect that, given a finite training set, there
+will be situations in which lines from one element are used to predict
+the abundance of another.
+A good example is shown in \figurename~\ref{fig:whatever}, where we
+see WHATEVER.
+DWH: Yada Yada...
 
 DWH: No accounting for variable spectroscopic resolution, nor
 microturbulence nor rotation.
