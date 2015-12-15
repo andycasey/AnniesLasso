@@ -139,7 +139,7 @@ the \apogee\ \aspcap\ pipeline.
 We (for very good reasons) believe the \aspcap\ labels for the highest
 signal-to-noise stars, and adopt these stars and their labels as the
 training set.
-We show, by very conservative cross-validation, that we can transfer these
+We show, by cross-validation, that we can transfer these
 labels to much lower signal-to-noise stars, with reduced precision but no
 strong biases.
 We then use the system to label all of the stars in the \apogee\ \dr\ data set.
@@ -237,8 +237,7 @@ general we can set it differently at every wavelength.
 This makes sense, because different wavelengths have very different
 dependences on different components of the label list $\ell$.
 In what follows, we will set the value of the $\Lambda_j$ by
-validation or cross-validation or possibly based on physical arguments
-about what matters!
+a simple validation test.
 
 In the \emph{test step}, we fix the parameters $\vectheta_j,s^2_j$ at all
 wavelength pixels $j$.
@@ -299,7 +298,7 @@ L1 regularization encourages parameters to vanish precisely but
 doesn't break convexity for convex problems.
 
 DWH: To set the amplitude $\Lambda_j$ at each wavelength pixel $j$, we
-employ cross-validation...
+employ a validation of the following form:...
 
 DWH: Scaling argument that, in general, the best value of $\Lambda_j$
 should be on the same order as the number of stars in the training
@@ -340,7 +339,7 @@ set into the training.
 When \TheCannon\ is used to label the full unlabeled set, we train on
 the entire unlabled data set (the largest possible training set) and
 use values for the hyper-parameters $\Lambda_j$ derived from the
-10-fold cross-validation experiment, as we will describe below.
+validation experiments, as we will describe below.
 
 \section{Experiments}
 
