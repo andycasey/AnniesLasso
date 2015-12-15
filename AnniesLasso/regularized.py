@@ -200,7 +200,8 @@ class L1RegularizedCannonModel(cannon.CannonModel):
             # Set up a model for this Lambda test.
             m = self.__class__(train_labelled_set, train_normalized_flux, 
                 train_normalized_ivar, dispersion=dispersion, copy=False,
-                threads=1 if self.pool is None else self.pool._processes)
+                threads=1 if self.pool is None else self.pool._processes,
+                **kwargs)
             m.vectorizer = self.vectorizer
             m.regularization = Lambda
             if fixed_scatter:
