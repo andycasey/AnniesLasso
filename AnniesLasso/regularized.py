@@ -161,6 +161,8 @@ class L1RegularizedCannonModel(cannon.CannonModel):
             raise ValueError("intrinsic pixel variance (s2) must be set "
                              "before training if fixed_scatter is set to True")
 
+        overwrite = kwargs.pop("overwrite", False)
+        include_training_data = kwargs.pop("include_training_data", False)
         model_filename_format = kwargs.pop("model_filename_format", None)
 
         if Lambdas is None:
@@ -219,7 +221,8 @@ class L1RegularizedCannonModel(cannon.CannonModel):
                 m._normalized_flux = normalized_flux
                 m._normalized_ivar = normalized_ivar
                 m._labelled_set = self.labelled_set
-                m.save(model_filename_format.format(i), **kwargs)
+                m.save(model_filename_format.format(i), overwrite=overwrite,
+                    include_training_data=include_training_data)
 
             # Predict the fluxes in the validate set.
             inv_var = validate_normalized_ivar / \
