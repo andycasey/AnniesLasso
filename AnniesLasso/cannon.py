@@ -105,20 +105,21 @@ class CannonModel(model.BaseCannonModel):
             mapper = map
         else:
             mapper = self.pool.map
-            shared_args = []
-            for arg in args:
-                if isinstance(arg, np.ndarray):
-                    shared_arg = sharedmem.empty_like(arg)
-                    shared_arg[:] = arg
-                else:
-                    shared_arg = arg
-                shared_args.append(shared_arg)
-            args = shared_args
+            if kwargs.pop("shared_memory", True):
+                shared_args = []
+                for arg in args:
+                    if isinstance(arg, np.ndarray):
+                        shared_arg = sharedmem.empty_like(arg)
+                        shared_arg[:] = arg
+                    else:
+                        shared_arg = arg
+                    shared_args.append(shared_arg)
+                args = shared_args
 
-            # Aaaand don't forget the big one!
-            dm = sharedmem.empty_like(self.design_matrix)
-            dm[:] = self.design_matrix
-            kwds["design_matrix"] = dm
+                # Aaaand don't forget the big one!
+                dm = sharedmem.empty_like(self.design_matrix)
+                dm[:] = self.design_matrix
+                kwds["design_matrix"] = dm
         
         # Wrap the function so we can parallelize it out.
         f = utils.wrapper(fitter, None, kwds, N, message=message)
