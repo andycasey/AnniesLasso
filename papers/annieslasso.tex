@@ -150,7 +150,35 @@ DWH: Etc!
 
 \section{Method}
 
-DWH: What are we going to assume?
+The assumptions of \TheCannon\ are the following:
+\begin{itemize}
+\item
+Stars with similar labels (parameters and abundances) have similar
+spectra.
+\item
+The expectation of the spectrum of a star is a smooth function of the
+values of the labels for that star.  Further than this, we assume that
+the function is so smooth it is reasonably approximated with a
+quadratic form in label space.
+\item
+The resolution of all \apogee\ spectra are identical, all spectra are
+calibrated to the same rest wavelength grid, the noise is Gaussian and
+independent from pixel to pixel (with correctly known variances at the
+pixel level), and continuum normalization is consistent.  Importantly,
+we are \emph{not} assuming that different stars have similar noise
+variances, nor that the training, test, and prediction sets have the
+same noise model.
+\item
+We have a training set of stars with accurate labels, where
+``accurate'' is defined by the accuracy requirements of the output
+labels.  It might be more accurate to say that we are assuming that
+the training-set stars have \emph{consistent} labels (consistent with
+the assumptions of smoothness, above).
+\item
+The training set is representative, in the sense that the training-set
+stars span the label space similarly to how any test or prediction set
+spans the label space.
+\end{itemize}
 
 The model is
 \begin{eqnarray}
@@ -347,7 +375,7 @@ It has a fundamental assumption that the training set is statistically
 identical to the prediction/test set.
 If there are covariances in the label space---that is, if stars in the
 training set are high in label $X$ whenever they are also high in
-label $Y$, then there will be opportunities for \TheCannon\ to get
+label $Y$---then there will be opportunities for \TheCannon\ to get
 information about $Y$ from considering data aspects that depend on
 $X$ (which, according to the training set, is reliably connected to $Y$).
 For this reason, we expect that, given a finite training set, there
