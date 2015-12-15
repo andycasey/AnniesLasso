@@ -19,7 +19,6 @@ from . import (model, utils)
 
 logger = logging.getLogger(__name__)
 
-global_design_matrix = None
 
 class CannonModel(model.BaseCannonModel):
     """
@@ -88,71 +87,44 @@ class CannonModel(model.BaseCannonModel):
         # Prepare details about any progressbar to show.
         M, N = self.normalized_flux.shape
         message = None if not progressbar else \
-            "Training {0} with {1} stars and {2} pixels/star".format(
-                type(self).__name__, M, N)
+            "Training {0}-label {1} with {2} stars and {3} pixels/star".format(
+                len(self.vectorizer.label_names), type(self).__name__, M, N)
 
         # Prepare the method and arguments.
         fitter = kwargs.pop("function", _fit_pixel)
         args = [self.normalized_flux.T, self.normalized_ivar.T, p0_scatter]
-        shared_args = []
-        sa_normalized_flux = sharedmem.empty_like(self.normalized_flux.T)
-        sa_normalized_flux[:] = self.normalized_flux.T
-        sa_normalized_ivar = sharedmem.empty_like(self.normalized_ivar.T)
-        sa_normalized_ivar[:] = self.normalized_ivar.T
-        sa_p0_scatter = sharedmem.empty_like(p0_scatter)
-        sa_p0_scatter[:] = p0_scatter
-        shared_args = [sa_normalized_flux, sa_normalized_ivar, sa_p0_scatter]
-        shared_args.extend(kwargs.pop("additional_args", []))
-
+        args.extend(kwargs.pop("additional_args", []))
         kwds = {
             "fixed_scatter": fixed_scatter,
-        #    "design_matrix": self.design_matrix
+            "design_matrix": self.design_matrix
         }
         kwds.update(kwargs)
-        """
-        if self.pool is not None:
 
-            # Sometimes the design matrix is *huge*, so we need to store it as
-            # a shared memory array to prevent the multiprocessing pool from
-            # completely hanging.
-
-            def _init(dm):
-                global design_matrix
-                design_matrix = dm
-
-            dm = self.design_matrix.flatten()
-            _ = np.ctypeslib.as_ctypes(dm)
-            shared_design_matrix \
-                = mp.sharedctypes.Array(_._type_, _, lock=False)
-            shared_design_matrix[:] = dm.copy()
-            pool = self.pool.__class__(self.pool._processes,
-                initializer=_init, initargs=(shared_design_matrix, ))
-            self.pool.close()
-            self.pool = pool
-            mapper = self.pool.map
-
-        else:
+        # Only use shared memory if necessary because it is a performance hit.
+        if self.pool is None:
             mapper = map
-            kwds["design_matrix"] = self.design_matrix
-        """
-        def _init(dm):
-            global global_design_matrix
-            global_design_matrix = dm
+        else:
+            mapper = self.pool.map
+            shared_args = []
+            for arg in args:
+                if isinstance(arg, np.ndarray):
+                    shared_arg = sharedmem.empty_like(arg)
+                    shared_arg[:] = arg
+                else:
+                    shared_arg = arg
+                shared_args.append(shared_arg)
+            args = shared_args
 
-        global global_design_matrix
-        global_design_matrix = self.design_matrix.copy()
+            # Aaaand don't forget the big one!
+            dm = sharedmem.empty_like(self.design_matrix)
+            dm[:] = self.design_matrix
+            kwds["design_matrix"] = dm
         
-        if self.pool is not None:
-            self.pool.close()
-            self.pool = self.pool.__class__(self.pool._processes,
-                initializer=_init, initargs=(self.design_matrix, ))
-
         # Wrap the function so we can parallelize it out.
-        mapper = map if self.pool is None else self.pool.map
         f = utils.wrapper(fitter, None, kwds, N, message=message)
 
         # Time for work.
-        results = np.array(mapper(f, [row for row in zip(*shared_args)]))
+        results = np.array(mapper(f, [row for row in zip(*args)]))
         
         # Unpack the results.
         self.theta, self.s2 = (results[:, :-1], results[:, -1]**2)
@@ -291,21 +263,8 @@ def _fit_spectrum(normalized_flux, normalized_ivar, vectorizer, theta, s2,
     return (labels, cov)
 
 
-def _get_design_matrix(N, **kwargs):
-
-    try:
-        _ = kwargs.pop("design_matrix")
-        return (_, kwargs)
-    except KeyError:
-        global global_design_matrix
-        try:
-            design_matrix.ndim
-        except AttributeError:
-            design_matrix = np.ctypeslib.as_array(design_matrix).reshape((N, -1))
-
-    return (design_matrix, kwargs)
-
-def _fit_pixel(normalized_flux, normalized_ivar, scatter, fixed_scatter=False, **kwargs):
+def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
+    fixed_scatter=False, **kwargs):
     """
     Return the optimal vectorizer coefficients and variance term for a pixel
     given the normalized flux, the normalized inverse variance, and the design
@@ -330,10 +289,8 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, fixed_scatter=False, *
         if it was supplied by the user.
     """
 
-    #design_matrix, kwargs = _get_design_matrix(normalized_flux.shape[0], **kwargs)
-            
-    theta, ATCiAinv, inv_var, design_matrix = _fit_theta(normalized_flux, normalized_ivar,
-        scatter)
+    theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
+        scatter, design_matrix)
 
     # Singular matrix or fixed scatter?
     if ATCiAinv is None or fixed_scatter:
@@ -352,8 +309,8 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, fixed_scatter=False, *
             "Maximum number of iterations made during optimisation."
             ][warnflag - 1]))
 
-    theta, ATCiAinv, inv_var, _ = _fit_theta(normalized_flux, normalized_ivar,
-        op_scatter)
+    theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
+        op_scatter, design_matrix)
     return np.hstack([theta, op_scatter])
 
 
@@ -377,8 +334,8 @@ def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
         The design matrix for the model.
     """
 
-    theta, ATCiAinv, inv_var, design_matrix = _fit_theta(normalized_flux, normalized_ivar,
-        scatter)
+    theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
+        scatter, design_matrix)
 
     return_theta = kwargs.get("__return_theta", False)
     if ATCiAinv is None:
@@ -391,7 +348,7 @@ def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
     return (Q, theta) if return_theta else Q
 
 
-def _fit_theta(normalized_flux, normalized_ivar, scatter):
+def _fit_theta(normalized_flux, normalized_ivar, scatter, design_matrix):
     """
     Fit theta coefficients to a set of normalized fluxes for a single pixel.
 
@@ -413,20 +370,16 @@ def _fit_theta(normalized_flux, normalized_ivar, scatter):
         and the total inverse variance.
     """
 
-    global global_design_matrix
-    design_matrix = global_design_matrix
-
     ivar = normalized_ivar/(1. + normalized_ivar * scatter**2)
     CiA = design_matrix * np.tile(ivar, (design_matrix.shape[1], 1)).T
     try:
         ATCiAinv = np.linalg.inv(np.dot(design_matrix.T, CiA))
     except np.linalg.linalg.LinAlgError:
         #if logger.getEffectiveLevel() == logging.DEBUG: raise
-        return (np.hstack([1, [0] * (design_matrix.shape[1] - 1)]), None, ivar,
-            design_matrix)
+        return (np.hstack([1, [0] * (design_matrix.shape[1] - 1)]), None, ivar)
 
     ATY = np.dot(design_matrix.T, normalized_flux * ivar)
     theta = np.dot(ATCiAinv, ATY)
 
-    return (theta, ATCiAinv, ivar, design_matrix)
+    return (theta, ATCiAinv, ivar)
 

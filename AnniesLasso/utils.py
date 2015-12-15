@@ -23,13 +23,12 @@ _counter_lock = Lock()
 
 class wrapper(object):
     """
-    A generic wrapper with a progressbar that allows functions to be in parallel.
+    A generic multiprocessing wrapper with a progressbar.
     """
     def __init__(self, f, args, kwargs, N, message=None, size=100):
         self.f = f
         self.args = list(args if args is not None else [])
         self.kwargs = kwargs
-
         self._init_progressbar(message, N)
 
 
@@ -43,7 +42,6 @@ class wrapper(object):
         if message is not None:
             logger.info(message.rstrip())
             sys.stdout.flush()
-
             with _counter_lock:
                 _counter.value = 0
 
@@ -56,24 +54,27 @@ class wrapper(object):
 
         index = _counter.value
         if self.message is None: return
-        
-        t = time() if index >= self.N else None
 
         increment = max(1, int(self.N/100))
-        if index % increment == 0 or index in (0, self.N) and self.N > 0:
-            sys.stdout.write("\r[{done}{not_done}] {percent:3.0f}%{t}".format(
-                done="=" * int(index/increment),
-                not_done=" " * int((self.N - index)/increment),
-                percent=100. * index/self.N,
-                t="" if t is None else " ({0:.0f}s)".format(t-self.t_init)))
-            sys.stdout.flush()
+        t = time() if index >= self.N else None
+
+        #if index % increment == 0 or index in (0, self.N) and self.N > 0:
+        status = "({0}/{1})   ".format(index, self.N) if t is None else \
+                 "({0:.0f}s)                      ".format(t-self.t_init)
+        sys.stdout.write(
+            "\r[{done}{not_done}] {percent:3.0f}% {status}".format(
+            done="=" * int(index/increment),
+            not_done=" " * int((self.N - index)/increment),
+            percent=100. * index/self.N,
+            status=status))
+        sys.stdout.flush()
 
         if t is not None:
             sys.stdout.write("\r\n")
             sys.stdout.flush()
 
-    def __call__(self, x):
 
+    def __call__(self, x):
         try:
             result = self.f(*(list(x) + self.args), **self.kwargs)
         except:

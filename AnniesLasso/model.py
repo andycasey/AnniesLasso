@@ -26,6 +26,7 @@ from .vectorizer.base import BaseVectorizer
 from . import (utils, __version__ as code_version)
 
 np.random.seed(123)
+
 logger = logging.getLogger(__name__)
 
 def requires_training_wheels(method):
@@ -98,7 +99,8 @@ class BaseCannonModel(object):
 
     _descriptive_attributes = ["_vectorizer"]
     _trained_attributes = ["_s2", "_theta"]
-    _data_attributes = ["labelled_set", "normalized_flux", "normalized_ivar"]
+    _data_attributes \
+        = ["labelled_set", "dispersion", "normalized_flux", "normalized_ivar"]
     
     def __init__(self, labelled_set, normalized_flux, normalized_ivar,
         dispersion=None, threads=1, pool=None, copy=False, verify=True):

@@ -23,6 +23,78 @@ def _get_pixel_mask(model, wavelengths=None, pixels=None):
     return pixels, pixel_mask
 
 
+def compare_model_predictions(A, B, latex_labels=None, **kwargs):
+
+    raise NotImplementedError
+
+def compare_derivatives(models, model_names, latex_labels=None, **kwargs):
+    """
+    Compare the model derivatives (theta coefficients) for multiple models.
+    """
+
+    if not all(m.is_trained for m in models):
+        raise ValueError("not all models are trained")
+
+
+    axes_per_page = 10.
+    N_axes = 1.0 + len(models[0].vectorizer.terms) 
+    N_figs = int(np.ceil(N_axes/axes_per_page))
+
+    figs = []
+    for i in range(N_figs):
+        fig, _ = plt.subplots(min([axes_per_page, N_axes]))
+        figs.append(fig)
+
+    axes = np.hstack([fig.axes for fig in figs])
+    colours = ("#4C72B0", "#55A868", "#C44E52", "#8172B2", "#64B5CD")
+    
+    if latex_labels is not None:
+        label_names = models[0].vectorizer.get_human_readable_label_vector(
+            latex_labels, mul=kwargs.pop("mul", "\cdot"))
+    else:
+        label_names = models[0].vectorizer.get_human_readable_label_vector()
+
+
+    for i, ax in enumerate(axes):
+        
+        if 1 + i == N_axes:
+            # Scatter plot
+            break
+
+        for m, name in zip(models, model_names):
+            ax.plot(m.dispersion, m.theta[:, i], c=c, lw=2, label=name)
+
+        ax.set_xlim(m.dispersion[0], m.dispersion[-1])
+        if ax.is_last_row():
+            ax.set_xlabel("Lambda")
+
+        else:
+            ax.set_xticklabels([])
+
+        ax.set_ylabel(r"$\theta_{{{0}}}$".format(i))
+        ax_twin = ax.twinx()
+        ax_twin.set_ylabel(label_names[i] if latex_labels is None \
+            else r"${}$".format(label_names[i]),
+            rotation=0, labelpad=40)
+        ax_twin.set_yticks([])
+
+
+    # s2
+    for m, name in zip(models, model_names):
+        ax.plot(m.dispersion, m.s2, c=c, lw=2, label=name)
+
+    if show_legend:
+        figs[0].legend(figs[0].axes[0].lines, model_names,
+            bbox_to_anchor=(0.5, 1.00),
+            loc="upper center", frameon=False, ncol=len(models))
+
+
+    return figs
+
+
+
+
+
 def Lambda_lambda(models):
     """
     Show the minimum regularization parameter Lambda for each pixel with
@@ -375,7 +447,7 @@ def pixel_regularization_validation(models, wavelengths, show_legend=True):
     # Get regularization parameters.
     Lambda = np.array([m.regularization[0] for m in models])
     scaled_validation_scalar = validation_scalar - validation_scalar[0, :]
-    scaled_validation_scalar = scaled_validation_scalar/validate_set.sum()
+    #scaled_validation_scalar = scaled_validation_scalar/validate_set.sum()
 
     fig, ax = plt.subplots()
     ax.axhline(0, c='k', zorder=-1)

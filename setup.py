@@ -27,10 +27,10 @@ setup(
     name="AnniesLasso",
     version=version,
     author="Andrew R. Casey, David W. Hogg, Melissa K. Ness",
-    author_email="arc@ast.cam.ac.uk",  # <-- Direct complaints to this address.
+    author_email="arc@ast.cam.ac.uk",
     description="The Cannon 2: Compressed sensing edition",
     long_description=read(path.join(here, "README.md")),
-    url="https://github.com/andycasey/AnniesLasso",
+    url="http://thecannon.io",
     license="MIT",
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -42,9 +42,9 @@ setup(
         "Topic :: Scientific/Engineering :: Astronomy",
         "Topic :: Scientific/Engineering :: Physics"
     ],
-    keywords="Cannon Annie's Lasso",
+    keywords="The Cannon Annie's Lasso",
     packages=find_packages(exclude=["documents", "tests"]),
-    install_requires=["numpy", "scipy", "six"],
+    install_requires=["numpy", "scipy", "six", "sharedmem"],
     extras_require={
         "test": ["coverage"]
     },
