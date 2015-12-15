@@ -13,12 +13,13 @@ __all__ = ["CannonModel"]
 import logging
 import numpy as np
 import scipy.optimize as op
+import sharedmem
 
 from . import (model, utils)
 
 logger = logging.getLogger(__name__)
 
-design_matrix = None
+global_design_matrix = None
 
 class CannonModel(model.BaseCannonModel):
     """
@@ -93,7 +94,15 @@ class CannonModel(model.BaseCannonModel):
         # Prepare the method and arguments.
         fitter = kwargs.pop("function", _fit_pixel)
         args = [self.normalized_flux.T, self.normalized_ivar.T, p0_scatter]
-        args.extend(kwargs.pop("additional_args", []))
+        shared_args = []
+        sa_normalized_flux = sharedmem.empty_like(self.normalized_flux.T)
+        sa_normalized_flux[:] = self.normalized_flux.T
+        sa_normalized_ivar = sharedmem.empty_like(self.normalized_ivar.T)
+        sa_normalized_ivar[:] = self.normalized_ivar.T
+        sa_p0_scatter = sharedmem.empty_like(p0_scatter)
+        sa_p0_scatter[:] = p0_scatter
+        shared_args = [sa_normalized_flux, sa_normalized_ivar, sa_p0_scatter]
+        shared_args.extend(kwargs.pop("additional_args", []))
 
         kwds = {
             "fixed_scatter": fixed_scatter,
@@ -127,24 +136,23 @@ class CannonModel(model.BaseCannonModel):
             kwds["design_matrix"] = self.design_matrix
         """
         def _init(dm):
-            global design_matrix
-            design_matrix = dm
+            global global_design_matrix
+            global_design_matrix = dm
 
-        global design_matrix
-        design_matrix = self.design_matrix.copy()
+        global global_design_matrix
+        global_design_matrix = self.design_matrix.copy()
         
         if self.pool is not None:
             self.pool.close()
             self.pool = self.pool.__class__(self.pool._processes,
                 initializer=_init, initargs=(self.design_matrix, ))
 
-        
         # Wrap the function so we can parallelize it out.
         mapper = map if self.pool is None else self.pool.map
         f = utils.wrapper(fitter, None, kwds, N, message=message)
 
         # Time for work.
-        results = np.array(mapper(f, [row for row in zip(*args)]))
+        results = np.array(mapper(f, [row for row in zip(*shared_args)]))
         
         # Unpack the results.
         self.theta, self.s2 = (results[:, :-1], results[:, -1]**2)
@@ -289,7 +297,7 @@ def _get_design_matrix(N, **kwargs):
         _ = kwargs.pop("design_matrix")
         return (_, kwargs)
     except KeyError:
-        global design_matrix
+        global global_design_matrix
         try:
             design_matrix.ndim
         except AttributeError:
@@ -405,7 +413,9 @@ def _fit_theta(normalized_flux, normalized_ivar, scatter):
         and the total inverse variance.
     """
 
-    global design_matrix
+    global global_design_matrix
+    design_matrix = global_design_matrix
+
     ivar = normalized_ivar/(1. + normalized_ivar * scatter**2)
     CiA = design_matrix * np.tile(ivar, (design_matrix.shape[1], 1)).T
     try:
