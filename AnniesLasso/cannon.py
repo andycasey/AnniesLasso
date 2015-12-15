@@ -10,6 +10,7 @@ from __future__ import (division, print_function, absolute_import,
 
 __all__ = ["CannonModel"]
 
+import cPickle as pickle
 import logging
 import numpy as np
 import scipy.optimize as op
@@ -92,8 +93,6 @@ class CannonModel(model.BaseCannonModel):
 
         # Prepare the method and arguments.
         fitter = kwargs.pop("function", _fit_pixel)
-        args = [self.normalized_flux.T, self.normalized_ivar.T, p0_scatter]
-        args.extend(kwargs.pop("additional_args", []))
         kwds = {
             "fixed_scatter": fixed_scatter,
             "design_matrix": self.design_matrix
@@ -106,7 +105,10 @@ class CannonModel(model.BaseCannonModel):
         else:
             mapper = self.pool.map
             if kwargs.get("shared_memory", True):
+                """
                 shared_args = []
+                args = [self.normalized_flux.T, self.normalized_ivar.T, p0_scatter]
+                args.extend(kwargs.get("additional_args", []))
                 for arg in args:
                     if isinstance(arg, np.ndarray):
                         shared_arg = sharedmem.empty_like(arg)
@@ -115,20 +117,56 @@ class CannonModel(model.BaseCannonModel):
                         shared_arg = arg
                     shared_args.append(shared_arg)
                 args = shared_args
-
+                """
                 # Aaaand don't forget the big one!
                 dm = sharedmem.empty_like(self.design_matrix)
-                dm[:] = self.design_matrix
+                dm[:] = self.design_matrix.copy()
                 kwds["design_matrix"] = dm
         
         # Wrap the function so we can parallelize it out.
         f = utils.wrapper(fitter, None, kwds, N, message=message)
 
-        # Time for work.
-        results = np.array(mapper(f, [row for row in zip(*args)]))
+        # Calculate chunk size, etc.
+        chunks = kwargs.pop("chunks", 10)
+        chunk_size = int(np.ceil(len(self.dispersion)/float(chunks)))
+        theta = np.zeros((len(self.dispersion), 1 + len(self.vectorizer.terms)))
+        scatter = np.zeros((len(self.dispersion)))
+        for i in range(chunks):
+            # Time for work.
+            logger.info("Chunks: {0} w/ chunk size: {1}".format(chunks,
+                chunk_size))
+            a, b = (i * chunk_size, (i + 1) * chunk_size)
+
+            sm_nf = sharedmem.empty_like(self.normalized_flux.T[a:b])
+            sm_ni = sharedmem.empty_like(self.normalized_ivar.T[a:b])
+            sm_p0 = sharedmem.empty_like(p0_scatter[a:b])
+
+            sm_nf[:] = self.normalized_flux.T[a:b]
+            sm_ni[:] = self.normalized_ivar.T[a:b]
+            sm_p0[:] = p0_scatter[a:b]
+            args = [sm_nf, sm_ni, sm_p0]
+            args.extend(kwargs.get("additional_args", []))
+            
+            #args = [self.normalized_flux.T[a:b], self.normalized_ivar.T[a:b], p0_scatter[a:b]]
+            #args.extend(kwargs.get("additional_args", []))
         
+            #_ = args[a:b]
+            results = mapper(f, [row for row in zip(*args)])
+            results = np.array(results)
+            
+            # Save these:
+            logger.info("Saving to temp.pkl and re-chunking..")
+            theta[a:b] = results[a:b, :-1]
+            scatter[a:b] = results[a:b, -1]
+
+            with open("temp.pkl", "wb") as fp:
+                pickle.dump((theta, scatter), fp, -1)
+
+        self.theta = theta
+        self.s2 = scatter**2
+
         # Unpack the results.
-        self.theta, self.s2 = (results[:, :-1], results[:, -1]**2)
+        #self.theta, self.s2 = (results[:, :-1], results[:, -1]**2)
         return None
 
 
