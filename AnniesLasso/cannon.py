@@ -98,14 +98,14 @@ class CannonModel(model.BaseCannonModel):
             "fixed_scatter": fixed_scatter,
             "design_matrix": self.design_matrix
         }
-        kwds.update(kwargs)
+        #kwds.update(kwargs)
 
         # Only use shared memory if necessary because it is a performance hit.
         if self.pool is None:
             mapper = map
         else:
             mapper = self.pool.map
-            if kwargs.pop("shared_memory", True):
+            if kwargs.get("shared_memory", True):
                 shared_args = []
                 for arg in args:
                     if isinstance(arg, np.ndarray):
