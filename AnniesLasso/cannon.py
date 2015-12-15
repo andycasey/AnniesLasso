@@ -105,7 +105,7 @@ class CannonModel(model.BaseCannonModel):
             mapper = map
         else:
             mapper = self.pool.map
-            if kwargs.pop("shared_memory", True):
+            if kwargs.get("shared_memory", True):
                 shared_args = []
                 for arg in args:
                     if isinstance(arg, np.ndarray):
