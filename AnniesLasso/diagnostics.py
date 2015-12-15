@@ -188,21 +188,6 @@ def Lambda_lambda(models):
     return fig
 
 
-def sparsity(models, cutoff, latex_labels=None):
-    """
-    Show a lower-diagonal matrix of axes that visualize the theta coefficients
-    in each pixel and highlight sparsity.
-    """
-
-    shape = [len(models)] + list(models[0].theta.shape[1:])
-    theta = np.nan * np.zeros(shape)
-    for i, model in enumerate(models):
-        theta[i, :] = model.theta
-
-    # We want to show the 
-
-    raise NotImplementedError
-
 
 def label_residuals(model):
     """
@@ -239,8 +224,7 @@ def label_residuals(model):
 
 
 
-def pixel_regularization_effectiveness(models, wavelengths, label_names=None,
-    latex_labels=None, same_limits=False,
+def pixel_regularization_effectiveness(models, pixels, latex_labels=None, same_limits=False,
     show_legend=True, **kwargs):
     """
     Visualize the effectiveness of the regularization on a single pixel.
@@ -258,9 +242,6 @@ def pixel_regularization_effectiveness(models, wavelengths, label_names=None,
         Toggle legend display.
     """
 
-    if label_names is None:
-        label_names = models[0].vectorizer.get_human_readable_label_vector()
-
     if 2 > len(models):
         raise ValueError("must provide more than a single model for comparison")
 
@@ -277,8 +258,9 @@ def pixel_regularization_effectiveness(models, wavelengths, label_names=None,
 
     # Make some checks that the models are the same, etc.
     # same dispersion, q values, etc.
-    pixels = np.searchsorted(models[0].dispersion, wavelengths)
+    #pixels = np.searchsorted(models[0].dispersion, wavelengths)
     #pixels = np.array([0, 1])
+    wavelengths = models[0].dispersion[pixels]
 
     # Sort the models by their regularization value.
     N = models[0].theta.shape[1]
@@ -404,8 +386,8 @@ def pixel_regularization_effectiveness(models, wavelengths, label_names=None,
 def calculate_optimal_lambda(Lambda, Q, tolerance=0.1, full_output=False):
     # Return just the minimum:
     #return Lambda[np.argmin(Q)]
-    if full_output:
-        return (Lambda[np.argmin(Q)], np.argmin(Q))
+    #if full_output:
+    #    return (Lambda[np.argmin(Q)], np.argmin(Q))
 
     # Return max({Lambda: Q(Lambda) < Q_min + tolerance })
     index = np.where(Q < np.min(Q) + tolerance)[0][-1]
@@ -416,11 +398,13 @@ def calculate_optimal_lambda(Lambda, Q, tolerance=0.1, full_output=False):
 
 
 
-def pixel_regularization_validation(models, wavelengths, show_legend=True):
+def pixel_regularization_validation(models, pixels, show_legend=True):
     """
     Show the balance between model prediction and regularization for given
     pixels.
     """
+
+    wavelengths = models[0].dispersion[pixels]
 
     # Do the prediction for some spectra.
 
@@ -451,19 +435,21 @@ def pixel_regularization_validation(models, wavelengths, show_legend=True):
 
     fig, ax = plt.subplots()
     ax.axhline(0, c='k', zorder=-1)
-    colours = ("#4C72B0", "#55A868", "#C44E52", "#8172B2", "#64B5CD")
-    for pixel, (wavelength, colour) in enumerate(zip(wavelengths, colours)):
+    colours = \
+        ["#4C72B0", "#55A868", "#C44E52", "#8172B2", "#64B5CD"]
+    for pixel, wavelength in enumerate(wavelengths):
 
         xi = np.log10(Lambda)
         yi = scaled_validation_scalar[:, pixel]
 
         _ = np.argsort(xi)
         xi, yi = xi[_], yi[_]
-        ax.plot(xi, yi, lw=2, c=colour, label=r"$%0.1f\,{\rm \AA}$" % wavelength)
+        ax.plot(xi, yi, lw=2, c=colours[pixel % len(colours)],
+            label=r"$%0.1f\,{\rm \AA}$" % wavelength)
 
         l, j = calculate_optimal_lambda(Lambda, yi, full_output=True)
-        ax.scatter([np.log10(l)], [yi[j]], facecolor=colour, linewidths=2,
-            edgecolor="k", s=100, zorder=100)
+        ax.scatter([np.log10(l)], [yi[j]], facecolor=colours[pixel % len(colours)],
+            linewidths=2, edgecolor="k", s=100, zorder=100)
 
 
     if show_legend:

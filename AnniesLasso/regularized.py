@@ -202,8 +202,7 @@ class L1RegularizedCannonModel(cannon.CannonModel):
             # Set up a model for this Lambda test.
             m = self.__class__(train_labelled_set, train_normalized_flux, 
                 train_normalized_ivar, dispersion=dispersion, copy=False,
-                threads=1 if self.pool is None else self.pool._processes,
-                **kwargs)
+                threads=1 if self.pool is None else self.pool._processes)
             m.vectorizer = self.vectorizer
             m.regularization = Lambda
             if fixed_scatter:
@@ -212,7 +211,7 @@ class L1RegularizedCannonModel(cannon.CannonModel):
             # We want to make sure that we have the same training set each time.
             m._metadata.update({ "q": self._metadata["q"], "mod": mod })
 
-            m.train(fixed_scatter=fixed_scatter)
+            m.train(fixed_scatter=fixed_scatter, **kwargs)
             if m.pool is not None: m.pool.close()
 
             if model_filename_format is not None:

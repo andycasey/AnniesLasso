@@ -1,9 +1,3 @@
-
-"""
-Perform the 17-label training for a few Lambda parameters for the red giant
-branch sample.
-"""
-
 import cPickle as pickle
 import numpy as np
 import os
@@ -12,11 +6,6 @@ from astropy.table import Table
 
 import AnniesLasso as tc
 
-np.random.seed(123) # For reproducibility.
-
-# Some "configurable" options..
-threads = 1
-mod = 10
 
 # Data.
 PATH, CATALOG, FILE_FORMAT = ("/Users/arc/research/apogee", "apogee-rg.fits",
@@ -36,45 +25,8 @@ normalized_ivar = np.memmap(
 elements = [label_name for label_name in labelled_set.dtype.names \
     if label_name not in ("PARAM_M_H", "SRC_H") and label_name.endswith("_H")]
 
-# Split up the data into ten random subsets.
-q = np.random.randint(0, maxsize, len(labelled_set)) % mod
 
-validate_set = (q == 0)
-test_set = (q == (mod - 1))
-train_set = (~validate_set) * (~test_set)
-assert np.sum(np.hstack([validate_set, test_set, train_set])) == q.size
-
-# Create a vectorizer for all models.
-vectorizer = tc.vectorizer.NormalizedPolynomialVectorizer(labelled_set,
-    tc.vectorizer.polynomial.terminator(["TEFF", "LOGG"] + elements, 2))
-
-# Create a zero regularization model and train it on 7/10ths the subset.
-standard_cannon = tc.CannonModel(labelled_set[train_set],
-    normalized_flux[train_set], normalized_ivar[train_set],
-    dispersion=dispersion, threads=threads)
-standard_cannon.vectorizer = vectorizer
-
-model_filename = "apogee-rg-standard-cannon.model"
-if not os.path.exists(model_filename):
-    standard_cannon.train()
-    standard_cannon.save(model_filename, overwrite=True)
-else:
-    standard_cannon.load(model_filename)
-
-# Predict labels for the last 1/10th (test) set and compare them to ASCAP.
-aspcap_labels = np.array([labelled_set[label_name][test_set] \
-    for label_name in vectorizer.label_names]).T
-standard_cannon_predicted_labels = standard_cannon.fit(
-    normalized_flux[test_set], normalized_ivar[test_set])
-raise a
-
-# Create a regularized Cannon model to try at different Lambda values.
-regularized_cannon = tc.L1RegularizedCannonModel(labelled_set[train_set],
-    normalized_flux[train_set], normalized_ivar[train_set],
-    dispersion=dispersion, threads=threads)
-regularized_cannon.vectorizer = vectorizer
-
-
+# These are taken from sandbox_rgb.py
 # For ~50 pixels, try some Lambda values.
 # Recommended pixels from Melissa, in vacuum.
 wavelengths = [
@@ -155,49 +107,98 @@ wavelengths.extend(
      [15221.158563809242, 15266.17080169663])
 
 
-# Set the model up for validation.
-Lambdas = 10**np.arange(1, 8.2, 0.2)
-regularized_cannon.s2 = 0.0
-pixel_mask = np.searchsorted(model.dispersion, wavelengths)
-
-output_filename = "apogee-rg-validation-all.pkl"
-if not os.path.exists(output_filename):
-    regularizations, chi_sq, log_det, all_models = \
-        regularized_cannon.validate_regularization(
-            fixed_scatter=True, Lambdas=Lambdas, pixel_mask=pixel_mask, 
-            model_filename_format="apogee-rg-validation-{}.pkl", overwrite=True,
-            include_training_data=True)
-
-    with open(output_filename, "wb") as fp:
-        pickle.dump((regularizations, chi_sq, log_det), fp, -1)
-
-else:
-    with open(output_filename, "rb") as fp:
-        regularizations, chi_sq, log_det = pickle.load(fp)
+pixel_mask = np.searchsorted(dispersion, wavelengths)
 
 
-# Do a full training
+i, models = 0, []
+model_filename = "apogee-rg-validation-{}.pkl"
+while os.path.exists(model_filename.format(i)):
+    models.append(tc.load_model(model_filename.format(i)))
+    i += 1
+
+for model in models:
+    model._dispersion = dispersion[pixel_mask]
+    model._normalized_flux = normalized_flux[:, pixel_mask]
+    model._normalized_ivar = normalized_ivar[:, pixel_mask]
 
 
-# Plot stuff?
+latex_labels = [r"{T_{\rm eff}}", r"\log{g}"] \
+    + [r"{\rm [%s/H]}" % each.split("_")[0] for each in models[0].vectorizer.label_names[2:]]
+
+# Plot Lambda vs theta for the different models.
+"""
+figs = tc.diagnostics.pixel_regularization_effectiveness(models,
+    pixels=np.array([0, 1, 2, 3]), latex_labels=latex_labels)
+for i, fig in enumerate(figs):
+    fig.savefig("apogee-rg-3pixels-{}.png".format(i))
+"""
+
+# Show Lambda vs Q plot.
+fig = tc.diagnostics.pixel_regularization_validation(models,
+    pixels=np.arange(len(dispersion[pixel_mask])), show_legend=False)
+fig.savefig("apogee-rg-validation.pdf", dpi=300)
+
 
 raise a
 
-# Choose a single Lambda value for all pixels.
+figs = tc.diagnostics.pixel_regularization_effectiveness(models,
+    pixels=np.array([0, 1, 2]), latex_labels=latex_labels,
+    same_limits=True)
+for i, fig in enumerate(figs):
+    fig.savefig("apogee-rg-cont+teff-{}-same-limits.png".format(i))
+plt.close("all")
 
 
-# Create a 10^5 regularization model and train it on 7/10ths the subset.
-regularized_cannon.train()
-
-regularized_cannon.save("apogee-rg-regularized-cannon.model", overwrite=True)
-
-# Predict labels for the last 1/10th set and compare them to ASPCAP.
-regularized_cannon_predicted_labels = regularized_cannon.fit(
-    normalized_flux[test_set], normalized_ivar[test_set])
+figs = tc.diagnostics.pixel_regularization_effectiveness(models,
+    pixels=np.array([0, 3, 4]), latex_labels=latex_labels,
+    same_limits=True)
+for i, fig in enumerate(figs):
+    fig.savefig("apogee-rg-cont+logg-{}-same-limits.png".format(i))
+plt.close("all")
 
 
-# Are we doing as good, or better than ASPCAP?
+figs = tc.diagnostics.pixel_regularization_effectiveness(models,
+    pixels=np.array([10, 11, 12, 13]), latex_labels=latex_labels,
+    same_limits=True)
+for i, fig in enumerate(figs):
+    fig.savefig("apogee-rg-mg+al-{}-same-limits.png".format(i))
+plt.close("all")
 
 
-# How many terms did we remove? --> How has the sparsity changed?
+figs = tc.diagnostics.pixel_regularization_effectiveness(models,
+    pixels=np.array([14, 15, 16, 17]), latex_labels=latex_labels,
+    same_limits=True)
+for i, fig in enumerate(figs):
+    fig.savefig("apogee-rg-si+ca-{}-same-limits.png".format(i))
+plt.close("all")
+
+
+figs = tc.diagnostics.pixel_regularization_effectiveness(models,
+    pixels=np.array([18, 19, 20, 21]), latex_labels=latex_labels,
+    same_limits=True)
+for i, fig in enumerate(figs):
+    fig.savefig("apogee-rg-2cr+co+v-{}-same-limits.png".format(i))
+plt.close("all")
+
+
+figs = tc.diagnostics.pixel_regularization_effectiveness(models,
+    pixels=np.array([22, 23, 24, 25]), latex_labels=latex_labels,
+    same_limits=True)
+for i, fig in enumerate(figs):
+    fig.savefig("apogee-rg-ni+k-{}-same-limits.png".format(i))
+plt.close("all")
+
+
+figs = tc.diagnostics.pixel_regularization_effectiveness(models,
+    pixels=np.array([26, 27]), latex_labels=latex_labels,
+    same_limits=True)
+for i, fig in enumerate(figs):
+    fig.savefig("apogee-rg-mn{}-same-limits.png".format(i))
+plt.close("all")
+
+
+print("Created a bunch of apogee-*.png plots")
+
+
+raise a
 
