@@ -14,7 +14,7 @@ import AnniesLasso as tc
 
 np.random.seed(123) # For reproducibility.
 
-# Some "configurable" options..
+# Some "configurable" opions..
 threads = 1
 mod = 10
 
@@ -46,7 +46,7 @@ assert np.sum(np.hstack([validate_set, test_set, train_set])) == q.size
 
 # Create a vectorizer for all models.
 vectorizer = tc.vectorizer.NormalizedPolynomialVectorizer(labelled_set,
-    tc.vectorizer.polynomial.terminator(["TEFF", "LOGG", "FE_H"], 2))
+    tc.vectorizer.polynomial.terminator(["TEFF", "LOGG"] + elements, 2))
 
 
 # Create a regularized Cannon model to try at different Lambda values.
@@ -141,14 +141,15 @@ wavelengths.extend(
 Lambdas = 10**np.hstack([[0, 1, 2], np.arange(3, 6, 0.2)])
 pixel_mask = np.searchsorted(dispersion, wavelengths)
 
-filename = "convexity-proof-3label-all.pkl"
 
+"""
+filename = "convexity-proof-3label-all.pkl"
 if not os.path.exists(filename):
     regularizations, chi_sq, log_det, all_models = \
         regularized_cannon.validate_regularization(
             fixed_scatter=True, Lambdas=Lambdas, pixel_mask=pixel_mask,
-            initial_theta=True, model_filename_format="convexity-proof-3label-{}.pkl",
-            overwrite=True, xtol=1e-6, ftol=1e-6)
+            initial_theta=None, model_filename_format="convexity-proof-3label-{}.pkl",
+            overwrite=True, xtol=1e-4, ftol=1e-4)
 
     with open(filename, "wb") as fp:
         pickle.dump((regularizations, chi_sq, log_det, all_models), fp, -1)
@@ -156,9 +157,6 @@ if not os.path.exists(filename):
 else:
     with open(filename, "rb") as fp:
         regularizations, chi_sq, log_det, all_models = pickle.load(fp)
-
-
-
 
 
 scaled_chi_sq = chi_sq - chi_sq[0]
@@ -173,12 +171,103 @@ for i in range(scaled_chi_sq.shape[1]):
     ax.scatter(np.log10(Lambdas), scaled_chi_sq[:, i], facecolor=colours[i % len(colours)])
     ax.plot(np.log10(Lambdas), scaled_chi_sq[:, i], c=colours[i % len(colours)])
 
-ax.set_xlim(Lambdas[0], Lambdas[-1])
+ax.set_xlim(np.log10(Lambdas[0]), np.log10(Lambdas[-1]))
 
-ax.set_xlabel(r"$\Lambda$")
+ax.set_xlabel(r"$\log_{10}\Lambda$")
 ax.set_ylabel(r"$\chi^2 + \Delta$")
+ax.set_title(r"3-label $\theta_{init}={1,0...}$ + $s^2 = 0$ + Fixed_s2 + Powell + No_theta_passing + tol=1e-4")
 
 
+"""
+
+"""
+# Check the effect of tolerances
+wavelengths = [wavelengths[2], wavelengths[15]]
+Lambdas = 10**np.hstack([[0, 1, 2], np.arange(3, 6, 0.2)])
+pixel_mask = np.searchsorted(dispersion, wavelengths)
+
+regularizations, chi_sq, log_det, all_models = \
+        regularized_cannon.validate_regularization(
+            fixed_scatter=True, Lambdas=Lambdas, pixel_mask=pixel_mask,
+            initial_theta=None, xtol=1e-4, ftol=1e-4)
+
+regularizations2, chi_sq2, log_det2, all_models2 = \
+        regularized_cannon.validate_regularization(
+            fixed_scatter=True, Lambdas=Lambdas, pixel_mask=pixel_mask,
+            initial_theta=None, op_kwargs={"xtol":1e-8, "ftol":1e-8})
+
+scaled_chi_sq = chi_sq - chi_sq[0]
+scaled_chi_sq2 = chi_sq2 - chi_sq2[0]
+
+
+colours = ("#4C72B0", "#55A868", "#C44E52", "#8172B2", "#64B5CD")
+
+
+fig, ax = plt.subplots()
+for i in range(scaled_chi_sq.shape[1]):
+    ax.plot(np.log10(Lambdas), scaled_chi_sq[:, i], c=colours[i % len(colours)])
+
+
+for i in range(scaled_chi_sq.shape[1]):
+    ax.plot(np.log10(Lambdas), scaled_chi_sq2[:, i], c=colours[i % len(colours)], lw=2)
+    
+"""
+
+wavelengths = [wavelengths[2], wavelengths[15]]
+Lambdas = 10**np.hstack([[0, 1, 2], np.arange(3, 6, 0.2)])
+pixel_mask = np.searchsorted(dispersion, wavelengths)
+
+# BFGS
+regularizations, chi_sq, log_det, all_models = \
+        regularized_cannon.validate_regularization(
+            fixed_scatter=True, Lambdas=Lambdas, pixel_mask=pixel_mask,
+            initial_theta=True, op_kwargs={"xtol":1e-8, "ftol":1e-8})
+
+# Load old stuff.
+"""
+import cPickle as pickle
+with open("foo.pkl", "rb") as fp:
+    Lambdas, chi_sq_fmin_xtol4, chi_sq_fmin_xtol8 = pickle.load(fp)
+"""
+
+
+colours = ("#4C72B0", "#55A868", "#C44E52", "#8172B2", "#64B5CD")
+
+
+fig, ax = plt.subplots()
+"""
+for i in range(chi_sq_fmin_xtol4.shape[1]):
+    ax.plot(np.log10(Lambdas), chi_sq_fmin_xtol4[:, i], c=colours[i % len(colours)])
+
+for i in range(chi_sq_fmin_xtol8.shape[1]):
+    ax.plot(np.log10(Lambdas), chi_sq_fmin_xtol8[:, i], c=colours[i % len(colours)], lw=2)
+"""
+
+scaled_chi_sq_bfgs = chi_sq - chi_sq[0]
+
+for i in range(scaled_chi_sq_bfgs.shape[1]):
+    ax.plot(np.log10(Lambdas), scaled_chi_sq_bfgs[:, i], c=colours[i % len(colours)], lw=2)
+
+
+
+raise a
+
+
+# Do pixel 10 with a higher ftol:
+Lambdas = 10**np.hstack([[0, 1, 2], np.arange(3, 6, 0.1)])
+
+pixel_mask = np.searchsorted(dispersion, [wavelengths[10]])
+regularizations, chi_sq, log_det, all_models = \
+    regularized_cannon.validate_regularization(
+        fixed_scatter=True, Lambdas=Lambdas, pixel_mask=pixel_mask,
+        initial_theta=None, xtol=1e-7, ftol=1e-7)
+
+scaled_chi_sq = chi_sq - chi_sq[0]
+
+fig, ax = plt.subplots()
+ax.scatter(np.log10(Lambdas), scaled_chi_sq, facecolor="k")
+ax.plot(np.log10(Lambdas), scaled_chi_sq, c='k')
+ax.set_title(dispersion[pixel_mask][0])
 
 
 raise a

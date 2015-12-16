@@ -77,7 +77,7 @@ regularized_cannon.regularization = 10**4
 
 model_filename = "apogee-rg-regularized-cannon.model"
 if not os.path.exists(model_filename):
-    regularized_cannon.train()
+    regularized_cannon.train(initial_theta=True)
     regularized_cannon.save(model_filename, overwrite=True)
 else:
     regularized_cannon.load(model_filename)

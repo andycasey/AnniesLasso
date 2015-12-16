@@ -145,6 +145,7 @@ fig = tc.diagnostics.pixel_regularization_validation(models,
     pixels=np.arange(28), show_legend=False)
 fig.axes[0].set_title("RG validation 3 label w/ BFGS+Powell+Good_Theta+s=0.05")
 
+raise a
 
 
 

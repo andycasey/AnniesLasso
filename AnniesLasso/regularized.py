@@ -232,8 +232,9 @@ class L1RegularizedCannonModel(cannon.CannonModel):
             logger.info("SENDING PREVIOUS THETA: {}".format(previous_theta))
             m.train(
                 fixed_scatter=fixed_scatter, 
+                initial_theta=previous_theta,
                 **kwargs)
-            logger.info("Not sending previous theta")
+            #logger.info("Not sending previous theta")
 
             previous_theta = m.theta
             if m.pool is not None: m.pool.close()
@@ -466,8 +467,10 @@ def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
     """
 
     inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
-    return model._chi_sq(theta, design_matrix, normalized_flux, inv_var) \
+    foo = model._chi_sq(theta, design_matrix, normalized_flux, inv_var) \
         +  regularization * L1Norm(theta[1:])
+    logger.debug(foo)
+    return foo
 #        +  model._log_det(inv_var) \
 
 
@@ -540,25 +543,26 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
         "maxiter": np.inf,
     }
     assert scatter == 0.0
-    """
     op_params, fopt, d = op.fmin_l_bfgs_b(func, p0, approx_grad=True, **kwds)
 
     if d["warnflag"] > 0:
         logger.warning("BFGS stopped prematurely: {}".format(d["task"]))
 
         # Run Powell's method instead.
-    """
-    xtol, ftol = kwargs.get(("xtol", "ftol"), (1e-4, 1e-4))
-    op_params, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
-        func, p0, full_output=True, xtol=xtol, ftol=ftol, **kwds)
+        #xtol, ftol = kwargs.get(("xtol", "ftol"), (1e-4, 1e-4))
+        kwds.update(kwargs.get("op_kwargs", {}))
 
-    if warnflag > 0:
-        logger.warn("Powell optimization failed: {}".format([
-                "Maximum number of function evaluations.",
-                "Maximum number of iterations."
-            ][warnflag - 1]))
-    else:
-        logger.info("Powell optimization completed successfully.")
+        #print("using ftol xtol {0} {1}".format(xtol, ftol))
+        op_params, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
+            func, p0, full_output=True, **kwds)
+
+        if warnflag > 0:
+            logger.warn("Powell optimization failed: {}".format([
+                    "Maximum number of function evaluations.",
+                    "Maximum number of iterations."
+                ][warnflag - 1]))
+        else:
+            logger.info("Powell optimization completed successfully.")
 
     return np.hstack([op_params, scatter]) if fixed_scatter else op_params
 
