@@ -14,7 +14,8 @@ import cPickle as pickle
 import logging
 import numpy as np
 import scipy.optimize as op
-import sharedmem
+import tempfile
+from six import string_types
 
 from . import (model, utils)
 
@@ -100,16 +101,23 @@ class CannonModel(model.BaseCannonModel):
         fitter = kwargs.pop("function", _fit_pixel)
         kwds = {
             "fixed_scatter": fixed_scatter,
-            "design_matrix": self.design_matrix,
             "op_kwargs": kwargs.pop("op_kwargs", {})
         }
         #kwds.update(kwargs)
+
+        temporary_filenames = []
 
         # Only use shared memory if necessary because it is a performance hit.
         if self.pool is None:
             mapper = map
             args = [self.normalized_flux.T, self.normalized_ivar.T, p0_scatter]
             args.extend(kwargs.get("additional_args", []))
+
+            # Write the design matrix to a temporary file.
+            temporary_filename, _ = tempfile.mkstemp()
+            with open(temporary_filename, "wb") as fp:
+                pickle.dump(self.design_matrix, fp, -1)
+            kwds["design_matrix"] = mkstemp
 
             results = []
             previous_theta = [None]
@@ -125,23 +133,8 @@ class CannonModel(model.BaseCannonModel):
 
         else:
             mapper = self.pool.map
-            if kwargs.get("shared_memory", True):
-                shared_args = []
-                args = [self.normalized_flux.T, self.normalized_ivar.T, p0_scatter]
-                args.extend(kwargs.get("additional_args", []))
-                for arg in args:
-                    if isinstance(arg, np.ndarray):
-                        shared_arg = sharedmem.empty_like(arg)
-                        shared_arg[:] = arg
-                    else:
-                        shared_arg = arg
-                    shared_args.append(shared_arg)
-                args = shared_args
+            kwds["design_matrix"] = self.design_matrix
 
-                # Aaaand don't forget the big one!
-                dm = sharedmem.empty_like(self.design_matrix)
-                dm[:] = self.design_matrix.copy()
-                kwds["design_matrix"] = dm
 
             # Wrap the function so we can parallelize it out.
             f = utils.wrapper(fitter, None, kwds, N, message=message)
@@ -189,6 +182,10 @@ class CannonModel(model.BaseCannonModel):
 
         #self.theta = theta
         #self.s2 = scatter**2
+
+        # Clean up any temporary files.
+        for filename in temporary_filenames:
+            os.remove(filename)
 
         # Unpack the results.
         self.theta, self.s2 = (results[:, :-1], results[:, -1]**2)
@@ -353,6 +350,11 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
         The optimised label vector coefficients and scatter for this pixel, even
         if it was supplied by the user.
     """
+
+    if isinstance(design_matrix, string_types):
+        with open(design_matrix, "rb") as fp:
+            design_matrix = pickle.load(fp)
+
 
     # This initial theta will also be returned if we have no valid fluxes.
     initial_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])

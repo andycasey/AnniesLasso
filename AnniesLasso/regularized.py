@@ -11,6 +11,7 @@ from __future__ import (division, print_function, absolute_import,
 __all__ = ["L1RegularizedCannonModel"]
 
 import logging
+import cPickle as pickle
 import numpy as np
 import multiprocessing as mp
 import scipy.optimize as op
@@ -500,6 +501,11 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
     regularization, initial_theta, design_matrix, fixed_scatter=False, 
     **kwargs):
 
+    if isinstance(design_matrix, string_types):
+        with open(design_matrix, "rb") as fp:
+            design_matrix = pickle.load(fp)
+
+
     # Any actual information?
     if np.all(normalized_ivar == 0):
         return_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])
@@ -534,7 +540,7 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
     op_params, fopt, d = op.fmin_l_bfgs_b(func, p0, approx_grad=True, **kwds)
 
     if d["warnflag"] > 0:
-        logger.warning("Optimization stopped prematurely: {}".format(d["task"]))
+        logger.warning("BFGS stopped prematurely: {}".format(d["task"]))
 
         # Run Powell's method instead.
     """
@@ -543,12 +549,12 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
         func, p0, full_output=True, xtol=xtol, ftol=ftol, **kwds)
 
     if warnflag > 0:
-        logger.warn("Secondary optimization failed: {}".format([
+        logger.warn("Powell optimization failed: {}".format([
                 "Maximum number of function evaluations.",
                 "Maximum number of iterations."
             ][warnflag - 1]))
     else:
-        logger.info("Secondary optimization completed successfully.")
+        logger.info("Powell optimization completed successfully.")
 
     return np.hstack([op_params, scatter]) if fixed_scatter else op_params
 

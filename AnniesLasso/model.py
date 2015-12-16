@@ -20,12 +20,10 @@ from datetime import datetime
 from multiprocessing import Value
 from os import path
 from six.moves import cPickle as pickle
-from sys import maxsize
 
 from .vectorizer.base import BaseVectorizer
 from . import (utils, __version__ as code_version)
 
-np.random.seed(123)
 
 logger = logging.getLogger(__name__)
 
@@ -124,9 +122,10 @@ class BaseCannonModel(object):
         if verify: self._verify_training_data()
         self.reset()
 
-        # Initialize a random integer for each object.
+        # Initialize a random, yet reproducible group of subsets.
+        np.random.seed(123)
         self._metadata = {
-            "q": np.random.randint(0, maxsize, len(labelled_set))
+            "q": np.random.randint(0, 10, len(labelled_set))
         }
         if threads == 1:
             self.pool = None
