@@ -360,13 +360,14 @@ One thing that the vectorizing function $\vecv(\ell)$ can do is offset the
 labels by some kind of fiducial (mean, median, or other central)
 value, such that $\vecv(\ell)=0$ is at a central location in the label
 space.
-Another is divide out a scale, because, for example, $\Teff$ values
+Another is to divide out a scale, because, for example, $\Teff$ values
 are in the thousands, but $\logg$ values are of order unity.
 If scale is not divided out, the (isotropic in $\vectheta$)
 regularization will be much more harsh, effectively, on some
-parameters than others.
+parameters than others.  Throughout this work we adopt the mean $\overline\ell$ as the fiducial offsets and scale by half the percentile range from 2.5--97.5\% of the data.
 
-DWH: In detail we construct the vectorizing function $\vecv(\ell)$ as follows...
+
+%DWH: In detail we construct the vectorizing function $\vecv(\ell)$ as follows...
 
 For the regularizer $Q(\vectheta)$ we adopt a variant of L1
 regularization; we set
@@ -375,8 +376,8 @@ regularization; we set
   \quad,
 \end{eqnarray}
 where the sum is over the $[D-1]$ components of $\vectheta$, excluding
-the zeroth component (because we don't ever expect that component to
-vanish).
+the zeroth component because we don't ever expect that component to
+vanish.
 (Forgive a notational similarity here: When we subscript $\vectheta$ with
 $j$ we mean ``the $D$-vector of parameters associated with wavelength
 pixel $j$''; when we subscript $\theta$ with $d$ we mean ``the single
@@ -398,8 +399,8 @@ set....
 
 
 We employ the \apogee\ Data Release 12 to demonstrate the effectiveness of our 
-regularization approach.   We constructed our training set using a subset of 
-high-quality labels provided in version \texttt{v603} from the \aspcap\ 
+regularization approach.   We constructed our labelled set (recall that the training and validation sets are subsets of the labelled set) using sensible criteria for  
+stars in version \texttt{v603} from the \aspcap\ 
 pipeline, and used fluxes from the individual \texttt{aspcapStar} data files.
 The \texttt{aspcapStar} files contain (approximately) continuum-normalized 
 spectra, often stacked from multiple visits, and an error array for those 
@@ -408,7 +409,7 @@ resampled onto a common log-wavelength scale. In total, there are NNNNN science
 objects.
 
 We employed several quality criteria to distill a robust yet representative 
-training set: We removed any stars with problematic flags from the \aspcap\
+labelled set: We removed any stars with problematic flags from the \aspcap\
 pipeline, requiring \texttt{ASPCAPFLAG = 0}.  We excluded stars with 
 signal-to-noise ratios outside the range of 200-300, and stars with a radial 
 velocity scatter larger than 1~km~s$^{-1}$.  We further demanded that
@@ -416,26 +417,21 @@ our training set include reported abundances in all 15 elements (C, N, O, Na,
 Mg, Al, Si, S, K, Ca, Ti, V, Mn, Fe, and Ni), and restricted the abundance range
 such that $2 > \mathrm{[X/Fe]} > -2$, $\mathrm{[Fe/H]} > -3$, and 
 $[\alpha/\mathrm{Fe}] > -0.1$.  A visual comparison of the [V/H] labels
-with other (Fe-peak) labels showed that many stars in the training set had
+with other (Fe-peak) abundance labels showed that many stars in the training set had
 spurious measurements of [V/H]. For this reason we further constrained the
-training sample such that $\mathrm{[V/Fe]} > -0.6$.  The distilled training
-set includes 14,141 red giant branch stars, with [Fe/H] labels ranging from
+labelled set such that $\mathrm{[V/Fe]} > -0.6$.  The distilled sample
+includes 14,141 red giant branch stars that will form our labelled set, with [Fe/H] labels ranging from
 $\mathrm{[Fe/H]} = [-2.10, 0.30]$. 
-
-
-
-
 
 
 MKN: What is different about our continuum normalization from everyone else's?
 
-DWH: Define the various possible sets of ``labeled'' stars and the set of ``unlabeled''
-stars, for our various purposes.
+%DWH: Define the various possible sets of ``labeled'' stars and the set of ``unlabeled''
+%stars, for our various purposes.
 
-DWH: Any training set must be a subset of the
-labeled stars.
-We are going to use different subsets for different trainings of \TheCannon.
-ARC: Not anymore we ain't.
+%DWH: Any training set must be a subset of the
+%labeled stars.
+%We are going to use different subsets for different trainings of \TheCannon.
 
 To demonstrate the predictive power and accuracy of the method, we
 will (below) perform a conservative cross-validation using cyclic
@@ -459,6 +455,7 @@ the entire unlabled data set (the largest possible training set) and
 use values for the hyper-parameters $\Lambda_j$ derived from the
 10-fold cross-validation experiment, as we will describe below.
 
+% ARC: Figure: HRD (coloured by [Fe/H]) of the labelled set.
 
 \section{Experiments}
 
