@@ -586,4 +586,5 @@ def _log_det(inv_var):
     """
     Return the log determinant of the variance.
     """
-    return -np.sum(np.log(inv_var[inv_var > 0]))
+    return 0
+    #return -np.sum(np.log(inv_var[inv_var > 0]))

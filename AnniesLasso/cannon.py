@@ -78,6 +78,10 @@ class CannonModel(model.BaseCannonModel):
             Show a progress bar.
         """
         
+        print("OVERWRITING S2 AND FIXED SCATTER")
+        self.s2 = 0.0
+        self.fixed_scatter = True
+
         if fixed_scatter and self.s2 is None:
             raise ValueError("intrinsic pixel variance (s2) must be set "
                              "before training if fixed_scatter is set to True")
@@ -107,6 +111,18 @@ class CannonModel(model.BaseCannonModel):
             args = [self.normalized_flux.T, self.normalized_ivar.T, p0_scatter]
             args.extend(kwargs.get("additional_args", []))
 
+            results = []
+            previous_theta = [None]
+            for row in utils.progressbar(zip(*args), message=message):
+                logger.info("passing initial_theta: {}".format(previous_theta[-1]))
+                row = list(row)
+                row[-1] = previous_theta[-1]
+                row = tuple(row)
+                results.append(fitter(*row, **kwds))
+                previous_theta.append(results[-1][:-1].copy())
+
+            results = np.array(results)
+
         else:
             mapper = self.pool.map
             if kwargs.get("shared_memory", True):
@@ -127,8 +143,9 @@ class CannonModel(model.BaseCannonModel):
                 dm[:] = self.design_matrix.copy()
                 kwds["design_matrix"] = dm
 
-        # Wrap the function so we can parallelize it out.
-        f = utils.wrapper(fitter, None, kwds, N, message=message)
+            # Wrap the function so we can parallelize it out.
+            f = utils.wrapper(fitter, None, kwds, N, message=message)
+            results = np.array(mapper(f, [row for row in zip(*args)]))
 
         # Calculate chunk size, etc.
         """
@@ -168,13 +185,14 @@ class CannonModel(model.BaseCannonModel):
                 pickle.dump((theta, scatter), fp, -1)
         """
 
-        results = np.array(mapper(f, [row for row in zip(*args)]))
+            
 
         #self.theta = theta
         #self.s2 = scatter**2
 
         # Unpack the results.
         self.theta, self.s2 = (results[:, :-1], results[:, -1]**2)
+        assert np.all(self.s2 == 0.0)
         return None
 
 
@@ -418,8 +436,8 @@ def _model_pixel(theta, scatter, normalized_flux, normalized_ivar,
     design_matrix, **kwargs):
 
     inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
-    return model._chi_sq(theta, design_matrix, normalized_flux, inv_var) \
-         + model._log_det(inv_var)
+    return model._chi_sq(theta, design_matrix, normalized_flux, inv_var) 
+         #+ model._log_det(inv_var)
 
 
 def _model_pixel_fixed_scatter(parameters, normalized_flux, normalized_ivar,
@@ -459,8 +477,8 @@ def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
 
     # We take inv_var back from _fit_theta because it is the same quantity we 
     # need to calculate, and it saves us one operation.
-    Q   = model._chi_sq(theta, design_matrix, normalized_flux, inv_var) \
-        + model._log_det(inv_var)
+    Q   = model._chi_sq(theta, design_matrix, normalized_flux, inv_var) 
+        #+ model._log_det(inv_var)
     return (Q, theta) if return_theta else Q
 
 

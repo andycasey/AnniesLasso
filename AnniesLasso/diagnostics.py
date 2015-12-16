@@ -430,8 +430,8 @@ def pixel_regularization_validation(models, pixels, show_legend=True):
         inv_var = validation_ivar / (1. + validation_ivar * m.s2)
         validation_scalar[i, :] = \
             model._chi_sq(m.theta, design_matrix, validation_flux.T, inv_var.T,
-                axis=1) \
-          + model._log_det(inv_var)
+                axis=1)
+          #+ model._log_det(inv_var)
 
         #if not np.all(np.isfinite(validation_scalar[i, :])):
         #    raise a
@@ -485,7 +485,7 @@ def pixel_regularization_validation(models, pixels, show_legend=True):
     ax.set_xticklabels([r"$10^{%.0f}$" % _ for _ in ax.get_xticks()])
 
     ymin = scaled_validation_scalar.min()
-    ax.set_ylabel(r"$\frac{\sum\chi_{validate}^2}{N_{validate}} + \Delta$")
+    ax.set_ylabel(r"$\chi^2 + \Delta$")
     ax.set_ylim(ymin - 1, 2)
     ax.yaxis.set_major_locator(MaxNLocator(6))
 

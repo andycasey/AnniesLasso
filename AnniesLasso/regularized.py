@@ -121,6 +121,11 @@ class L1RegularizedCannonModel(cannon.CannonModel):
         :param progressbar: [optional]
             Show a progress bar.
         """
+
+        print("OVERWRITING FIXED SCATTER AND S2")
+        self.s2 = 0.0
+        fixed_scatter = True
+
         kwds = {
             "fixed_scatter": fixed_scatter,
             "progressbar": progressbar,
@@ -130,12 +135,15 @@ class L1RegularizedCannonModel(cannon.CannonModel):
         if initial_theta is None or initial_theta is True:
             initial_theta = [initial_theta] * self.dispersion.size
 
+        kwds["initial_theta"] = initial_theta
         # This is a hack for speed: if regularization is zero, things are fast!
         if not np.all(self.regularization == 0):
             kwds.update({
                 "function": _fit_regularized_pixel,
                 "additional_args": [self.regularization, initial_theta]
             })
+
+        logger.debug("SENDING: {}".format(kwds))
         super(L1RegularizedCannonModel, self).train(**kwds)
 
 
@@ -218,7 +226,7 @@ class L1RegularizedCannonModel(cannon.CannonModel):
 
             # We want to make sure that we have the same training set each time.
             m._metadata.update({ "q": self._metadata["q"], "mod": mod })
-
+            logger.info("SENDING PREVIOUS THETA: {}".format(previous_theta))
             m.train(
                 fixed_scatter=fixed_scatter, 
                 initial_theta=previous_theta,
@@ -246,7 +254,7 @@ class L1RegularizedCannonModel(cannon.CannonModel):
             # Save everything.
             chi_sq[i, :] = model._chi_sq(m.theta, design_matrix,
                 validate_normalized_flux.T, inv_var.T, axis=1)
-            log_det[i, :] = model._log_det(inv_var)
+            #log_det[i, :] = model._log_det(inv_var)
             models.append(m)
     
         return (Lambdas, chi_sq, log_det, models)
@@ -345,8 +353,8 @@ class L1RegularizedCannonModel(cannon.CannonModel):
 
             # Save everything.
             Q[i, :] = model._chi_sq(m.theta, design_matrix,
-                validate_normalized_flux.T, inv_var.T, axis=1) \
-                + model._log_det(inv_var)
+                validate_normalized_flux.T, inv_var.T, axis=1)
+                #+ model._log_det(inv_var)
             models.append(m)
 
         Q = Q - Q[0]
@@ -456,8 +464,8 @@ def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
 
     inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
     return model._chi_sq(theta, design_matrix, normalized_flux, inv_var) \
-        +  model._log_det(inv_var) \
         +  regularization * L1Norm(theta[1:])
+#        +  model._log_det(inv_var) \
 
 
 def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
@@ -483,11 +491,9 @@ def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
         The regularization term to scale the L1 norm of theta with.
     """
     theta, scatter = parameters[:-1], parameters[-1]
-    foo = _fit_pixel_with_fixed_regularization_and_fixed_scatter(
+    return _fit_pixel_with_fixed_regularization_and_fixed_scatter(
         theta, scatter, normalized_flux, normalized_ivar, regularization,
         design_matrix)
-    logger.debug("{}".format(foo))
-    return foo
 
 
 def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
@@ -506,6 +512,7 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
         initial_theta, _, __ = cannon._fit_theta(
             normalized_flux, normalized_ivar, scatter, design_matrix)
 
+    logger.debug("Using initial theta: {}".format(initial_theta))
     if fixed_scatter:
         p0 = initial_theta
         func = _fit_pixel_with_fixed_regularization_and_fixed_scatter
@@ -523,24 +530,25 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
         "maxfun": np.inf,
         "maxiter": np.inf,
     }
-
+    """
     op_params, fopt, d = op.fmin_l_bfgs_b(func, p0, approx_grad=True, **kwds)
 
     if d["warnflag"] > 0:
         logger.warning("Optimization stopped prematurely: {}".format(d["task"]))
 
         # Run Powell's method instead.
-        xtol, ftol = kwargs.get(("xtol", "ftol"), (1e-4, 1e-4))
-        op_params, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
-            func, p0, full_output=True, xtol=xtol, ftol=ftol, **kwds)
+    """
+    xtol, ftol = kwargs.get(("xtol", "ftol"), (1e-4, 1e-4))
+    op_params, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
+        func, p0, full_output=True, xtol=xtol, ftol=ftol, **kwds)
 
-        if warnflag > 0:
-            logger.warn("Secondary optimization failed: {}".format([
-                    "Maximum number of function evaluations.",
-                    "Maximum number of iterations."
-                ][warnflag - 1]))
-        else:
-            logger.info("Secondary optimization completed successfully.")
+    if warnflag > 0:
+        logger.warn("Secondary optimization failed: {}".format([
+                "Maximum number of function evaluations.",
+                "Maximum number of iterations."
+            ][warnflag - 1]))
+    else:
+        logger.info("Secondary optimization completed successfully.")
 
     return np.hstack([op_params, scatter]) if fixed_scatter else op_params
 
