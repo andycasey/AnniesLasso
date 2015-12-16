@@ -22,7 +22,7 @@
 \newcommand{\sdss}{\project{\acronym{SDSS-IV}}}
 \newcommand{\apogee}{\project{\acronym{APOGEE2}}}
 \newcommand{\aspcap}{\project{\acronym{ASPCAP}}}
-\newcommand{\dr}{\acronym{DRXX}}
+\newcommand{\dr}{\acronym{DR12}}
 \newcommand{\logg}{\log g}
 \newcommand{\mh}{\mathrm{[M/H]}}
 \newcommand{\Teff}{T_{\mathrm{eff}}}
@@ -41,7 +41,7 @@
 % context
 In previous work, we have shown that it is possible to train a generative
 probabilistic model for stellar spectra using a training set of stars, each with known
-parameters ($\Teff$, $\logg$, and $\mh$) and metallicity, and then use that model to infer labels for
+parameters ($\Teff$, $\logg$, $\mh$), and then use that model to infer labels for
 unlabeled stars, even stars with lower signal-to-noise observations.
 % aims
 Here we ask whether this is possible when the dimensionality of the chemical
@@ -66,63 +66,163 @@ set of ZZZ stars.
 
 \section{Introduction}
 
-It is impossible to make accurate measurements of the physical
-properties of stars, or their chemical abundances, without accurate
-physical models of stellar spectra.
-However, the physics-based models for stars have a number of known
-problems:
-They are generally one-dimensional rather than three-dimensional, and
-either don't include or else have only effective models for some of
-the relevant physical processes.
-The input atomic and molecular physics information is faulty and
-incomplete.
-There are some wavelengths and lines that are much better understood
-than others.
-In detail, the models do not explain all pixels of stellar
-spectroscopy at the precision with which we are currently observing,
-which is signal-to-noise ratios in the hundreds for thousands or tens
-of thousands of wavelength pixels per star.
 
-This led us to build \TheCannon\ (\citealt{tc}), a data-driven---as
-opposed to physics-based---model for stellar spectra.
+The detailed surface abundances of a star reflect its formation environment
+and the supernova(e) that preceded it.  Minute perturbations in the properties
+of either can produce subtly different chemical abundance patterns on successive
+generations of stars.  This chemical abundance signature largely remains 
+constant in the stellar photosphere throughout a star's lifetime, thereby 
+providing a fossilised record of the gas composition during formation and the 
+imprinted signature of stars that preceded it.  The variation between these
+signatures is small, implying that it is difficult to distinguish subtle 
+chemical patterns from different formation sites.  However if they were 
+distinguishable, a sufficiently large collection of stellar abundances would 
+unambiguously unravel the complete chemical evolution of the Milky Way.
 
-DWH: Summarize what it does and what it can be used for.
-DWH: Mention some users and projects, past, current, and future.
-DWH: Cite some relevant literature.
-It is important (to us) to note that \TheCannon\ is named not after a
+
+There are some exceptions to this line of reasoning: the abundances of some
+elements can (and do) change throughout a star's lifetime.  However these are
+subtle signatures that are reflective of intriguing astrophysical phenomena:
+atomic diffusion, evolutionary mixing, the presence (or accretion) of 
+exoplanets, material transfer from a stellar binary companion, and countless
+other scenarios.  In the same way that precise abundances are required to 
+identify unique chemical formation signatures, precise abundances are necessary
+to distinguish minute evolutionary or environment differences between subsets of
+stars.  In these scenarios we argue most astrophysicists care less about
+accuracy; it is the abundance precision that imparts discovery and understanding
+of these astrophysical phenomena.  Indeed, in most studies of stellar
+astrophysics \textit{an increase in precision yields far more astrophysical 
+insight than a comparable increase in accuracy}.
+
+
+For these reasons a comprehensive catalog of \textit{precise} detailed chemical
+abundances would revolutionise our understanding of planetary, stellar, and 
+galactic astrophysics.  This goal has only recently become feasible given the 
+increasing volume and quality of stellar spectra obtained in the last decade.  
+Specifically, large surveys are obtaining high-resolution 
+($\mathcal{R} \gtrsim 20,000$), high signal-to-noise (S/N) ratio spectra for
+$\sim10^{5}$---$10^{6}$ stars across all components of the Galaxy.  This is a
+sharp relative increase in data volume, which has mandated the automatic
+analysis of stellar spectra, and persuaded dozens of groups to produce bespoke
+pipelines.
+
+
+
+Most automated pipelines have grown from classical, manual methods.  That is to
+say, there has been relatively little work on unconventional methods to analyse
+spectra.  Spectroscopists have hard-coded their intuition (or subjectivity),
+with arbitrary heuristics to decide issues of wavelength masks, convergence
+criteria, etc.  Most of these decisions are based on optimizing the resultant
+accuracy for a few stars with extremely high quality data (e.g., high S/N).  As
+a result, these heuristics are frequently incomparable for more data with more
+modest (and representative) S/N ratios.  Therefore, for most stars in the sample,
+it can be trivially shown from repeat or blind experiments that that individual
+pipelines yield demonstrably imprecise abundances for S/N ratios that are 
+most typical in the data.  Moreover, results from individual pipelines vary 
+significantly with respect to each other, with abundance differences an order
+of magnitude larger than the aforementioned astrophysical signatures.
+%Thus, while there has been substantial effort in automating classical analysis
+%techniques, they are generally imprecise at modest S/N ratios, and yield
+%different and inaccurate results when compared against each other.
+
+Considerable efforts have also focussed on improving the accuracy of physical
+models.  Indeed it is impossible to measure physical properties of stars (or 
+their chemical abundances) accurately without accurate physical models of 
+stellar spectra.  However, physics-based models of stars have a number of known
+problems.  The atmospheres are generally one-dimensional; three-dimensional
+models remain computationally impractical for more than just a few stars.  As a
+consequence of the limited atmosphere dimensionality, crude (knowningly 
+incorrect) approximations for the convection and turbulence become necessary. 
+Although grids of three-dimensional hydrodynamic models have been produced 
+and averaged to one-dimensional approximations, these models still assume local
+thermodynamic equalibrium (LTE).  Properly accounting (or even approximating) 
+departures from LTE is a formidable analytic and computational challenge.
+Lastly, while laboratory efforts have thoroughly improved much of the faulty
+atomic and molecular data, this process is unquestionably incomplete.  For these
+reasons there are some spectral features that are much better understood than
+others.  As a consequence, physics-based methods are restricted to spectral
+regions or parameter space that are understood marginally better, which vastly
+limits their applicability and interpretability by construction.
+
+
+%Even the opacities employed by modern radiative transfer codes are polynomial approximations that are decades old.
+
+
+
+
+
+%It is impossible to make accurate measurements of the physical
+%properties of stars, or their chemical abundances, without accurate
+%physical models of stellar spectra.
+%However, the physics-based models for stars have a number of known
+%problems:
+%They are generally one-dimensional rather than three-dimensional, and
+%either don't include or else have only effective models for some of
+%the relevant physical processes.
+%The input atomic and molecular physics information is faulty and
+%incomplete.
+%There are some wavelengths and lines that are much better understood
+%than others.
+%In detail, the models do not explain all pixels of stellar
+%spectroscopy at the precision with which we are currently observing,
+%which is signal-to-noise ratios in the hundreds for thousands or tens
+%of thousands of wavelength pixels per star.
+
+In detail, physics-based models do not explain all pixels of stellar 
+spectroscopy at the precision with which we are currently observing.  The data
+quality have outgrown the classical methods used to analyse them.  This led us 
+to build \TheCannon\footnote{It is important (to us) to note that \TheCannon\ is named not after a
 weapon but instead after Annie Jump Cannon, who was the first to
 correctly order stellar spectra in temperature order (and who did so
-by looking at the data, and without any use of physics-based models).
+by looking at the data, and without any use of physics-based models).} (\citealt{tc}), a data-driven---as opposed to physics-based
+---model for stellar spectra.  \TheCannon\ is a data-driven model, but it differs from standard machine-learning
+approaches because it contains an explicit noise model. Given a representative set of stars with
+known labels of high-fidelity (see below), \TheCannon\ is a generative 
+model for stellar spectra based on a linear combination of the labels.
 
+
+
+
+%DWH: Summarize what it does and what it can be used for.
+%DWH: Mention some users and projects, past, current, and future.
+%DWH: Cite some relevant literature.
+
+
+Before we introduce different phases of the model 
+construction and evaluation, we first introduce the relevant terminology.
 In all that follows, we will call stellar parameters ($\Teff$ and
 $\logg$) and the full set of 15 chemical abundances
 collectively ``labels''.
-This unifies and collapses the ``stellar parameters and chemical
-abundances'' phrase to a word, and also connects to the terminology
+This unifies and collapses the phrase ``stellar parameters and chemical
+abundances'' to a word, and connects to relevant terminology
 for supervised methods in the machine-learning and statistics
-literatures.
-
-DWH: Define the words ``train'', ``validate'', and ``test''.  And maybe ``predict'' too?
-
-DWH: Labels for data at wavelengths where there are no good labels.
-
-DWH: Labels that are consistent across surveys and wavelengths.
-
-\TheCannon\ is a data-driven model, but it differs from standard machine-learning
-approaches because it contains an explicit noise model.
+literatures.  Consider a spectroscopic survey that contains \emph{survey objects}.
+Within that set of survey objects is a subset of stars where the
+data have high signal-to-noise ratios and the labels are reported
+with high fidelity.  We will call this sample the \emph{labelled set},
+whereas all other survey objects are categorized to the \emph{unlabelled set}. That is to say,
+although objects in the \emph{unlabelled set} may have some labels reported, we are going to construct (train) 
+\TheCannon\ using data in the labelled set and estimate (test) labels for those in the unlabelled set.
 This means that it can transfer labels from high signal-to-noise training-set
 stars to low signal-to-noise test-set stars; that is, the training set and 
-the test set do not need to be statistically identical.
-This is related to the fact that \TheCannon\ is an interpretable model;
+the test set do not need to be statistically identical. This is related to the fact that \TheCannon\ is an interpretable model;
 the internals of the model are the dependencies of the spectral expectation
 and variance on wavelength and physical parameters of the star.
 
-DWH: Should we be saying things about the fact that the model is probabilistic?
-It takes as input stellar labels and gives as output a pdf for stellar spectra?
 
-DWH: In the first work we did with \TheCannon, we only used a small
-number of labels (three in the original work, and four or five in late
-work; \citealt{tc, age}).
+%DWH: Define the words ``train'', ``validate'', and ``test''.  And maybe ``predict'' too?
+
+%DWH: Labels for data at wavelengths where there are no good labels.
+
+%DWH: Labels that are consistent across surveys and wavelengths.
+
+
+%DWH: Should we be saying things about the fact that the model is probabilistic?
+%It takes as input stellar labels and gives as output a pdf for stellar spectra?
+
+%DWH: 
+
+
 Here we were guided by thoughts related to density estimation:
 Sampling well a $K$-dimensional label space takes a training set the
 size of which scales exponentially (or worse) with $K$.
@@ -134,24 +234,39 @@ It is more like an \emph{interpolator}, which effectively finds stars in
 the training set that are close to the test star, and transfers labels,
 using the smooth polynomial model as a kind of regularizer.
 
-DWH: Here we exploit this to the fullest.
-We consider the \emph{entire} 17-dimensional label spece produced by
+
+
+In the first work we did with \TheCannon, we only used a small
+number of labels (three in the original work, and four or five in late
+work; \citealt{tc, age}).  A tantalizing extension of these works would
+be to expand the list of labels to include the abundances of individual
+elements.  However as the label list grows the model complexity (i.e.,
+the number of parameters) becomes formidable.  Perhaps more importantly,
+it can be shown that a standard model is physically incorrect: For example
+there may be an abundance label with non-zero contributions at all pixels,
+but physically we know that spectral lines of that element do not contribute
+across all wavelengths.  For these reasons we know that the problem is sparse.
+
+Here we exploit this information to the fullest, using standard regularization methods to discover
+and enforce sparsity. We consider the \emph{entire} 17-dimensional label space produced by
 the \apogee\ \aspcap\ pipeline.
 We accept the \aspcap\ labels for the highest
 signal-to-noise stars, and adopt these stars and their labels as the
 training set.
-We show, by cross-validation, that we can transfer these
+We show by validation that we can transfer these
 labels to much lower signal-to-noise stars, with reduced precision but no
 strong biases.
 We then use the system to label all of the stars in the \apogee\ \dr\ data set.
 
-DWH: The differences between measurement and prediction...
+%DWH: The differences between measurement and prediction...
 
-DWH: Etc!
+%DWH: Etc!
 
 \section{Method}
 
-The assumptions of \TheCannon\ are the following:
+We assume the following about \TheCannon\ and the \apogee\ data set:
+
+%The assumptions of \TheCannon\ are the following:
 \begin{itemize}
 \item
 Stars with similar labels (parameters and abundances) have similar
@@ -170,6 +285,7 @@ we are \emph{not} assuming that different stars have similar noise
 variances, nor that the training, test, and prediction sets have the
 same noise model.
 \item
+% ARC: I don't think we even care if ASPCAP is accurate or not -- we aren't technically assuming accuracy in the training set, are we? We are only assuming consistency in all of our criteria for deciding what should or should not be in the labelled set (and thus the training set).
 We have a training set of stars with accurate labels, where
 ``accurate'' is defined by the accuracy requirements of the output
 labels.  It might be more accurate to say that we are assuming that
@@ -181,7 +297,7 @@ stars span the label space similarly to how any test or prediction set
 spans the label space.
 \end{itemize}
 
-The model is
+\noindent Given these assumptions, the model we adopt is
 \begin{eqnarray}
   y_{jn} &=& \vecv(\ell_n)\cdot\vectheta_j + e_{jn}
   \label{eq:model}\quad ,
@@ -191,7 +307,7 @@ $\vecv(\ell_n)$ is a function that takes as input
 the label list $\ell_n$ of length $K$ for star $n$
 and outputs a vector of length $D>K$ of functions of those labels,
 $\vectheta_j$ is a vector of length $D$ of parameters controlling the model at wavelength pixel $j$,
-and $e_{jn}$ is a noise draw or residual.
+and $e_{jn}$ is a noise draw or residual.  We refer to $\vecv(\ell_n)$ as ``the vectorizing function'', which allows for arbitrarily complex functions that might not be simple polynomial expansions of the label list $\ell_n$.  
 Inasmuch as the model is good, the noise values $e_{jn}$ can be taken to be
 drawn from a Gaussian with zero mean and variance $\sigma^2_{jn}+s^2_j$,
 where $\sigma^2_{jn}$ is the pipeline-reported uncertainty variance on datum
@@ -239,6 +355,7 @@ This makes sense, because different wavelengths have very different
 dependences on different components of the label list $\ell$.
 In what follows, we will set the value of the $\Lambda_j$ by
 a simple validation test.
+
 
 In the \emph{test step}, we fix the parameters $\vectheta_j,s^2_j$ at all
 wavelength pixels $j$.
@@ -299,7 +416,7 @@ L1 regularization encourages parameters to vanish precisely but
 doesn't break convexity for convex problems.
 
 DWH: To set the amplitude $\Lambda_j$ at each wavelength pixel $j$, we
-employ a validation of the following form:...
+employ a validation of the following form:....
 
 DWH: Scaling argument that, in general, the best value of $\Lambda_j$
 should be on the same order as the number of stars in the training
@@ -307,10 +424,38 @@ set....
 
 \section{Training, validation, and test data}
 
-MKN: Describe \apogee\ data here.
+
+We employ the \apogee\ Data Release 12 to demonstrate the effectiveness of our 
+regularization approach.   We constructed our training set using a subset of 
+high-quality labels provided in version \texttt{v603} from the \aspcap\ 
+pipeline, and used fluxes from the individual \texttt{aspcapStar} data files.
+The \texttt{aspcapStar} files contain (approximately) continuum-normalized 
+spectra, often stacked from multiple visits, and an error array for those 
+fluxes.  All spectra have been placed at rest-frame (vacuum wavelengths), and
+resampled onto a common log-wavelength scale. In total, there are NNNNN science
+objects.
+
+We employed several quality criteria to distill a robust yet representative 
+training set: We removed any stars with problematic flags from the \aspcap\
+pipeline, requiring \texttt{ASPCAPFLAG = 0}.  We excluded stars with 
+signal-to-noise ratios outside the range of 200-300, and stars with a radial 
+velocity scatter larger than 1~km~s$^{-1}$.  We further demanded that
+our training set include reported abundances in all 15 elements (C, N, O, Na, 
+Mg, Al, Si, S, K, Ca, Ti, V, Mn, Fe, and Ni), and restricted the abundance range
+such that $2 > \mathrm{[X/Fe]} > -2$, $\mathrm{[Fe/H]} > -3$, and 
+$[\alpha/\mathrm{Fe}] > -0.1$.  A visual comparison of the [V/H] labels
+with other (Fe-peak) labels showed that many stars in the training set had
+spurious measurements of [V/H]. For this reason we further constrained the
+training sample such that $\mathrm{[V/Fe]} > -0.6$.  The distilled training
+set includes 14,141 red giant branch stars, with [Fe/H] labels ranging from
+$\mathrm{[Fe/H]} = [-2.10, 0.30]$. 
+
+
+
+
+
 
 MKN: What is different about our continuum normalization from everyone else's?
-Why is it so important and why is it better?
 
 DWH: Define the various possible sets of ``labeled'' stars and the set of ``unlabeled''
 stars, for our various purposes.
@@ -318,8 +463,8 @@ stars, for our various purposes.
 DWH: Any training set must be a subset of the
 labeled stars.
 We are going to use different subsets for different trainings of \TheCannon.
+ARC: Not anymore we ain't.
 
-DWH: THIS PARAGRAPH MAY BE OUT:
 To demonstrate the predictive power and accuracy of the method, we
 will (below) perform a conservative cross-validation using cyclic
 training, validation, and test subsets of the labeled data:
@@ -347,6 +492,7 @@ ARC: Say what you want about the implementation and structure here.  Keep it bri
 
 DWH: Note that our optimizer is not fast; there is lots of literature
 on optimizing these convex problems (CITE THINGS); we should have looked at it.
+
 
 \section{Experiments}
 
@@ -397,6 +543,7 @@ the abundance of another.
 A good example is shown in \figurename~\ref{fig:whatever}, where we
 see WHATEVER.
 DWH: Yada Yada...
+
 
 DWH: No accounting for variable spectroscopic resolution, nor
 microturbulence nor rotation.
