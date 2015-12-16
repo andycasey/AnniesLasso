@@ -15,7 +15,7 @@ import AnniesLasso as tc
 np.random.seed(123) # For reproducibility.
 
 # Some "configurable" options..
-threads = 10
+threads = 1
 mod = 10
 
 # Data.
@@ -62,17 +62,28 @@ else:
     standard_cannon.load(model_filename)
 
 # Predict labels for the last 1/10th (test) set and compare them to ASCAP.
+"""
 aspcap_labels = np.array([labelled_set[label_name][test_set] \
     for label_name in vectorizer.label_names]).T
 standard_cannon_predicted_labels = standard_cannon.fit(
     normalized_flux[test_set], normalized_ivar[test_set])
-raise a
+"""
 
-# Create a regularized Cannon model to try at different Lambda values.
 regularized_cannon = tc.L1RegularizedCannonModel(labelled_set[train_set],
     normalized_flux[train_set], normalized_ivar[train_set],
     dispersion=dispersion, threads=threads)
 regularized_cannon.vectorizer = vectorizer
+regularized_cannon.regularization = 10**4
+
+model_filename = "apogee-rg-regularized-cannon.model"
+if not os.path.exists(model_filename):
+    regularized_cannon.train()
+    regularized_cannon.save(model_filename, overwrite=True)
+else:
+    regularized_cannon.load(model_filename)
+
+
+raise a
 
 
 # For ~50 pixels, try some Lambda values.

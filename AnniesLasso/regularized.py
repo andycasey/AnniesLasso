@@ -14,7 +14,7 @@ import logging
 import numpy as np
 import multiprocessing as mp
 import scipy.optimize as op
-from sys import stdout
+from sys import stdout, maxsize
 from six import string_types
 
 from . import (cannon, model, utils)
@@ -109,7 +109,8 @@ class L1RegularizedCannonModel(cannon.CannonModel):
         return None
 
 
-    def train(self, fixed_scatter=False, progressbar=True, **kwargs):
+    def train(self, fixed_scatter=False, progressbar=True, initial_theta=None,
+        **kwargs):
         """
         Train the model based on the labelled set using the given vectorizer.
 
@@ -120,14 +121,20 @@ class L1RegularizedCannonModel(cannon.CannonModel):
         :param progressbar: [optional]
             Show a progress bar.
         """
-        kwds = { "fixed_scatter": fixed_scatter, "progressbar": progressbar }
+        kwds = {
+            "fixed_scatter": fixed_scatter,
+            "progressbar": progressbar,
+        }
         kwds.update(kwargs)
+
+        if initial_theta is None or initial_theta is True:
+            initial_theta = [initial_theta] * self.dispersion.size
 
         # This is a hack for speed: if regularization is zero, things are fast!
         if not np.all(self.regularization == 0):
             kwds.update({
                 "function": _fit_regularized_pixel,
-                "additional_args": [self.regularization]
+                "additional_args": [self.regularization, initial_theta]
             })
         super(L1RegularizedCannonModel, self).train(**kwds)
 
@@ -196,6 +203,7 @@ class L1RegularizedCannonModel(cannon.CannonModel):
         models = []
         chi_sq = np.zeros((N_Lambdas, N_px))
         log_det = np.zeros((N_Lambdas, N_px))
+        previous_theta = kwargs.pop("initial_theta", None)
         for i, Lambda in enumerate(Lambdas):
             logger.info("Setting Lambda = {0}".format(Lambda))
 
@@ -211,7 +219,12 @@ class L1RegularizedCannonModel(cannon.CannonModel):
             # We want to make sure that we have the same training set each time.
             m._metadata.update({ "q": self._metadata["q"], "mod": mod })
 
-            m.train(fixed_scatter=fixed_scatter, **kwargs)
+            m.train(
+                fixed_scatter=fixed_scatter, 
+                initial_theta=previous_theta,
+                **kwargs)
+
+            previous_theta = m.theta
             if m.pool is not None: m.pool.close()
 
             if model_filename_format is not None:
@@ -415,9 +428,8 @@ def L1Norm(Q):
     return np.sum(np.abs(Q))
 
 
-def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta,
-    normalized_flux, inv_var, scatter, regularization,
-    design_matrix, **kwargs):
+def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
+    normalized_flux, normalized_ivar, regularization, design_matrix):
     """
     Fit the normalized flux for a single pixel (across many stars) given the
     theta parameters, a fixed scatter, and a fixed regularization term.
@@ -441,14 +453,15 @@ def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta,
     :param regularization:
         The regularization term to scale the L1 norm of theta with.
     """
-    
+
+    inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
     return model._chi_sq(theta, design_matrix, normalized_flux, inv_var) \
         +  model._log_det(inv_var) \
         +  regularization * L1Norm(theta[1:])
 
 
 def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
-    normalized_ivar, regularization, design_matrix, **kwargs):
+    normalized_ivar, regularization, design_matrix):
     """
     Fit the normalized flux for a single pixel (across many stars) given the
     parameters (scatter, theta) and a fixed regularization term.
@@ -469,14 +482,73 @@ def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
     :param regularization:
         The regularization term to scale the L1 norm of theta with.
     """
-    scatter, theta = parameters[0], parameters[1:]
-    inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
-    return _fit_pixel_with_fixed_regularization_and_fixed_scatter(
-        theta, normalized_flux, inv_var, scatter, regularization,
-        design_matrix, **kwargs)
+    theta, scatter = parameters[:-1], parameters[-1]
+    foo = _fit_pixel_with_fixed_regularization_and_fixed_scatter(
+        theta, scatter, normalized_flux, normalized_ivar, regularization,
+        design_matrix)
+    logger.debug("{}".format(foo))
+    return foo
 
 
 def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
+    regularization, initial_theta, design_matrix, fixed_scatter=False, 
+    **kwargs):
+
+    # Any actual information?
+    if np.all(normalized_ivar == 0):
+        return_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])
+        return np.hstack([return_theta, scatter if fixed_scatter else 0])
+
+    if initial_theta is None:
+        initial_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])
+
+    elif initial_theta is True:
+        initial_theta, _, __ = cannon._fit_theta(
+            normalized_flux, normalized_ivar, scatter, design_matrix)
+
+    if fixed_scatter:
+        p0 = initial_theta
+        func = _fit_pixel_with_fixed_regularization_and_fixed_scatter
+        args = (scatter, normalized_flux, normalized_ivar, regularization,
+            design_matrix)
+    else:
+        p0 = np.hstack([initial_theta, scatter])
+        func = _fit_pixel_with_fixed_regularization
+        args = (normalized_flux, normalized_ivar, regularization, design_matrix)
+
+    # Prepare keywords for optimization.
+    kwds = {
+        "args": args,
+        "disp": False,
+        "maxfun": np.inf,
+        "maxiter": np.inf,
+    }
+
+    op_params, fopt, d = op.fmin_l_bfgs_b(func, p0, approx_grad=True, **kwds)
+
+    if d["warnflag"] > 0:
+        logger.warning("Optimization stopped prematurely: {}".format(d["task"]))
+
+        # Run Powell's method instead.
+        xtol, ftol = kwargs.get(("xtol", "ftol"), (1e-4, 1e-4))
+        op_params, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
+            func, p0, full_output=True, xtol=xtol, ftol=ftol, **kwds)
+
+        if warnflag > 0:
+            logger.warn("Secondary optimization failed: {}".format([
+                    "Maximum number of function evaluations.",
+                    "Maximum number of iterations."
+                ][warnflag - 1]))
+        else:
+            logger.info("Secondary optimization completed successfully.")
+
+    return np.hstack([op_params, scatter]) if fixed_scatter else op_params
+
+
+
+'''
+
+def _fit_regularized_pixel_incorrectly(normalized_flux, normalized_ivar, scatter,
     regularization, design_matrix, fixed_scatter=False, **kwargs):
     """
     Return the optimal vectorizer coefficients and variance term for a pixel
@@ -520,7 +592,10 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
         args = (normalized_flux, normalized_ivar, regularization, design_matrix)
 
     kwds = { "disp": False, "maxiter": np.inf, "maxfun": np.inf }
-    kwds.update(kwargs)
+    #kwds.update(kwargs)
+    kwds.update(kwargs.get("op_kwargs", {}))
+
+    logger.info("Passing to optimizer: {}".format(kwds))
 
     logger.debug("Optimizing pixel from {0} {1} (fixed_scatter = {2})".format(
         scatter, theta, fixed_scatter))
@@ -540,4 +615,5 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
         parameters, scatter, fixed_scatter))
 
     return np.hstack([parameters, scatter])
+'''
 

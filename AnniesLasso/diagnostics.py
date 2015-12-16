@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from . import L1RegularizedCannonModel
-from . import model
+from . import model, regularized
 
 def _get_pixel_mask(model, wavelengths=None, pixels=None):
 
@@ -113,6 +113,15 @@ def Lambda_lambda(models):
     Lambdas = np.zeros_like(validation_scalar)
     for i, model in enumerate(models):
         
+        Lambdas[i] = model.regularization
+        
+        inv_var = validation_ivar / (1. + validation_ivar * model.s2)
+        validation_scalar[i, :] = \
+            regularized._fit_pixel_with_fixed_regularization_and_fixed_scatter(
+                model.theta, model.s2**0.5, validation_flux, validation_ivar,
+                inv_var, axis=1)
+
+        """
         # Predict the fluxes in the validate set.
         inv_var = validation_ivar / (1. + validation_ivar * model.s2)
         design_matrix = model.vectorizer(np.vstack(
@@ -120,11 +129,11 @@ def Lambda_lambda(models):
                 for label_name in model.vectorizer.label_names]).T)
 
         # Calculate the validation scalar.
-        Lambdas[i] = model.regularization
         validation_scalar[i, :] = \
             _chi_sq(model.theta, design_matrix, validation_flux.T, inv_var.T,
                 axis=1) \
           + _log_det(inv_var)
+        """
 
     # Scale the validation scalar (even though we don't need to, really..)
     scaled_validation_scalar = validation_scalar - validation_scalar[0, :]
@@ -410,20 +419,39 @@ def pixel_regularization_validation(models, pixels, show_legend=True):
     validate_set = \
         (models[0]._metadata["q"] % models[0]._metadata.get("mod", 5)) == 0
 
+    validation_ivar = models[0].normalized_ivar[validate_set]
+    validation_flux = models[0].normalized_flux[validate_set]
+
+
     for i, m in enumerate(models):
         
+        m.s2[~np.isfinite(m.s2)] = 0.0
+        design_matrix = m.vectorizer(np.array([m.labelled_set[name][validate_set] for name in m.vectorizer.label_names]).T)
+        inv_var = validation_ivar / (1. + validation_ivar * m.s2)
+        validation_scalar[i, :] = \
+            model._chi_sq(m.theta, design_matrix, validation_flux.T, inv_var.T,
+                axis=1) \
+          + model._log_det(inv_var)
+
+        #if not np.all(np.isfinite(validation_scalar[i, :])):
+        #    raise a
+
+        """
         # Predict the fluxes in the validate set.
-        inv_var = models[0].normalized_ivar[validate_set] / \
-            (1. + models[0].normalized_ivar[validate_set] * m.s2)
+        inv_var = m.normalized_ivar[validate_set] / \
+            (1. + m.normalized_ivar[validate_set] * m.s2)
         design_matrix = m.vectorizer(np.vstack(
-            [models[0].labelled_set[label_name][validate_set] \
+            [m.labelled_set[label_name][validate_set] \
                 for label_name in m.vectorizer.label_names]).T)
 
         # Calculate the validation scalar.
         validation_scalar[i, :] = model._chi_sq(m.theta, design_matrix, 
-            models[0].normalized_flux[validate_set].T, inv_var.T, axis=1)
-        validation_scalar[i, :] += model._log_det(inv_var)
+            m.normalized_flux[validate_set].T, inv_var.T, axis=1)
+        #validation_scalar[i, :] += model._log_det(inv_var)
+        """
 
+    #if not np.all(np.isfinite(validation_scalar[0, :])):
+    #    raise a
     # Get regularization parameters.
     Lambda = np.array([m.regularization[0] for m in models])
     scaled_validation_scalar = validation_scalar - validation_scalar[0, :]

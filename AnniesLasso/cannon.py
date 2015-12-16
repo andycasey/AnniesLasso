@@ -65,7 +65,8 @@ class CannonModel(model.BaseCannonModel):
 
 
     @model.requires_model_description
-    def train(self, fixed_scatter=False, progressbar=True, **kwargs):
+    def train(self, fixed_scatter=False, progressbar=True, initial_theta=None,
+        **kwargs):
         """
         Train the model based on the labelled set using the given vectorizer.
 
@@ -95,17 +96,20 @@ class CannonModel(model.BaseCannonModel):
         fitter = kwargs.pop("function", _fit_pixel)
         kwds = {
             "fixed_scatter": fixed_scatter,
-            "design_matrix": self.design_matrix
+            "design_matrix": self.design_matrix,
+            "op_kwargs": kwargs.pop("op_kwargs", {})
         }
         #kwds.update(kwargs)
 
         # Only use shared memory if necessary because it is a performance hit.
         if self.pool is None:
             mapper = map
+            args = [self.normalized_flux.T, self.normalized_ivar.T, p0_scatter]
+            args.extend(kwargs.get("additional_args", []))
+
         else:
             mapper = self.pool.map
             if kwargs.get("shared_memory", True):
-                """
                 shared_args = []
                 args = [self.normalized_flux.T, self.normalized_ivar.T, p0_scatter]
                 args.extend(kwargs.get("additional_args", []))
@@ -117,16 +121,17 @@ class CannonModel(model.BaseCannonModel):
                         shared_arg = arg
                     shared_args.append(shared_arg)
                 args = shared_args
-                """
+
                 # Aaaand don't forget the big one!
                 dm = sharedmem.empty_like(self.design_matrix)
                 dm[:] = self.design_matrix.copy()
                 kwds["design_matrix"] = dm
-        
+
         # Wrap the function so we can parallelize it out.
         f = utils.wrapper(fitter, None, kwds, N, message=message)
 
         # Calculate chunk size, etc.
+        """
         chunks = kwargs.pop("chunks", 10)
         chunk_size = int(np.ceil(len(self.dispersion)/float(chunks)))
         theta = np.zeros((len(self.dispersion), 1 + len(self.vectorizer.terms)))
@@ -151,7 +156,7 @@ class CannonModel(model.BaseCannonModel):
             #args.extend(kwargs.get("additional_args", []))
         
             #_ = args[a:b]
-            results = mapper(f, [row for row in zip(*args)])
+            
             results = np.array(results)
             
             # Save these:
@@ -161,12 +166,15 @@ class CannonModel(model.BaseCannonModel):
 
             with open("temp.pkl", "wb") as fp:
                 pickle.dump((theta, scatter), fp, -1)
+        """
 
-        self.theta = theta
-        self.s2 = scatter**2
+        results = np.array(mapper(f, [row for row in zip(*args)]))
+
+        #self.theta = theta
+        #self.s2 = scatter**2
 
         # Unpack the results.
-        #self.theta, self.s2 = (results[:, :-1], results[:, -1]**2)
+        self.theta, self.s2 = (results[:, :-1], results[:, -1]**2)
         return None
 
 
@@ -328,6 +336,48 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
         if it was supplied by the user.
     """
 
+    # This initial theta will also be returned if we have no valid fluxes.
+    initial_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])
+
+    if np.all(normalized_ivar == 0):
+        return np.hstack([initial_theta, scatter if fixed_scatter else 0])
+
+    # Optimize the parameters.
+    kwds = {
+        "maxiter": np.inf,
+        "maxfun": np.inf,
+        "disp": False,
+        "full_output": True
+    }
+    kwds.update(kwargs.get("op_kwargs", {}))
+    args = (normalized_flux, normalized_ivar, design_matrix)    
+    logger.debug("Optimizer kwds: {}".format(kwds))
+
+    if fixed_scatter:
+        p0 = initial_theta
+        func = _model_pixel_fixed_scatter
+        args = tuple([scatter] + list(args))
+
+    else:
+        p0 = np.hstack([initial_theta, p0_scatter])
+        func = _model_pixel
+
+    op_params, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
+        func, p0, args=args, **kwds)
+
+    if warnflag > 0:
+        logger.warning("Warning: {}".format([
+            "Maximum number of function evaluations made during optimisation.",
+            "Maximum number of iterations made during optimisation."
+            ][warnflag - 1]))
+
+    return np.hstack([op_params, scatter]) if fixed_scatter else op_params
+
+
+def _fit_pixel_s2_theta_separately(normalized_flux, normalized_ivar, scatter, design_matrix,
+    fixed_scatter=False, **kwargs):
+
+    """
     theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
         scatter, design_matrix)
 
@@ -337,10 +387,20 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
 
     # Optimise the pixel scatter, and at each pixel scatter value we will 
     # calculate the optimal vector coefficients for that pixel scatter value.
+    kwds = {
+        "maxiter": np.inf,
+        "maxfun": np.inf,
+        "disp": False, 
+        "full_output":True
+
+    }
+    kwds.update(kwargs.get("op_kwargs", {}))
+    logger.info("Passing to optimizer: {}".format(kwds))
+
     op_scatter, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
         _fit_pixel_with_fixed_scatter, scatter,
         args=(normalized_flux, normalized_ivar, design_matrix),
-        maxiter=np.inf, maxfun=np.inf, disp=False, full_output=True)
+        **kwds)
 
     if warnflag > 0:
         logger.warning("Warning: {}".format([
@@ -351,6 +411,23 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
     theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
         op_scatter, design_matrix)
     return np.hstack([theta, op_scatter])
+    """
+
+
+def _model_pixel(theta, scatter, normalized_flux, normalized_ivar,
+    design_matrix, **kwargs):
+
+    inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
+    return model._chi_sq(theta, design_matrix, normalized_flux, inv_var) \
+         + model._log_det(inv_var)
+
+
+def _model_pixel_fixed_scatter(parameters, normalized_flux, normalized_ivar,
+    design_matrix, **kwargs):
+    
+    theta, scatter = parameters[:-1], parameters[-1]
+    return _model_pixel(
+        theta, scatter, normalized_flux, normalized_ivar, design_matrix)
 
 
 def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
