@@ -225,13 +225,15 @@ class L1RegularizedCannonModel(cannon.CannonModel):
             if fixed_scatter:
                 m.s2 = self.s2[pixel_mask]
 
+            assert fixed_scatter and np.all(m.s2 == 0)
+
             # We want to make sure that we have the same training set each time.
             m._metadata.update({ "q": self._metadata["q"], "mod": mod })
             logger.info("SENDING PREVIOUS THETA: {}".format(previous_theta))
             m.train(
                 fixed_scatter=fixed_scatter, 
-                initial_theta=previous_theta,
                 **kwargs)
+            logger.info("Not sending previous theta")
 
             previous_theta = m.theta
             if m.pool is not None: m.pool.close()
@@ -514,9 +516,10 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
     if initial_theta is None:
         initial_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])
 
-    elif initial_theta is True:
-        initial_theta, _, __ = cannon._fit_theta(
-            normalized_flux, normalized_ivar, scatter, design_matrix)
+    assert initial_theta is not True
+    #elif initial_theta is True:
+    #    initial_theta, _, __ = cannon._fit_theta(
+    #        normalized_flux, normalized_ivar, scatter, design_matrix)
 
     logger.debug("Using initial theta: {}".format(initial_theta))
     if fixed_scatter:
@@ -536,6 +539,7 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
         "maxfun": np.inf,
         "maxiter": np.inf,
     }
+    assert scatter == 0.0
     """
     op_params, fopt, d = op.fmin_l_bfgs_b(func, p0, approx_grad=True, **kwds)
 

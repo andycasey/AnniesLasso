@@ -107,17 +107,12 @@ class CannonModel(model.BaseCannonModel):
 
         temporary_filenames = []
 
-        # Only use shared memory if necessary because it is a performance hit.
+        args = [self.normalized_flux.T, self.normalized_ivar.T, p0_scatter]
+        args.extend(kwargs.get("additional_args", []))
         if self.pool is None:
             mapper = map
-            args = [self.normalized_flux.T, self.normalized_ivar.T, p0_scatter]
-            args.extend(kwargs.get("additional_args", []))
-
-            # Write the design matrix to a temporary file.
-            temporary_filename, _ = tempfile.mkstemp()
-            with open(temporary_filename, "wb") as fp:
-                pickle.dump(self.design_matrix, fp, -1)
-            kwds["design_matrix"] = mkstemp
+            
+            kwds["design_matrix"] = self.design_matrix
 
             results = []
             previous_theta = [None]
@@ -133,12 +128,17 @@ class CannonModel(model.BaseCannonModel):
 
         else:
             mapper = self.pool.map
-            kwds["design_matrix"] = self.design_matrix
+            
+            # Write the design matrix to a temporary file.
+            _, temporary_filename = tempfile.mkstemp()
+            with open(temporary_filename, "wb") as fp:
+                pickle.dump(self.design_matrix, fp, -1)
+            kwds["design_matrix"] = temporary_filename
+            temporary_filenames.append(temporary_filename)
 
-
-            # Wrap the function so we can parallelize it out.
-            f = utils.wrapper(fitter, None, kwds, N, message=message)
-            results = np.array(mapper(f, [row for row in zip(*args)]))
+        # Wrap the function so we can parallelize it out.
+        f = utils.wrapper(fitter, None, kwds, N, message=message)
+        results = np.array(mapper(f, [row for row in zip(*args)]))
 
         # Calculate chunk size, etc.
         """
@@ -354,7 +354,6 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
     if isinstance(design_matrix, string_types):
         with open(design_matrix, "rb") as fp:
             design_matrix = pickle.load(fp)
-
 
     # This initial theta will also be returned if we have no valid fluxes.
     initial_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])
