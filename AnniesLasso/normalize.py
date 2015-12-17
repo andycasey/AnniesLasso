@@ -40,6 +40,7 @@ def fit(dispersion, normalized_flux, normalized_ivar, continuum_pixels, L=1400,
         particular pixel (e.g., the pixel is outside of the `regions`).
     """
 
+    scalar = kwargs.pop("__magic_scalar", 1e-6)
 
     N = normalized_flux.shape[0]
     if regions is None:
@@ -68,13 +69,6 @@ def fit(dispersion, normalized_flux, normalized_ivar, continuum_pixels, L=1400,
         # TODO: ISSUE: Check for overlapping regions and raise an warning.
 
     # Keywords for optimization (except sigma).
-    curve_fit_kwds = {
-        "p0": np.ones(2*order + 1),#np.ones(2*K + 1),
-        "maxfev": 10**6, # Cannot set as np.inf for maxfev.
-        "absolute_sigma": False
-    }
-    curve_fit_kwds.update(kwargs)
-    p0_theta = curve_fit_kwds["p0"]
 
     metadata = []
     continuum = np.ones_like(normalized_flux) * fill_value
@@ -89,89 +83,33 @@ def fit(dispersion, normalized_flux, normalized_ivar, continuum_pixels, L=1400,
         # Normalize each region.
         for region_mask, region_matrix, continuum_mask, continuum_matrix \
         in zip(region_masks, region_matrices, continuum_masks, continuum_matrices):
-            if continuum_mask.size == 0: continue
+            if continuum_mask.size == 0:
+                # Give an empty list back as metadata.
+                object_metadata.append([])
+                continue
 
             # We will fit to continuum pixels.   
             continuum_disp = dispersion[continuum_mask] 
             continuum_flux, continuum_ivar \
                 = (object_flux[continuum_mask], object_ivar[continuum_mask])
 
-
+            # Solve for the amplitudes.
             M = continuum_matrix
             MTM = np.dot(M, continuum_ivar[:, None] * M.T)
             MTy = np.dot(M, (continuum_ivar * continuum_flux).T)
 
             eigenvalues = np.linalg.eigvalsh(MTM)
-            print("Condition number: {}".format(max(eigenvalues)/min(eigenvalues)))
-            assert np.all(eigenvalues > 0)
-            MTM[np.diag_indices(len(MTM))] += 1e-6 * np.max(eigenvalues) # MAGIC
+            MTM[np.diag_indices(len(MTM))] += scalar * np.max(eigenvalues) # MAGIC
             eigenvalues = np.linalg.eigvalsh(MTM)
-            print("Condition number after: {}".format(max(eigenvalues)/min(eigenvalues)))
-            #assert np.all(eigenvalues > 0)
+            condition_number = max(eigenvalues)/min(eigenvalues)
 
+            amplitudes = np.linalg.solve(MTM, MTy)
+            continuum[i, region_mask] *= np.dot(region_matrix.T, amplitudes)
 
-            amps = np.linalg.solve(MTM, MTy)
+            object_metadata.append(
+                (order, L, fill_value, scalar, amplitudes, condition_number))
 
-            cont = np.dot(region_matrix.T, amps)
-
-
-            import matplotlib.pyplot as plt
-            fig, ax = plt.subplots()
-            scale = np.median(continuum_ivar[continuum_ivar > 0])
-            for i in range(continuum_disp.size):
-
-                ax.scatter([continuum_disp[i]], [continuum_flux[i]], facecolor="k",
-                    alpha=continuum_ivar[i]/scale)
-
-            ax.plot(dispersion[region_mask], object_flux[region_mask], alpha=0.25,
-                zorder=-1, c='k', drawstyle='steps-mid')
-
-            ax.plot(dispersion[region_mask], cont)
-
-            ax.set_ylim(0.9, 1.1)
-            ax.set_xlim(dispersion[region_mask][0], dispersion[region_mask][-1])
-
-
-            raise a
-            continuum[i, region_mask] *= np.dot(op_theta, region_matrix)
-
-
-            # First try with curve_fit.
-            continuum_model = lambda x, *theta: np.dot(theta, continuum_matrix)
-
-            curve_fit_kwds["sigma"] = continuum_ivar
-
-
-            op_theta, cov = op.curve_fit(
-                continuum_model, continuum_disp, continuum_flux, **curve_fit_kwds)
-
-
-            """
-            # And let's try Powell.
-            objective = lambda t: np.sum(continuum_ivar \
-                * (continuum_model(t) - continuum_flux)**2)
-            op_theta = op.fmin_powell(
-                objective, p0_theta, maxiter=np.inf, maxfun=np.inf, disp=False,
-                xtol=1e-10, ftol=1e-10)
-            """
-            import matplotlib.pyplot as plt
-            fig, ax = plt.subplots()
-
-            ax.scatter(continuum_disp, continuum_flux,
-                alpha=continuum_ivar/np.median(continuum_ivar[continuum_ivar > 0]))
-            y = np.dot(op_theta, continuum_matrix)
-            ax.plot(continuum_disp, y)
-
-            raise a
-
-            # Evaluate the continuum at all pixels in this region.
-            continuum[i, region_mask] *= np.dot(op_theta, region_matrix)
-            #continuum2[i, region_mask] = np.dot(unpack(op_theta2), region_matrix)
-
-            # TODO: Store some information about the fit!
-            #object_metadata.append()
-
-        metadata.append(tuple(object_metadata))
+        metadata.append(object_metadata)
 
     if full_output:
         return (continuum, metadata)
@@ -179,24 +117,7 @@ def fit(dispersion, normalized_flux, normalized_ivar, continuum_pixels, L=1400,
 
 
 
-
-    raise a
-
-    import matplotlib.pyplot as plt
-    fig, ax = plt.subplots()
-    ax.scatter(disp, continuum_flux, facecolor="k")
-    ax.plot(disp, f(theta), c='r')
-    ax.plot(disp, f(moo), c='g')
-    ax.plot(dispersion, normalized_flux[0], c='#666666', zorder=-1)
-
-    raise a
-
-    return a
-
 if __name__ == "__main__":
-
-    continuum_pixels = np.loadtxt("pixtest4.txt", dtype=int)
-
 
 
     import os
@@ -204,6 +125,7 @@ if __name__ == "__main__":
     from astropy.table import Table
 
     # Data.
+    continuum_pixels = np.loadtxt("pixtest4.txt", dtype=int)
     PATH, CATALOG, FILE_FORMAT = ("/Users/arc/research/apogee", "apogee-rg.fits",
         "apogee-rg-{}.memmap")
 
@@ -220,52 +142,78 @@ if __name__ == "__main__":
 
     regions = ([15090, 15822], [15823, 16451], [16452, 16971])
 
-    """
-    idx = np.searchsorted(dispersion, 15800)
-    dispersion = dispersion[:idx]
-    normalized_flux = normalized_flux[:, :idx]
-    normalized_ivar = normalized_ivar[:, :idx]
-    continuum_pixels = continuum_pixels[continuum_pixels < idx]
-    """
-
-    #Let's just do 2000 stars for the moment
-    N = 10
-    normalized_flux = normalized_flux[:N]
-    normalized_ivar = normalized_ivar[:N]
 
     continuum = fit(dispersion, normalized_flux, normalized_ivar,
-        continuum_pixels, regions=regions, order=2, L=1200)
+        continuum_pixels, regions=regions, order=3, L=1200)
 
-    raise a
 
     # Find the biggest example.
     mad = np.sum(np.abs(1 - continuum), axis=1)
+    indices = {
+        "smallest MAD": np.argmin(mad),
+        "largest MAD": np.argmax(mad),
+    }
 
-    indices = (np.argmin(mad), np.argmax(mad))
+    for reason, index in indices.items():
 
-    # Plot the two distributions of continuum fits?
-    for i in indices:
-        fig, ax = plt.subplots(2)
-        ax[0].scatter(dispersion[continuum_pixels], normalized_flux[i][continuum_pixels], facecolor="k")
-        ax[0].plot(dispersion, normalized_flux[i], c="r")
-        ax[0].plot(dispersion, continuum[i, :], c="b", zorder=1)
-        #ax[1].plot(dispersion, normalized_flux[i], c="r")
-        #ax[1].plot(dispersion, normalized_flux[i]/continuum[i], c="b")
-        #ax[1].scatter(dispersion[continuum_pixels], normalized_flux[i][continuum_pixels], facecolor="k")
-        #ax[1].axhline(1, c="#666666", zorder=-1)
-        #ax[0].set_ylim(0.5, 1.1)
-        #ax[1].set_ylim(0.5, 1.1)
+        fig, ax = plt.subplots(figsize=(14, 6))
+        object_flux = normalized_flux[index]
+        object_ivar = normalized_ivar[index]
+
+        scalar = np.median(object_ivar[object_ivar > 0])
+
+        rgba_colors = np.zeros((object_flux.size, 4))
+        # Set the first three columns as zero for black.
+        rgba_colors[:, :3] = 0.0
+        rgba_colors[:, 3] = object_ivar/scalar # The last column is alpha.
+
+        ax.set_title("Object index {0} has {1}".format(index, reason))
+
+        ax.scatter(dispersion[continuum_pixels], object_flux[continuum_pixels],
+            color=rgba_colors[continuum_pixels])
+
+        ax.plot(dispersion, object_flux, alpha=0.25, zorder=-1, c='k',
+            drawstyle='steps-mid')
+
+        ax.plot(dispersion, continuum[index], c='r', lw=2)
+
+        ax.set_ylim(0.9, 1.1)
+        ax.set_xlim(dispersion[0], dispersion[-1])
+
+        filename = "apogee-rg-normalization/normalization-test-{}.png".format(reason.replace(" ", "_"))
+        fig.savefig(filename)
+        print("Created {}".format(filename))
 
 
-    raise a
+    # Draw all of the spectra?
+    for index in range(normalized_flux.shape[0]):
 
-        #axes[1].plot(dispersion, c2[i, :], c="#666666", zorder=-1, alpha=0.5)
+        fig, ax = plt.subplots(figsize=(14, 6))
+        object_flux = normalized_flux[index]
+        object_ivar = normalized_ivar[index]
 
-    for i in range(N):
-        ax.plot(dispersion, normalized_flux[i], c='r', alpha=0.1, zorder=-2)
+        scalar = np.median(object_ivar[object_ivar > 0])
 
-    raise a
+        rgba_colors = np.zeros((object_flux.size, 4))
+        # Set the first three columns as zero for black.
+        rgba_colors[:, :3] = 0.0
+        rgba_colors[:, 3] = object_ivar/scalar # The last column is alpha.
 
+        ax.set_title("Object index {0}".format(index))
 
+        ax.scatter(dispersion[continuum_pixels], object_flux[continuum_pixels],
+            color=rgba_colors[continuum_pixels])
 
+        ax.plot(dispersion, object_flux, alpha=0.25, zorder=-1, c='k',
+            drawstyle='steps-mid')
 
+        ax.plot(dispersion, continuum[index], c='r', lw=2)
+
+        ax.set_ylim(0.9, 1.1)
+        ax.set_xlim(dispersion[0], dispersion[-1])
+
+        filename = "apogee-rg-normalization/object-{}.png".format(index)
+        fig.savefig(filename)
+        print("Created {}".format(filename))
+
+        plt.close("all")
