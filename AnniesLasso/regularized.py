@@ -436,8 +436,11 @@ def chi_sq(theta, design_matrix, data, inv_var, axis=None, gradient=True):
     residuals = np.dot(theta, design_matrix.T) - data
 
     f = np.sum(inv_var * residuals**2, axis=axis)
+    if not gradient:
+        return f
+    
     g = 2.0 * np.dot(inv_var * residuals, design_matrix)
-    return (f, g) if gradient else f
+    return (f, g)
 
     
 def L1Norm(Q):
