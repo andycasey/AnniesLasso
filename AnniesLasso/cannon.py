@@ -101,7 +101,8 @@ class CannonModel(model.BaseCannonModel):
         fitter = kwargs.pop("function", _fit_pixel)
         kwds = {
             "fixed_scatter": fixed_scatter,
-            "op_kwargs": kwargs.pop("op_kwargs", {})
+            "op_kwargs": kwargs.pop("op_kwargs", {}),
+            "op_bfgs_kwargs": kwargs.pop("op_bfgs_kwargs", {})
         }
         #kwds.update(kwargs)
 
@@ -113,7 +114,7 @@ class CannonModel(model.BaseCannonModel):
             mapper = map
             
             kwds["design_matrix"] = self.design_matrix
-
+            """
             results = []
             previous_theta = [None]
             for row in utils.progressbar(zip(*args), message=message):
@@ -123,6 +124,15 @@ class CannonModel(model.BaseCannonModel):
                 row = tuple(row)
                 results.append(fitter(*row, **kwds))
                 previous_theta.append(results[-1][:-1].copy())
+            """
+            results = []
+            for row in utils.progressbar(zip(*args), message=message):
+                #row = list(row)
+                #raise a
+                #row[-1] = initial_theta
+                #row = tuple(row)
+                print("ACTUALLY SENDING {}".format(initial_theta))
+                results.append(fitter(*row, **kwds))
 
             results = np.array(results)
 

@@ -578,7 +578,10 @@ def _chi_sq(theta, design_matrix, normalized_flux, inv_var, axis=None):
     Calculate the chi-squared difference between the spectral model and data.
     """
     residuals = np.dot(theta, design_matrix.T) - normalized_flux
-    return np.sum(inv_var * residuals**2, axis=axis)
+
+    return np.sum(inv_var * residuals**2, axis=axis), \
+        2.0 * inv_var * residuals * design_matrix.T
+
 
 
 def _log_det(inv_var):

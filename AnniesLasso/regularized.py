@@ -136,7 +136,6 @@ class L1RegularizedCannonModel(cannon.CannonModel):
         if initial_theta is None or initial_theta is True:
             initial_theta = [initial_theta] * self.dispersion.size
 
-        kwds["initial_theta"] = initial_theta
         # This is a hack for speed: if regularization is zero, things are fast!
         if not np.all(self.regularization == 0):
             kwds.update({
@@ -212,7 +211,9 @@ class L1RegularizedCannonModel(cannon.CannonModel):
         models = []
         chi_sq = np.zeros((N_Lambdas, N_px))
         log_det = np.zeros((N_Lambdas, N_px))
-        previous_theta = kwargs.pop("initial_theta", None)
+        previous_theta = kwargs.pop("initial_theta", [None])
+        if previous_theta is None:
+            previous_theta = [None]
         for i, Lambda in enumerate(Lambdas):
             logger.info("Setting Lambda = {0}".format(Lambda))
 
@@ -229,14 +230,14 @@ class L1RegularizedCannonModel(cannon.CannonModel):
 
             # We want to make sure that we have the same training set each time.
             m._metadata.update({ "q": self._metadata["q"], "mod": mod })
-            logger.info("SENDING PREVIOUS THETA: {}".format(previous_theta))
+            logger.info("SENDING PREVIOUS THETA: {}".format(previous_theta[-1]))
             m.train(
                 fixed_scatter=fixed_scatter, 
-                initial_theta=previous_theta,
+                initial_theta=previous_theta[-1],
                 **kwargs)
             #logger.info("Not sending previous theta")
 
-            previous_theta = m.theta
+            previous_theta.append(m.theta)
             if m.pool is not None: m.pool.close()
 
             if model_filename_format is not None:
@@ -438,7 +439,7 @@ def chi_sq(theta, design_matrix, data, inv_var, axis=None, gradient=True):
     f = np.sum(inv_var * residuals**2, axis=axis)
     if not gradient:
         return f
-    
+
     g = 2.0 * np.dot(inv_var * residuals, design_matrix)
     return (f, g)
 
