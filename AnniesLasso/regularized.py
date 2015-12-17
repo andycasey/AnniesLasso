@@ -256,8 +256,11 @@ class L1RegularizedCannonModel(cannon.CannonModel):
                     for label_name in self.vectorizer.label_names]).T)
 
             # Save everything.
-            chi_sq[i, :] = model._chi_sq(m.theta, design_matrix,
-                validate_normalized_flux.T, inv_var.T, axis=1)
+            #chi_sq[i, :] = model._chi_sq(m.theta, design_matrix,
+            #    validate_normalized_flux.T, inv_var.T, axis=1)
+            for j in range(N_px):
+                chi_sq[i, j] = np.sum(inv_var[:, j] * (np.dot(m.theta[j], design_matrix.T) - validate_normalized_flux[:, j].T)**2)
+            #chi_sq[i, :] = inv_var.T * (np.dot(m.theta, design_matrix.T) - validate_normalized_flux.T)**2
             #log_det[i, :] = model._log_det(inv_var)
             models.append(m)
     
@@ -426,10 +429,17 @@ class L1RegularizedCannonModel(cannon.CannonModel):
 
 
 
+def chi_sq(theta, design_matrix, data, inv_var, axis=None, gradient=True):
+    """
+    Calculate the chi-squared difference between the spectral model and data.
+    """
+    residuals = np.dot(theta, design_matrix.T) - data
 
+    f = np.sum(inv_var * residuals**2, axis=axis)
+    g = 2.0 * np.dot(inv_var * residuals, design_matrix)
+    return (f, g) if gradient else f
 
-
-
+    
 def L1Norm(Q):
     """
     Return the L1 normalization of Q.
@@ -437,7 +447,7 @@ def L1Norm(Q):
     :param Q:
         An array of finite values.
     """
-    return np.sum(np.abs(Q))
+    return (np.sum(np.abs(Q)), np.sign(Q))
 
 
 def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
@@ -467,11 +477,16 @@ def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
     """
 
     inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
-    foo = model._chi_sq(theta, design_matrix, normalized_flux, inv_var) \
-        +  regularization * L1Norm(theta[1:])
-    logger.debug(foo)
-    return foo
-#        +  model._log_det(inv_var) \
+    csq, d_csq = chi_sq(theta, design_matrix, normalized_flux, inv_var)
+    L1, d_L1 = L1Norm(theta)
+
+    # We are using a variation of L1 norm that ignores the first coefficient.
+    L1 = L1 - np.abs(theta[0])
+
+    f = csq + regularization * L1
+    g = d_csq + regularization * d_L1
+    return (f, g)
+
 
 
 def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
@@ -500,6 +515,8 @@ def _fit_pixel_with_fixed_regularization(parameters, normalized_flux,
     return _fit_pixel_with_fixed_regularization_and_fixed_scatter(
         theta, scatter, normalized_flux, normalized_ivar, regularization,
         design_matrix)
+
+
 
 
 def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
@@ -542,8 +559,17 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
         "maxfun": np.inf,
         "maxiter": np.inf,
     }
+    bfgs_terms = kwargs.pop("op_bfgs_kwargs", {})
+    kwds.update(bfgs_terms)
+
+    logger.debug("Checking that kwds are going in to bFGS: {}".format(kwds))
     assert scatter == 0.0
-    op_params, fopt, d = op.fmin_l_bfgs_b(func, p0, approx_grad=True, **kwds)
+
+    f = lambda theta: my_func(theta, design_matrix, normalized_flux, normalized_ivar, regularization)
+    g = lambda theta: my_grad(theta, design_matrix, normalized_flux, normalized_ivar, regularization)
+
+    op_params, fopt, d = op.fmin_l_bfgs_b(func, p0, fprime=None,
+        approx_grad=False, **kwds)
 
     if d["warnflag"] > 0:
         logger.warning("BFGS stopped prematurely: {}".format(d["task"]))
@@ -551,10 +577,13 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
         # Run Powell's method instead.
         #xtol, ftol = kwargs.get(("xtol", "ftol"), (1e-4, 1e-4))
         kwds.update(kwargs.get("op_kwargs", {}))
+        for k in bfgs_terms:
+            del kwds[k]
 
         #print("using ftol xtol {0} {1}".format(xtol, ftol))
+        """
         op_params, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
-            func, p0, full_output=True, **kwds)
+            func, op_params, full_output=True, **kwds)
 
         if warnflag > 0:
             logger.warn("Powell optimization failed: {}".format([
@@ -563,6 +592,7 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
                 ][warnflag - 1]))
         else:
             logger.info("Powell optimization completed successfully.")
+        """
 
     return np.hstack([op_params, scatter]) if fixed_scatter else op_params
 
