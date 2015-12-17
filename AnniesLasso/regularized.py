@@ -124,7 +124,7 @@ class L1RegularizedCannonModel(cannon.CannonModel):
             Show a progress bar.
         """
 
-        print("OVERWRITING FIXED SCATTER AND S2")
+        logger.warn("OVERWRITING FIXED SCATTER AND S2")
         self.s2 = 0.0
         fixed_scatter = True
 
@@ -268,7 +268,6 @@ class L1RegularizedCannonModel(cannon.CannonModel):
             for j in range(N_px):
                 chi_sq[i, j] = np.sum(inv_var[:, j] * (np.dot(m.theta[j], design_matrix.T) - validate_normalized_flux[:, j].T)**2)
             #chi_sq[i, :] = inv_var.T * (np.dot(m.theta, design_matrix.T) - validate_normalized_flux.T)**2
-            #log_det[i, :] = model._log_det(inv_var)
             models.append(m)
     
         return (Lambdas, chi_sq, log_det, models)
@@ -368,7 +367,6 @@ class L1RegularizedCannonModel(cannon.CannonModel):
             # Save everything.
             Q[i, :] = model._chi_sq(m.theta, design_matrix,
                 validate_normalized_flux.T, inv_var.T, axis=1)
-                #+ model._log_det(inv_var)
             models.append(m)
 
         Q = Q - Q[0]

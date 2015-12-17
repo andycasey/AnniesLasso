@@ -80,9 +80,10 @@ class CannonModel(model.BaseCannonModel):
             Show a progress bar.
         """
         
-        print("OVERWRITING S2 AND FIXED SCATTER")
+        logger.warn("OVERWRITING S2 AND FIXED SCATTER")
         self.s2 = 0.0
-        self.fixed_scatter = True
+        fixed_scatter = True
+
 
         if fixed_scatter and self.s2 is None:
             raise ValueError("intrinsic pixel variance (s2) must be set "
@@ -457,7 +458,6 @@ def _model_pixel(theta, scatter, normalized_flux, normalized_ivar,
 
     inv_var = normalized_ivar/(1. + normalized_ivar * scatter**2)
     return model._chi_sq(theta, design_matrix, normalized_flux, inv_var) 
-         #+ model._log_det(inv_var)
 
 
 def _model_pixel_fixed_scatter(parameters, normalized_flux, normalized_ivar,
@@ -498,7 +498,6 @@ def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
     # We take inv_var back from _fit_theta because it is the same quantity we 
     # need to calculate, and it saves us one operation.
     Q   = model._chi_sq(theta, design_matrix, normalized_flux, inv_var) 
-        #+ model._log_det(inv_var)
     return (Q, theta) if return_theta else Q
 
 

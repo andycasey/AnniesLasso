@@ -583,10 +583,3 @@ def _chi_sq(theta, design_matrix, normalized_flux, inv_var, axis=None):
         2.0 * inv_var * residuals * design_matrix.T
 
 
-
-def _log_det(inv_var):
-    """
-    Return the log determinant of the variance.
-    """
-    return 0
-    #return -np.sum(np.log(inv_var[inv_var > 0]))

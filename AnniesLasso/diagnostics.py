@@ -131,8 +131,7 @@ def Lambda_lambda(models):
         # Calculate the validation scalar.
         validation_scalar[i, :] = \
             _chi_sq(model.theta, design_matrix, validation_flux.T, inv_var.T,
-                axis=1) \
-          + _log_det(inv_var)
+                axis=1) 
         """
 
     # Scale the validation scalar (even though we don't need to, really..)
@@ -431,7 +430,6 @@ def pixel_regularization_validation(models, pixels, show_legend=True):
         validation_scalar[i, :] = \
             model._chi_sq(m.theta, design_matrix, validation_flux.T, inv_var.T,
                 axis=1)
-          #+ model._log_det(inv_var)
 
         #if not np.all(np.isfinite(validation_scalar[i, :])):
         #    raise a
