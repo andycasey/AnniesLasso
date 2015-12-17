@@ -111,6 +111,7 @@ class L1RegularizedCannonModel(cannon.CannonModel):
 
 
     def train(self, fixed_scatter=False, progressbar=True, initial_theta=None,
+        use_neighbouring_pixel_theta=False,
         **kwargs):
         """
         Train the model based on the labelled set using the given vectorizer.
@@ -127,21 +128,26 @@ class L1RegularizedCannonModel(cannon.CannonModel):
         self.s2 = 0.0
         fixed_scatter = True
 
-        kwds = {
-            "fixed_scatter": fixed_scatter,
-            "progressbar": progressbar,
-        }
-        kwds.update(kwargs)
 
         if initial_theta is None or initial_theta is True:
             initial_theta = [initial_theta] * self.dispersion.size
+            
+        kwds = {
+            "fixed_scatter": fixed_scatter,
+            "progressbar": progressbar,
+            "use_neighbouring_pixel_theta": use_neighbouring_pixel_theta,
+            "function": _fit_regularized_pixel,
+            "additional_args": [self.regularization, initial_theta]
+        }
+        kwds.update(kwargs)
+
 
         # This is a hack for speed: if regularization is zero, things are fast!
-        if not np.all(self.regularization == 0):
-            kwds.update({
-                "function": _fit_regularized_pixel,
-                "additional_args": [self.regularization, initial_theta]
-            })
+        #if not np.all(self.regularization == 0):
+        #    kwds.update({
+        #        "function": _fit_regularized_pixel,
+        #        "additional_args": [self.regularization, initial_theta]
+        #    })
 
         logger.debug("SENDING: {}".format(kwds))
         super(L1RegularizedCannonModel, self).train(**kwds)

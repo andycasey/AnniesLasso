@@ -67,6 +67,7 @@ class CannonModel(model.BaseCannonModel):
 
     @model.requires_model_description
     def train(self, fixed_scatter=False, progressbar=True, initial_theta=None,
+        use_neighbouring_pixel_theta=False,
         **kwargs):
         """
         Train the model based on the labelled set using the given vectorizer.
@@ -110,6 +111,7 @@ class CannonModel(model.BaseCannonModel):
 
         args = [self.normalized_flux.T, self.normalized_ivar.T, p0_scatter]
         args.extend(kwargs.get("additional_args", []))
+
         if self.pool is None:
             mapper = map
             
@@ -126,13 +128,20 @@ class CannonModel(model.BaseCannonModel):
                 previous_theta.append(results[-1][:-1].copy())
             """
             results = []
-            for row in utils.progressbar(zip(*args), message=message):
+            previous_theta = [None]
+            for j, row in enumerate(utils.progressbar(zip(*args), message=message)):
+                if j > 0 and use_neighbouring_pixel_theta:
+                    row = list(row)
+                    row[-1] = previous_theta[-1]
+                    row = tuple(row)
                 #row = list(row)
                 #raise a
                 #row[-1] = initial_theta
                 #row = tuple(row)
-                print("ACTUALLY SENDING {}".format(initial_theta))
+                #print("ACTUALLY SENDING {}".format(initial_theta))
                 results.append(fitter(*row, **kwds))
+                if use_neighbouring_pixel_theta:
+                    previous_theta[-1] = results[-1][:-1]
 
             results = np.array(results)
 
