@@ -8,21 +8,18 @@ branch sample that we normalized ourselves.
 import cPickle as pickle
 import numpy as np
 import os
-from sys import maxsize
 from astropy.table import Table
 
 import AnniesLasso as tc
 
 np.random.seed(123) # For reproducibility.
 
+base_10_Lambda, scale_factor = sys.argv[1], sys.argv[2]
 
-# Lambda, scale_factor.
-base_10_Lambda = 1
-scale_factor = 50.0
-
+print("USING BASE 10 {base_10_Lambda} AND SCALE FACTOR {1}".format(scale_factor))
 
 # Data.
-PATH, CATALOG, FILE_FORMAT = ("/Users/arc/research/apogee", "apogee-rg.fits",
+PATH, CATALOG, FILE_FORMAT = ("", "apogee-rg.fits",
     "apogee-rg-custom-normalization-{}.memmap")
 
 # Load the data.
