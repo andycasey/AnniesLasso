@@ -74,6 +74,27 @@ class BasePolynomialVectorizer(BaseVectorizer):
         return np.vstack(columns).T
 
 
+    def get_label_vector_derivative(self, labels):
+        """
+        Return the derivatives of the label vector with respect to fluxes.
+
+        :param labels:
+            The labels to calculate the label vector derivatives for. This can 
+            be a one-dimensional vector of `K` labels (using the same order and
+            length provided by self.label_names), or a two-dimensional array of
+            `N` by `K` values. The returning array will be of shape `(N, D)`,
+            where `D` is the number of terms in the label vector description.
+        """
+
+        labels = np.atleast_2d(labels)
+        if labels.ndim > 2:
+            raise ValueError("labels must be a 1-d or 2-d array")
+
+        # Offset and scale the labels before building the vector.
+        scaled_labels = (labels - self.fiducials)/self.scales
+        raise NotImplementedError("soon")
+
+
     def get_approximate_labels(self, label_vector):
         """
         Return the approximate labels that would produce the given label_vector.
@@ -170,7 +191,7 @@ class NormalizedPolynomialVectorizer(BasePolynomialVectorizer):
         The terms that constitute the label vector.
     """
 
-    def __init__(self, labelled_set, terms):
+    def __init__(self, labelled_set, terms, scale_factor=1.0):
         # First parse the terms so that we can get the label names.
         structured_terms = parse_label_vector_description(terms)
         label_names = get_label_names(structured_terms)
@@ -185,7 +206,9 @@ class NormalizedPolynomialVectorizer(BasePolynomialVectorizer):
                     .format(label_name))
 
         # Calculate the scales and fiducials.
-        scales = [np.ptp(np.percentile(labelled_set[_], [2.5, 97.5]))/2. \
+        scale_factor = float(scale_factor)
+        scales = [
+            np.ptp(np.percentile(labelled_set[_], [2.5, 97.5])) * scale_factor \
             for _ in label_names]
         fiducials = [np.percentile(labelled_set[_], 50) for _ in label_names]
 
