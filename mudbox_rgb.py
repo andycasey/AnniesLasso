@@ -14,12 +14,14 @@ import AnniesLasso as tc
 
 np.random.seed(123) # For reproducibility.
 
-base_10_Lambda, scale_factor = sys.argv[1], sys.argv[2]
+#base_10_Lambda, scale_factor = sys.argv[1], sys.argv[2]
+base_10_Lambda, scale_factor = 1, 0.5
 
-print("USING BASE 10 {base_10_Lambda} AND SCALE FACTOR {1}".format(scale_factor))
+print("USING BASE 10 {base_10_Lambda} AND SCALE FACTOR {scale_factor}".format(
+    scale_factor=scale_factor, base_10_Lambda=base_10_Lambda))
 
 # Data.
-PATH, CATALOG, FILE_FORMAT = ("", "apogee-rg.fits",
+PATH, CATALOG, FILE_FORMAT = ("/Users/arc/research/apogee/", "apogee-rg.fits",
     "apogee-rg-custom-normalization-{}.memmap")
 
 # Load the data.
@@ -44,13 +46,13 @@ train_set = (~validate_set)
 
 # Create a vectorizer for all models.
 vectorizer = tc.vectorizer.NormalizedPolynomialVectorizer(labelled_set,
-    tc.vectorizer.polynomial.terminator(["TEFF", "LOGG"] + elements, 2),
+    tc.vectorizer.polynomial.terminator(["TEFF", "LOGG", "FE_H"], 2),
     scale_factor=scale_factor)
 
 # Create a model and train it on 9/10ths the subset.
 model = tc.L1RegularizedCannonModel(labelled_set[train_set],
     normalized_flux[train_set], normalized_ivar[train_set],
-    dispersion=dispersion, threads=threads)
+    dispersion=dispersion)
 model.vectorizer = vectorizer
 model.s2 = 0.0
 model.regularization = 10**base_10_Lambda
@@ -59,11 +61,20 @@ model.regularization = 10**base_10_Lambda
 model.train(fixed_scatter=True, use_neighbouring_pixel_theta=True)
 
 # Save it.
-with open("apogee-rg-custom-{0:.2f}-{1:.2e}.model".format(base_10_Lambda,
-    scale_factor)) as fp:
-    pickle.dump(model, fp, -1)
+filename = "apogee-rg-custom-{0:.2f}-{1:.2e}.model".format(
+    base_10_Lambda, scale_factor)
+with open(filename, "wb") as fp:
+    pickle.dump((model.theta, model.s2, model.regularization, model._metadata), fp, -1)
 
 # Fit the remaining set of normalized spectra (just as a check: we will need to
 # do this for the individual stuff too.)
+inferred_labels = model.fit(normalized_flux[validate_set], normalized_ivar[validate_set])
+expected_labels = np.vstack([labelled_set[label_name][validate_set] \
+    for label_name in model.vectorizer.label_names]).T
+
+for i, label_name in enumerate(model.vectorizer.label_names):
+    
+    difference = expected_labels[:, i] - inferred_labels[:, i]
+    print(i, label_name, np.median(difference), np.std(difference))
 
 

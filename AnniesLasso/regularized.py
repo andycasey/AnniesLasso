@@ -537,7 +537,7 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
 
 
     # Any actual information?
-    if np.all(normalized_ivar == 0):
+    if np.sum(normalized_ivar) < 1. * normalized_ivar.size: # MAGIC 
         return_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])
         return np.hstack([return_theta, scatter if fixed_scatter else 0])
 
@@ -600,8 +600,7 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
                 ][warnflag - 1]))
         else:
             logger.info("Powell optimization completed successfully.")
-        """
-
+        """        
     return np.hstack([op_params, scatter]) if fixed_scatter else op_params
 
 
