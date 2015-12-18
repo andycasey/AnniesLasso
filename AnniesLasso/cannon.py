@@ -156,9 +156,9 @@ class CannonModel(model.BaseCannonModel):
             kwds["design_matrix"] = temporary_filename
             temporary_filenames.append(temporary_filename)
 
-        # Wrap the function so we can parallelize it out.
-        f = utils.wrapper(fitter, None, kwds, N, message=message)
-        results = np.array(mapper(f, [row for row in zip(*args)]))
+            # Wrap the function so we can parallelize it out.
+            f = utils.wrapper(fitter, None, kwds, N, message=message)
+            results = np.array(mapper(f, [row for row in zip(*args)]))
 
         # Calculate chunk size, etc.
         """
