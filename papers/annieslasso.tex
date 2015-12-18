@@ -377,10 +377,15 @@ Another is to divide out a scale, because, for example, $\Teff$ values
 are in the thousands, but $\logg$ values are of order unity.
 If scale is not divided out, the (isotropic in $\vectheta$)
 regularization will be much more harsh, effectively, on some
-parameters than others.  Throughout this work we adopt the mean $\overline\ell$ as the fiducial offsets and scale by half the percentile range from 2.5--97.5\% of the data.
+parameters than others.
 
-
-%DWH: In detail we construct the vectorizing function $\vecv(\ell)$ as follows...
+In what follows, we adopt the median value in the training set for
+each label value as the fiducial offset for that label.
+We choose a dimensionless constant $Q$ times the label range (defined
+as the difference between the 97.5th percentile and the 2.5th
+percentile of the training set along each label direction) as the
+label scale for that label.
+DWH: We need an equation array here giving the above...
 
 For the regularizer $Q(\vectheta)$ we adopt a variant of L1
 regularization; we set
@@ -408,11 +413,15 @@ DWH: Scaling argument that, in general, the best value of $\Lambda_j$
 should be on the same order as the number of stars in the training
 set....
 
+DWH: Note that the vectorizer scales $\Delta$ play into the
+regularization, because the bigger the $\Delta$, the more penalized
+the cross (quadratic) terms become relative to the linear terms...
+
 \section{Training, validation, and test data}
 
-
-We employ the \apogee\ Data Release 12 to demonstrate the effectiveness of our 
-regularization approach.   We constructed our labelled set (recall that the training and validation sets are subsets of the labelled set) using sensible criteria for  
+We employ the \apogee\ Data Release 12 data to demonstrate the effectiveness
+of \TheCannon\ and the regularization approach in a high-dimensional label space.
+We constructed our labelled set (recall that the training and validation sets are subsets of the labelled set) using sensible criteria for  
 stars in version \texttt{v603} from the \aspcap\ 
 pipeline, and used fluxes from the individual \texttt{aspcapStar} data files.
 The \texttt{aspcapStar} files contain (approximately) continuum-normalized 
