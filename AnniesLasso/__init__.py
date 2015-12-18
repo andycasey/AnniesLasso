@@ -9,10 +9,10 @@ from warnings import simplefilter
 
 from .cannon import *
 from .regularized import *
-from . import (continuum, diagnostics, utils, vectorizer)
+from . import (continuum, diagnostics, normalize, utils, vectorizer)
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG) # TODO: Remove this when stable.
+logger.setLevel(logging.INFO) # TODO: Remove this when stable.
 
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter(

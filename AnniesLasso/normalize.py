@@ -170,8 +170,7 @@ if __name__ == "__main__":
 
     # Load the data.
     labelled_set = Table.read(os.path.join(PATH, CATALOG))
-    dispersion = np.memmap(os.path.join(PATH, FILE_FORMAT).format("dispersion"),
-        mode="r", dtype=float)
+
     normalized_flux = np.memmap(
         os.path.join(PATH, FILE_FORMAT).format("normalized-flux"),
         mode="r", dtype=float).reshape((len(labelled_set), -1))
@@ -185,8 +184,11 @@ if __name__ == "__main__":
     from astropy.io import fits
     from glob import glob
 
+    PATH, FILE_FORMAT = ("/Users/arc/research/apogee", "apogee-rg-{}.memmap")
+
     continuum_pixels = np.loadtxt("continuum.list", dtype=int)
-    
+    dispersion = np.memmap(os.path.join(PATH, FILE_FORMAT).format("dispersion"),
+        mode="r", dtype=float)
 
     regions = ([15140, 15812], [15857, 16437], [16472, 16960])
 
@@ -200,8 +202,8 @@ if __name__ == "__main__":
         fluxes = np.atleast_2d(image[1].data)[row_index]
         inv_var = 1.0/(np.atleast_2d(image[2].data)[row_index]**2)
         
-        bad = (0 >= flux) + (0 >= inv_var)
-        flux[bad] = 1.0
+        bad = (0 >= fluxes) + (0 >= inv_var)
+        fluxes[bad] = 1.0
         inv_var[bad] = 0.0
         
         return (fluxes, inv_var, image)
@@ -217,42 +219,58 @@ if __name__ == "__main__":
         continuum_pixels, regions=regions, order=4, L=1200)
     continuum, flux, ivar = [each.flatten() for each in (continuum, flux, ivar)]
 
-    # Start plotting.
-    rgba_colors = np.zeros((continuum_pixels.size, 4))
-    rgba_colors[:, :3] = 0.0
-    rgba_colors[:, 3] = ivar[continuum_pixels]/np.median(ivar[ivar[continuum_pixels] > 0]) # The last column is alpha.
-    rgba_colors = np.clip(rgba_colors, 0, 1)
 
-    fig, axes = plt.subplots(2, figsize=(14, 6))
-    axes[0].set_title(os.path.basename(filename))
-    axes[0].scatter(dispersion[continuum_pixels], flux[continuum_pixels],
-        c=rgba_colors, zorder=10)
+    def plot_continuum_fit(dispersion, flux, ivar, continuum, continuum_pixels,
+        title=None):
 
-    axes[0].plot(dispersion, flux, alpha=0.25, zorder=-1, c='k',
-        drawstyle='steps-mid')
-    #axes[0].fill_between(dispersion, flux - err, flux + err, facecolor="#cccccc")
+        # Start plotting.
 
-    axes[0].plot(dispersion, continuum, c='r', lw=2, zorder=1)
-    #axes[0].set_xticklabels([])
-    axes[0].set_ylabel("Flux")
+        fig, axes = plt.subplots(2, figsize=(14, 6))
+        if title is not None:
+            axes[0].set_title(title)
 
-    axes[1].axhline(1, c='r', lw=2, zorder=1)
-    axes[1].scatter(dispersion[continuum_pixels], (flux/continuum)[continuum_pixels],
-        c=rgba_colors, zorder=10)
+        # Colour continuum pixels by their relative inverse variance.
+        rgba_colors = np.zeros((continuum_pixels.size, 4))
+        rgba_colors[:, :3] = 0.0
+        rgba_colors[:, 3] = \
+            ivar[continuum_pixels]/np.median(ivar[ivar[continuum_pixels] > 0]) 
+        rgba_colors = np.clip(rgba_colors, 0, 1)
 
-    axes[1].plot(dispersion, flux/continuum, alpha=0.25, zorder=-1, c='k',
-        drawstyle='steps-mid')
+        axes[0].scatter(dispersion[continuum_pixels], flux[continuum_pixels],
+            c=rgba_colors, zorder=10)
+
+        axes[0].plot(dispersion, flux, alpha=0.25, zorder=-1, c='k',
+            drawstyle='steps-mid')
+        
+        axes[0].plot(dispersion, continuum, c='r', lw=2, zorder=1)
+        axes[0].set_xticklabels([])
+        axes[0].set_ylabel("Flux")
+
+        axes[1].axhline(1, c='r', lw=2, zorder=1)
+        axes[1].scatter(
+            dispersion[continuum_pixels], (flux/continuum)[continuum_pixels],
+            c=rgba_colors, zorder=10)
+
+        axes[1].plot(dispersion, flux/continuum, alpha=0.25, zorder=-1, c='k',
+            drawstyle='steps-mid')
 
 
-    axes[0].set_xlim(dispersion[0], dispersion[-1])
-    axes[1].set_xlim(dispersion[0], dispersion[-1])
-    axes[0].set_ylim(0, axes[0].get_ylim()[1])
-    axes[1].set_ylim(0.9, 1.1)
-    axes[1].set_xlabel("Wavelength")
-    axes[1].set_ylabel("Normalized flux")
-    fig.tight_layout()
+        axes[0].set_xlim(dispersion[0], dispersion[-1])
+        axes[1].set_xlim(dispersion[0], dispersion[-1])
+        axes[0].set_ylim(0, axes[0].get_ylim()[1])
+        axes[1].set_ylim(0.9, 1.1)
+        axes[1].set_xlabel("Wavelength")
+        axes[1].set_ylabel("Normalized flux")
+        fig.tight_layout()
 
+        return fig
+
+
+    fig = plot_continuum_fit(dispersion, flux, ivar, continuum, continuum_pixels,
+        title=os.path.basename(filename))
     plt.show()
+
+    raise a
 
 
     raise a
