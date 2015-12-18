@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-A continuum normalizer.
+Functionality to continuum-normalize spectra.
 """
 
 import matplotlib.pyplot as plt
@@ -10,17 +10,22 @@ import numpy as np
 import scipy.optimize as op
 
 def build_continuum_design_matrix(disp, L, order):
+    """
+    Build a design matrix for the continuum determination.
+    """
+
     L = float(L)
     disp = np.array(disp)
-    scale = 2 * np.pi / L
+    scale = 2 * (np.pi / L)
     return np.vstack([
         np.ones_like(disp).reshape((1, -1)), 
         np.array([[np.cos(o * scale * disp), np.sin(o * scale * disp)] \
             for o in range(1, order + 1)]).reshape((2 * order, disp.size))
         ])
 
-def fit(dispersion, normalized_flux, normalized_ivar, continuum_pixels, L=1400,
-    order=5, regions=None, fill_value=1.0, full_output=False, **kwargs):
+
+def fit_continuum(dispersion, normalized_flux, normalized_ivar, continuum_pixels,
+    L=1400, order=5, regions=None, fill_value=1.0, full_output=False, **kwargs):
     """
     Fit the flux values of pre-defined continuum pixels using a sum of sine and
     cosine functions.
@@ -40,11 +45,46 @@ def fit(dispersion, normalized_flux, normalized_ivar, continuum_pixels, L=1400,
         particular pixel (e.g., the pixel is outside of the `regions`).
     """
 
-    scalar = kwargs.pop("__magic_scalar", 1e-6)
+    normalized_flux = np.atleast_2d(normalized_flux)
+    normalized_ivar = np.atleast_2d(normalized_ivar)
 
     N = normalized_flux.shape[0]
     if regions is None:
         regions = [(dispersion[0], dispersion[-1])]
+
+    # Look for bad edge pixels?
+    if kwargs.pop("__fix_edges", True):
+        # MAGIC below.
+        below_median_fraction = 0.75
+        within_edge_fraction = 0.10
+
+        for i, object_flux in enumerate(normalized_flux):
+            for start, end in regions:
+                si, ei = np.searchsorted(dispersion, (start, end))
+                median_flux = np.median(object_flux[si:ei])
+
+                # Any continuum points below this magic number?
+                continuum_disps = dispersion[continuum_pixels]
+                ok = np.where((end >= continuum_disps) \
+                    * (continuum_disps >= start))[0]
+                
+                bad = object_flux[continuum_pixels][ok] < (median_flux * below_median_fraction)
+
+                bad_points_at = np.arange(dispersion.size)[continuum_pixels][ok][np.where(bad)[0]]
+                edge_fraction = (dispersion[bad_points_at] - start)/(end - start)
+ 
+                bad_points_at = bad_points_at[
+                    (edge_fraction < within_edge_fraction) + \
+                    (edge_fraction > (1 - within_edge_fraction))]
+
+                if np.any(bad_points_at):
+                    normalized_ivar[i, bad_points_at] = 0.0
+                    print("set ivar = 0 for bad points:")
+                    print(dispersion[bad_points_at])
+                    print(bad_points_at)
+
+
+    scalar = kwargs.pop("__magic_scalar", 1e-6)
 
     continuum_masks = []
     continuum_matrices = []
@@ -84,8 +124,7 @@ def fit(dispersion, normalized_flux, normalized_ivar, continuum_pixels, L=1400,
         for region_mask, region_matrix, continuum_mask, continuum_matrix \
         in zip(region_masks, region_matrices, continuum_masks, continuum_matrices):
             if continuum_mask.size == 0:
-                # Give an empty list back as metadata.
-                object_metadata.append([])
+                object_metadata.append([order, L, fill_value, scalar, [], None])
                 continue
 
             # We will fit to continuum pixels.   
@@ -99,7 +138,7 @@ def fit(dispersion, normalized_flux, normalized_ivar, continuum_pixels, L=1400,
             MTy = np.dot(M, (continuum_ivar * continuum_flux).T)
 
             eigenvalues = np.linalg.eigvalsh(MTM)
-            MTM[np.diag_indices(len(MTM))] += scalar * np.max(eigenvalues) # MAGIC
+            MTM[np.diag_indices(len(MTM))] += scalar * np.max(eigenvalues)#MAGIC
             eigenvalues = np.linalg.eigvalsh(MTM)
             condition_number = max(eigenvalues)/min(eigenvalues)
 
@@ -113,19 +152,19 @@ def fit(dispersion, normalized_flux, normalized_ivar, continuum_pixels, L=1400,
 
     if full_output:
         return (continuum, metadata)
-    return continuum
+    return (continuum, normalized_flux, normalized_ivar)
 
 
 
 if __name__ == "__main__":
 
-
+    """
     import os
     from sys import maxsize
     from astropy.table import Table
 
     # Data.
-    continuum_pixels = np.loadtxt("pixtest4.txt", dtype=int)
+    continuum_pixels = np.loadtxt("continuum.list", dtype=int)
     PATH, CATALOG, FILE_FORMAT = ("/Users/arc/research/apogee", "apogee-rg.fits",
         "apogee-rg-{}.memmap")
 
@@ -139,11 +178,86 @@ if __name__ == "__main__":
     normalized_ivar = np.memmap(
         os.path.join(PATH, FILE_FORMAT).format("normalized-ivar"),
         mode="r", dtype=float).reshape(normalized_flux.shape)
+    """
 
-    regions = ([15090, 15822], [15823, 16451], [16452, 16971])
+    import os
+    import numpy as np
+    from astropy.io import fits
+    from glob import glob
+
+    continuum_pixels = np.loadtxt("continuum.list", dtype=int)
+    
+
+    regions = ([15140, 15812], [15857, 16437], [16472, 16960])
 
 
-    continuum = fit(dispersion, normalized_flux, normalized_ivar,
+    # Extract the combined spectra, which we will use for the training set.
+    def get_combined_spectrum(filename, weighting="individual"):
+        assert weighting in ("individual", "group")
+
+        row_index = 0 if weighting == "individual" else 1
+        image = fits.open(filename)
+        fluxes = np.atleast_2d(image[1].data)[row_index]
+        inv_var = 1.0/(np.atleast_2d(image[2].data)[row_index]**2)
+        
+        bad = (0 >= flux) + (0 >= inv_var)
+        flux[bad] = 1.0
+        inv_var[bad] = 0.0
+        
+        return (fluxes, inv_var, image)
+
+
+    files = glob("/Users/arc/research/apogee/apogee-rg-apStar/*/*.fits")
+    filename = np.random.choice(files)
+    flux, ivar, image = get_combined_spectrum(filename)
+
+
+    # Fit the continuum.
+    continuum, flux, ivar = fit_continuum(dispersion, flux, ivar,
+        continuum_pixels, regions=regions, order=4, L=1200)
+    continuum, flux, ivar = [each.flatten() for each in (continuum, flux, ivar)]
+
+    # Start plotting.
+    rgba_colors = np.zeros((continuum_pixels.size, 4))
+    rgba_colors[:, :3] = 0.0
+    rgba_colors[:, 3] = ivar[continuum_pixels]/np.median(ivar[ivar[continuum_pixels] > 0]) # The last column is alpha.
+    rgba_colors = np.clip(rgba_colors, 0, 1)
+
+    fig, axes = plt.subplots(2, figsize=(14, 6))
+    axes[0].set_title(os.path.basename(filename))
+    axes[0].scatter(dispersion[continuum_pixels], flux[continuum_pixels],
+        c=rgba_colors, zorder=10)
+
+    axes[0].plot(dispersion, flux, alpha=0.25, zorder=-1, c='k',
+        drawstyle='steps-mid')
+    #axes[0].fill_between(dispersion, flux - err, flux + err, facecolor="#cccccc")
+
+    axes[0].plot(dispersion, continuum, c='r', lw=2, zorder=1)
+    #axes[0].set_xticklabels([])
+    axes[0].set_ylabel("Flux")
+
+    axes[1].axhline(1, c='r', lw=2, zorder=1)
+    axes[1].scatter(dispersion[continuum_pixels], (flux/continuum)[continuum_pixels],
+        c=rgba_colors, zorder=10)
+
+    axes[1].plot(dispersion, flux/continuum, alpha=0.25, zorder=-1, c='k',
+        drawstyle='steps-mid')
+
+
+    axes[0].set_xlim(dispersion[0], dispersion[-1])
+    axes[1].set_xlim(dispersion[0], dispersion[-1])
+    axes[0].set_ylim(0, axes[0].get_ylim()[1])
+    axes[1].set_ylim(0.9, 1.1)
+    axes[1].set_xlabel("Wavelength")
+    axes[1].set_ylabel("Normalized flux")
+    fig.tight_layout()
+
+    plt.show()
+
+
+    raise a
+
+    continuum = fit_continuum(dispersion, normalized_flux, normalized_ivar,
         continuum_pixels, regions=regions, order=3, L=1200)
 
 
@@ -198,6 +312,8 @@ if __name__ == "__main__":
         # Set the first three columns as zero for black.
         rgba_colors[:, :3] = 0.0
         rgba_colors[:, 3] = object_ivar/scalar # The last column is alpha.
+
+        rgba_colors = np.clip(rgba_colors, 0, 1)
 
         ax.set_title("Object index {0}".format(index))
 
