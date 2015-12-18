@@ -242,41 +242,46 @@ then use the system to label all of the stars in the \apogee\ \dr\ data set.
 
 \section{Method}
 
-We assume the following about \TheCannon\ and the \apogee\ \dr\:
+\noindent{}We assume the following about \TheCannon\ and the \apogee\ \dr:
 
 %The assumptions of \TheCannon\ are the following:
 \begin{itemize}
 \item
-Stars with similar labels (parameters and abundances) have similar
-spectra.
+Stars with similar labels (parameters and abundances) have similar spectra.
 \item
-The expectation of the spectrum of a star is a smooth function of the
-values of the labels for that star.  Further than this, we assume that
-the function is so smooth it is reasonably approximated with a
-quadratic form in label space.
+The expectation of the spectrum of a star is a smooth function of the values of 
+the labels for that star.  Further than this, we assume that the function is so 
+smooth it is reasonably approximated with a quadratic form in label space.
 \item
-The resolution of all \apogee\ spectra are identical, all spectra are
-calibrated to the same rest wavelength grid, the noise is Gaussian and
-independent from pixel to pixel (with correctly known variances at the
-pixel level), and continuum normalization is consistent.  Importantly,
-we are \emph{not} assuming that different stars have similar noise
-variances, nor that the training, test, and prediction sets have the
-same noise model.
+The resolution of all \apogee\ spectra are identical, all spectra are calibrated
+to the same rest wavelength grid, the noise is Gaussian and independent from 
+pixel to pixel (with correctly known variances at the pixel level).  
+Importantly, we are \emph{not} assuming that different stars have similar noise
+variances, nor that the training, test, and prediction sets have the same noise 
+model.
 \item
-% ARC: I don't think we even care if ASPCAP is accurate or not -- we aren't technically assuming accuracy in the training set, are we? We are only assuming consistency in all of our criteria for deciding what should or should not be in the labelled set (and thus the training set).
-We have a training set of stars with accurate labels, where
-``accurate'' is defined by the accuracy requirements of the output
-labels.  It might be more accurate to say that we are assuming that
-the training-set stars have \emph{consistent} labels (consistent with
-the assumptions of smoothness, above).
+We have a training set of stars with accurate labels, where ``accurate'' is 
+defined by the accuracy requirements of the output labels.  It might be more 
+accurate to say that we are assuming that the training-set stars have 
+\emph{consistent} labels (consistent with the assumptions of smoothness, above).
+% ARC: I don't think we even care if ASPCAP is accurate or not -- we aren't 
+technically assuming accuracy in the training set, are we? We are only assuming 
+consistency in all of our criteria for deciding what should or should not be in 
+the labelled set (and thus the training set).
 \item
-The training set is representative, in the sense that the training-set
-stars span the label space similarly to how any test or prediction set
-spans the label space.
+The training set is representative, in the sense that the training-set stars 
+span the label space similarly to how any test or prediction set spans the label
+space.
+\item
+We assume our continuum normalization procedure (described below) is consistent.
+Note that we do not require \emph{true} continuum-normalization in the classical
+sense because any offset (even a label-dependent residual due to a strong 
+absorption line) can be captured by the model.  Instead we require that our 
+normalization procedure is invariant with respect to S/N ratios.
 \end{itemize}
 
 
-\noindent Given these assumptions, the model we adopt is
+\noindent{}Given these assumptions, the model we adopt is
 \begin{eqnarray}
   y_{jn} &=& \vecv(\ell_n)\cdot\vectheta_j + e_{jn}
   \label{eq:model}\quad ,
