@@ -150,14 +150,16 @@ limits their applicability and interpretability by construction.
 In detail, physics-based models do not explain all pixels of stellar 
 spectroscopy at the precision with which we are currently observing.  The data
 quality have outgrown the classical methods used to analyse them.  This led us 
-to build \TheCannon\footnote{It is important (to us) to note that \TheCannon\ is named not after a weapon but instead after Annie Jump Cannon, who was the first to
-correctly order stellar spectra in temperature order (and who did so
-by looking at the data, and without any use of physics-based models).} (\citealt{tc}), a data-driven---as opposed to physics-based
----model for stellar spectra.  \TheCannon\ is a data-driven model, but it differs from standard machine-learning
-approaches because it contains an explicit noise model. Given a representative set of stars with
-known labels of high-fidelity (see below), \TheCannon\ is a generative 
-model for stellar spectra based on a linear combination of the labels.
-
+to build \TheCannon\footnote{It is important (to us) to note that \TheCannon\ 
+is named not after a weapon but instead after Annie Jump Cannon, who was the 
+first to correctly order stellar spectra in temperature order (and who did so
+by looking at the data, and without any use of physics-based models).} 
+(\citealt{tc}), a data-driven---as opposed to physics-based---model for stellar
+spectra.  \TheCannon\ is a data-driven model, but it differs from standard 
+machine-learning approaches because it contains an explicit noise model. Given a
+representative set of stars with known labels of high-fidelity (see below), 
+\TheCannon\ is a generative model for stellar spectra based on a linear 
+combination of the labels.
 
 
 
@@ -166,26 +168,27 @@ model for stellar spectra based on a linear combination of the labels.
 %DWH: Cite some relevant literature.
 
 
-Before we introduce different phases of the model 
-construction and evaluation, we first introduce the relevant terminology.
-In all that follows, we will call stellar parameters ($\Teff$ and
-$\logg$) and the full set of 15 chemical abundances
-collectively ``labels''.
-This unifies and collapses the phrase ``stellar parameters and chemical
-abundances'' to a word, and connects to relevant terminology
-for supervised methods in the machine-learning and statistics
-literatures.  Consider a spectroscopic survey that contains \emph{survey objects}.
-Within that set of survey objects is a subset of stars where the
-data have high signal-to-noise ratios and the labels are reported
-with high fidelity.  We will call this sample the \emph{labelled set},
-whereas all other survey objects are categorized to the \emph{unlabelled set}. That is to say,
-although objects in the \emph{unlabelled set} may have some labels reported, we are going to construct (train) 
-\TheCannon\ using data in the labelled set and estimate (test) labels for those in the unlabelled set.
-This means that it can transfer labels from high signal-to-noise training-set
-stars to low signal-to-noise test-set stars; that is, the training set and 
-the test set do not need to be statistically identical. This is related to the fact that \TheCannon\ is an interpretable model;
-the internals of the model are the dependencies of the spectral expectation
-and variance on wavelength and physical parameters of the star.
+Before we introduce the construction of the model and the tests we employed to
+evaluate it, we first need to introduce the relevant terminology.  In all that 
+follows, we will call stellar parameters ($\Teff$ and $\logg$) and the full set
+of 15 chemical abundances collectively ``labels''.  This unifies and collapses 
+the phrase ``stellar parameters and chemical abundances'' to a word, and 
+connects to relevant terminology for supervised methods in the machine-learning
+and statistics literatures.  Consider a spectroscopic survey that contains 
+\emph{survey objects}.  Within that set of survey objects is a subset of stars 
+where the data have high signal-to-noise ratios such that we can assert the 
+labels are reported with high fidelity.  We will call this sample the 
+\emph{labelled set}, whereas all other survey objects are categorized to the
+\emph{unlabelled set}.  That is to say, although objects in the 
+\emph{unlabelled set} may have reported labels, we are going to construct
+(train) \TheCannon\ using data in the labelled set and estimate (test) labels 
+for those in the unlabelled set.  This means that \TheCannon\ can transfer 
+labels from high signal-to-noise training-set stars to low signal-to-noise 
+test-set stars; that is, the training set and the test set do not need to be 
+statistically identical.  This is related to the fact that \TheCannon\ is an 
+interpretable model; the internals of the model are the dependencies of the 
+spectral expectation and variance on wavelength and physical parameters of the 
+star.
 
 
 %DWH: Define the words ``train'', ``validate'', and ``test''.  And maybe ``predict'' too?
@@ -200,32 +203,37 @@ and variance on wavelength and physical parameters of the star.
 
 %DWH: 
 
+In the first work we did with \TheCannon, we only used a small number of labels
+(three in the original work, and four or five in late work; \citealt{tc, age}). 
+Here we were guided by thoughts related to density estimation: As the length of 
+the label list $K$ grows, so too does the model complexity.  Sampling well a 
+$K$-dimensional label space takes a training set the size of which scales 
+exponentially (or worse) with $K$.  Subsequent experiments, however, did not 
+bear this out. We found that we can transfer many labels from the training set 
+to the test set, with training sets of thousands of stars.  The fundamental 
+reason is that \TheCannon\ is \emph{not} a density estimator!  It is more like 
+an \emph{interpolator}, which effectively finds stars in the training set that 
+are close to the test star, and transfers labels, using the smooth polynomial 
+model as a kind of regularizer.
 
-Here we were guided by thoughts related to density estimation:
-Sampling well a $K$-dimensional label space takes a training set the
-size of which scales exponentially (or worse) with $K$.
-Subsequent experiments, however, did not bear this out:
-We found that we can transfer many labels from the training set to
-the test set, with training sets of thousands of stars.
-The fundamental reason is that \TheCannon\ is \emph{not} a density estimator!
-It is more like an \emph{interpolator}, which effectively finds stars in
-the training set that are close to the test star, and transfers labels,
-using the smooth polynomial model as a kind of regularizer.
 
+The capacity to extend to a larger set of $K$ labels without significant
+computational detriment offers tantalizing opportunities.  The most 
+straightforward would be to include abundances of individual elements as labels.
+However in doing so, it can be shown that a standard \emph{Cannon} model yields
+$\theta$ derivatives (see next section) that are incompatible with expectations
+from physics: there may be an abundance label with non-zero contributions at all
+pixels, but physically we know that spectral lines of a single element do not 
+contribute across all wavelengths.  
 
-In the first work we did with \TheCannon, we only used a small
-number of labels (three in the original work, and four or five in late
-work; \citealt{tc, age}).  A tantalizing extension of these works would
-be to expand the list of labels to include the abundances of individual
-elements.  However as the label list grows the model complexity (i.e.,
-the number of parameters) becomes formidable.  Perhaps more importantly,
-it can be shown that a standard model is physically incorrect: For example
-there may be an abundance label with non-zero contributions at all pixels,
-but physically we know that spectral lines of that element do not contribute
-across all wavelengths.  For these reasons we know that the problem is sparse.
-
-Here we exploit this information to the fullest, using standard regularization methods to discover
-and enforce sparsity. We consider the \emph{entire} 17-dimensional label space produced by the \apogee\ \aspcap\ pipeline. We accept the \aspcap\ labels for the highest signal-to- noise stars, and adopt these stars and their labels as the training set. We show by validation that we can transfer these labels to much lower signal-to-noise stars, with reduced precision but no strong biases. We then use the system to label all of the stars in the \apogee\ \dr\ data set.
+For this reason alone we know the problem is sparse.  Here we exploit this 
+information to the fullest, using standard regularization methods to discover
+and enforce sparsity. We consider the \emph{entire} 17-dimensional label space 
+produced by the \apogee\ \aspcap\ pipeline.  We accept the \aspcap\ labels for 
+the highest signal-to-noise stars, and adopt these stars and their labels as the
+training set.  We show by validation that we can transfer these labels to much 
+lower signal-to-noise stars, with reduced precision but no strong biases.  We
+then use the system to label all of the stars in the \apogee\ \dr\ data set.
 
 
 %DWH: The differences between measurement and prediction...
@@ -234,7 +242,7 @@ and enforce sparsity. We consider the \emph{entire} 17-dimensional label space p
 
 \section{Method}
 
-We assume the following about \TheCannon\ and the \apogee\ data set:
+We assume the following about \TheCannon\ and the \apogee\ \dr\:
 
 %The assumptions of \TheCannon\ are the following:
 \begin{itemize}
