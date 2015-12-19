@@ -40,16 +40,17 @@
 \begin{abstract}
 % context
 In previous work, we have shown that it is possible to train a generative
-probabilistic model for stellar spectra using a training set of stars, each with known
-parameters ($\Teff$, $\logg$, $\mh$), and then use that model to infer labels for
+probabilistic model for stellar spectra using a training set of stars, each labeled with known
+physical attributes ($\Teff$, $\logg$, $\mh$), and then use that model to infer labels for
 unlabeled stars, even stars with lower signal-to-noise observations.
 % aims
 Here we ask whether this is possible when the dimensionality of the chemical
-abundance space is large (15 abundances: Mg, Fe, etc, etc, Al)
+abundance space is large
+(15 abundances: C, N, O, Na, Mg, Al, Si, S, K, Ca, Ti, V, Mn, Fe, Ni)
 and the model is non-linear in its response to abundance and parameter changes.
-% method
+% methods
 We adopt ideas from compressed sensing to limit overall model complexity (number
-of non-zero parameters) while retaining model freedom.
+of non-zero model parameters) while retaining model freedom.
 The training set is a set of YYY red-giant stars with high signal-to-noise
 spectroscopic observations and stellar parameters and abundances taken from the
 \apogee\ Survey.
