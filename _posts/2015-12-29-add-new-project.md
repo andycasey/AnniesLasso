@@ -12,11 +12,11 @@ This page will walk you through how to add a new project to TheCannon.io website
 
 1. The website is stored in the `gh-pages` branch in the project's git repository. Visit <a href="https://github.com/andycasey/AnniesLasso/tree/gh-pages/_posts">the `gh-pages` branch on GitHub</a>.
 
-2. On GitHub, click the 'New file' button in the top right-hand side of the page.
+2. Click the 'New file' button in the top right-hand side of that page.
 
 3. Name your file according to the following convention: `YYYY-MM-DD-my-project-idea.md`.
 
-4.  Describe your project below using <a href="https://help.github.com/articles/github-flavored-markdown/">GitHub flavored Markdown</a>. You must have the `layout`, `title`, and `categories` information in the header as shown:
+4. Describe your project below using <a href="https://help.github.com/articles/github-flavored-markdown/">GitHub flavored Markdown</a>. You must have the `layout`, `title`, and `categories` information in the header as shown:
 {% highlight text %}
 ---
 layout: post
