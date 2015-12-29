@@ -5,11 +5,17 @@
 Functionality to continuum-normalize spectra.
 """
 
+import logging
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.optimize as op
-from astropy.io import fits
 
+logger = logging.getLogger(__name__)
+
+try:
+    from astropy.io import fits
+except:
+    logger.warn("Could not load astropy.io.fits")
 
 def build_continuum_design_matrix(disp, L, order):
     """

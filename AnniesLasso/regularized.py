@@ -18,6 +18,8 @@ import scipy.optimize as op
 from sys import stdout, maxsize
 from six import string_types
 
+#from autodiff import function, gradient
+
 from . import (cannon, model, utils)
 
 logger = logging.getLogger(__name__)
@@ -444,7 +446,7 @@ def chi_sq(theta, design_matrix, data, inv_var, axis=None, gradient=True):
     if not gradient:
         return f
 
-    g = 2.0 * np.dot(inv_var * residuals, design_matrix)
+    g = 2.0 * np.dot(design_matrix.T, inv_var * residuals)
     return (f, g)
 
     
@@ -456,6 +458,9 @@ def L1Norm(Q):
         An array of finite values.
     """
     return (np.sum(np.abs(Q)), np.sign(Q))
+
+
+
 
 
 def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
@@ -488,11 +493,60 @@ def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
     csq, d_csq = chi_sq(theta, design_matrix, normalized_flux, inv_var)
     L1, d_L1 = L1Norm(theta)
 
+
     # We are using a variation of L1 norm that ignores the first coefficient.
+    # Here we either subtract the absolute value of the first coefficient, or we
+    # have to do:
+    # >> L1, d_L1 = L1Norm(theta[1:])
+    # >> d_L1 = np.insert(d_L1, 0, 0.0)
     L1 = L1 - np.abs(theta[0])
 
     f = csq + regularization * L1
     g = d_csq + regularization * d_L1
+    logger.debug(" --> {0:.2f} {1:.2f}".format(float(f), np.sum(np.abs(g))))
+
+    """
+    def my_func(theta, scatter, normalized_flux, normalized_ivar, regularization, design_matrix):
+        residuals = np.dot(theta, design_matrix.T) - normalized_flux
+        return np.sum(inv_var * residuals**2) #+ regularization * np.sum(np.abs(theta[1:]))
+
+    @gradient(wrt='theta')
+    def autodiff_grad(theta, scatter, normalized_flux, normalized_ivar, regularization, design_matrix):
+        residuals = np.dot(theta, design_matrix.T) - normalized_flux
+        return np.sum(inv_var * residuals**2) #+ regularization * np.sum(np.abs(theta[1:]))
+
+
+    def hoggs_grad(theta, scatter, normalized_flux, normalized_ivar, regularization, design_matrix):
+        residuals = np.dot(theta, design_matrix.T) - normalized_flux
+
+        g_chisq = 2.0 * np.dot(inv_var * residuals, design_matrix)
+
+        foo = regularization * np.sign(theta)
+        foo[0] = 0.0
+
+        return g_chisq + foo
+
+    def my_grad(theta, scatter, normalized_flux, normalized_ivar, regularization, design_matrix):
+        residuals = np.dot(theta, design_matrix.T) - normalized_flux
+
+        g_chisq = -2.0 * np.dot(design_matrix.T, inv_var * residuals)
+
+        foo = regularization * np.sign(theta)
+        foo[0] = 0.0
+
+        #foo = regularization * np.sign(np.sum(np.abs(theta[1:])))
+
+        return g_chisq + foo
+
+
+
+    import scipy.optimize as op
+    args = (scatter, normalized_flux, normalized_ivar, regularization, design_matrix)
+
+    _ = my_grad(theta, *args)
+
+    raise a
+    """
     return (f, g)
 
 
@@ -572,9 +626,6 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
 
     logger.debug("Checking that kwds are going in to bFGS: {}".format(kwds))
     assert scatter == 0.0
-
-    f = lambda theta: my_func(theta, design_matrix, normalized_flux, normalized_ivar, regularization)
-    g = lambda theta: my_grad(theta, design_matrix, normalized_flux, normalized_ivar, regularization)
 
     op_params, fopt, d = op.fmin_l_bfgs_b(func, p0, fprime=None,
         approx_grad=False, **kwds)

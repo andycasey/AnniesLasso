@@ -157,12 +157,12 @@ class BaseCannonModel(object):
 
     def copy(self):
         """
-        Create a copy of the current model.
+        Create a (serial; unparallelized) copy of the current model.
         """
 
-        model = self.__class__(
-            self.labelled_set, self._normalized_flux, self._normalized_ivar,
-            dispersion=self.dispersion, threads=self.threads)
+        model = self.__class__(self.labelled_set.copy(), 
+            self._normalized_flux.copy(), self._normalized_ivar.copy(),
+            dispersion=self.dispersion.copy())
         attributes = ["_metadata"] + \
             self._descriptive_attributes + self._trained_attributes
         for attribute in attributes:
@@ -381,7 +381,6 @@ class BaseCannonModel(object):
                                   "implemented by subclasses")
 
 
-    @requires_training_wheels
     def save(self, filename, include_training_data=False, overwrite=False):
         """
         Serialise the trained model and save it to disk. This will save all

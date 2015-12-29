@@ -53,5 +53,9 @@ setup(
     },
     include_package_data=True,
     data_files=None,
-    entry_points=None
+    entry_points={
+        "console_scripts": [
+            "tc = AnniesLasso.__main__:main",
+        ]
+    }
 )

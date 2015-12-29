@@ -15,6 +15,7 @@ import logging
 import numpy as np
 import scipy.optimize as op
 import tempfile
+import os
 from six import string_types
 
 from . import (model, utils)
@@ -31,7 +32,7 @@ class CannonModel(model.BaseCannonModel):
         columns as labels, and stars/objects as rows.
 
     :type labelled_set:
-        :class:`~astropy.table.Table`, numpy structured array
+        :class:`~astropy.table.Table` or a numpy structured array
 
     :param normalized_flux:
         An array of normalized fluxes for stars in the labelled set, given as
@@ -53,13 +54,22 @@ class CannonModel(model.BaseCannonModel):
         The dispersion values corresponding to the given pixels. If provided, 
         this should have length `num_pixels`.
 
+    :type dispersion:
+        :class:`np.array`
+
     :param threads: [optional]
         Specify the number of parallel threads to use. If `threads > 1`, the
         training and prediction phases will be automagically parallelised.
 
+    :type threads:
+        int
+
     :param pool: [optional]
         Specify an optional multiprocessing pool to map jobs onto.
         This argument is only used if specified and if `threads > 1`.
+    
+    :type pool:
+        bool
     """
     def __init__(self, *args, **kwargs):
         super(CannonModel, self).__init__(*args, **kwargs)
@@ -70,14 +80,7 @@ class CannonModel(model.BaseCannonModel):
         use_neighbouring_pixel_theta=False,
         **kwargs):
         """
-        Train the model based on the labelled set using the given vectorizer.
-
-        :param fixed_scatter: [optional]
-            Fix the scatter terms and do not solve for them during the training
-            phase. If set to `True`, the `s2` attribute must be already set.
-
-        :param progressbar: [optional]
-            Show a progress bar.
+        Train the model based on the labelled set.
         """
         
         logger.warn("OVERWRITING S2 AND FIXED SCATTER")
@@ -116,18 +119,9 @@ class CannonModel(model.BaseCannonModel):
         if self.pool is None:
             mapper = map
             
+            # Single threaded, so we can supply a large design matrix.            
             kwds["design_matrix"] = self.design_matrix
-            """
-            results = []
-            previous_theta = [None]
-            for row in utils.progressbar(zip(*args), message=message):
-                logger.info("passing initial_theta: {}".format(previous_theta[-1]))
-                row = list(row)
-                row[-1] = previous_theta[-1]
-                row = tuple(row)
-                results.append(fitter(*row, **kwds))
-                previous_theta.append(results[-1][:-1].copy())
-            """
+
             results = []
             previous_theta = [None]
             for j, row in enumerate(utils.progressbar(zip(*args), message=message)):
@@ -159,55 +153,22 @@ class CannonModel(model.BaseCannonModel):
             temporary_filenames.append(temporary_filename)
 
             # Wrap the function so we can parallelize it out.
-            f = utils.wrapper(fitter, None, kwds, N, message=message)
-            results = np.array(mapper(f, [row for row in zip(*args)]))
+            try:
+                f = utils.wrapper(fitter, None, kwds, N, message=message)
+                results = np.array(mapper(f, [row for row in zip(*args)]))
 
-        # Calculate chunk size, etc.
-        """
-        chunks = kwargs.pop("chunks", 10)
-        chunk_size = int(np.ceil(len(self.dispersion)/float(chunks)))
-        theta = np.zeros((len(self.dispersion), 1 + len(self.vectorizer.terms)))
-        scatter = np.zeros((len(self.dispersion)))
-        for i in range(chunks):
-            # Time for work.
-            logger.info("Chunks: {0} w/ chunk size: {1}".format(chunks,
-                chunk_size))
-            a, b = (i * chunk_size, (i + 1) * chunk_size)
+            except KeyboardInterrupt:
+                logger.debug("Removing temporary filenames:\n{}".format(
+                    "\n".join(temporary_filenames)))
+                map(os.remove, temporary_filenames)
 
-            sm_nf = sharedmem.empty_like(self.normalized_flux.T[a:b])
-            sm_ni = sharedmem.empty_like(self.normalized_ivar.T[a:b])
-            sm_p0 = sharedmem.empty_like(p0_scatter[a:b])
-
-            sm_nf[:] = self.normalized_flux.T[a:b]
-            sm_ni[:] = self.normalized_ivar.T[a:b]
-            sm_p0[:] = p0_scatter[a:b]
-            args = [sm_nf, sm_ni, sm_p0]
-            args.extend(kwargs.get("additional_args", []))
-            
-            #args = [self.normalized_flux.T[a:b], self.normalized_ivar.T[a:b], p0_scatter[a:b]]
-            #args.extend(kwargs.get("additional_args", []))
-        
-            #_ = args[a:b]
-            
-            results = np.array(results)
-            
-            # Save these:
-            logger.info("Saving to temp.pkl and re-chunking..")
-            theta[a:b] = results[a:b, :-1]
-            scatter[a:b] = results[a:b, -1]
-
-            with open("temp.pkl", "wb") as fp:
-                pickle.dump((theta, scatter), fp, -1)
-        """
-
-            
 
         #self.theta = theta
         #self.s2 = scatter**2
 
         # Clean up any temporary files.
         for filename in temporary_filenames:
-            os.remove(filename)
+            if os.path.exists(filename): os.remove(filename)
 
         # Unpack the results.
         self.theta, self.s2 = (results[:, :-1], results[:, -1]**2)
