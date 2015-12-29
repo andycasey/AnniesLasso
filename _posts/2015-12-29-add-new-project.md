@@ -23,6 +23,8 @@ layout: post
 title: "My awesome project idea"
 categories: project
 ---
+
+We should do *ALL THE THINGS*.
 {% endhighlight %}
 
 
