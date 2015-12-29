@@ -17,14 +17,13 @@ This page will walk you through how to add a new project to TheCannon.io website
 3. Name your file according to the following convention: `YYYY-MM-DD-my-project-idea.md`.
 
 4. Enter this information in the top of your new file:
-
-    {% highlight text %}
-    ---
-    layout: post
-    title: "My awesome project idea"
-    categories: project
-    ---
-    {% endhighlight %}
+{% highlight text %}
+---
+layout: post
+title: "My awesome project idea"
+categories: project
+---
+{% endhighlight %}
 
 5. Describe your project below using <a href="https://help.github.com/articles/github-flavored-markdown/">GitHub flavored Markdown</a>.
 
