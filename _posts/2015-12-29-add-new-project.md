@@ -18,18 +18,18 @@ This page will walk you through how to add a new project to TheCannon.io website
 
 4. Enter this information in the top of your new file:
 
-{% highlight text %}
----
-layout: post
-title: "My awesome project idea"
-categories: project
----
-{% endhighlight %}
+    {% highlight text %}
+    ---
+    layout: post
+    title: "My awesome project idea"
+    categories: project
+    ---
+    {% endhighlight %}
 
-4. Describe your project below using <a href="https://help.github.com/articles/github-flavored-markdown/">GitHub flavored Markdown</a>.
+5. Describe your project below using <a href="https://help.github.com/articles/github-flavored-markdown/">GitHub flavored Markdown</a>.
 
-5. Commit your new file to the repository using the form at the bottom of the GitHub page.
+6. Commit your new file to the repository using the form at the bottom of the GitHub page.
 
-That's it! Your project should be listed on TheCannon.io in a few minutes. 
+That's it! Your project should be listed on TheCannon.io in a few minutes. If it's not, <a href="mailto:arc@ast.cam.ac.uk">fire Andy</a>. 
 
 
