@@ -18,7 +18,7 @@ This page will walk you through how to add a new project to TheCannon.io website
 
 4. Enter this information in the top of your new file:
 
-{% highlight markdown %}
+{% highlight text %}
 ---
 layout: post
 title: "My awesome project idea"
