@@ -14,7 +14,7 @@ import AnniesLasso as tc
 
 np.random.seed(123) # For reproducibility.
 
-# Some "configurable" options..
+# Some "configurable" opions..
 threads = 1
 mod = 10
 
@@ -32,6 +32,10 @@ normalized_flux = np.memmap(
 normalized_ivar = np.memmap(
     os.path.join(PATH, FILE_FORMAT).format("normalized-ivar"),
     mode="r", dtype=float).reshape(normalized_flux.shape)
+
+#normalized_flux = normalized_flux[:, :2000]
+#normalized_ivar = normalized_ivar[:, :2000]
+#dispersion = dispersion[:2000]
 
 elements = [label_name for label_name in labelled_set.dtype.names \
     if label_name not in ("PARAM_M_H", "SRC_H") and label_name.endswith("_H")]
@@ -137,20 +141,19 @@ wavelengths.extend(
      [15221.158563809242, 15266.17080169663])
 
 
-wavelengths = [wavelengths[1], 16811.5]
-
 # Set the model up for validation.
-Lambdas = 10**np.arange(2.5, 6, 0.5)
+Lambdas = 10**np.hstack([[0, 1, 2], np.arange(3, 6, 0.5)])
 pixel_mask = np.searchsorted(dispersion, wavelengths)
 
-filename = "convexity-proof-17label-all.pkl"
 
+"""
+filename = "convexity-proof-3label-all.pkl"
 if not os.path.exists(filename):
     regularizations, chi_sq, log_det, all_models = \
         regularized_cannon.validate_regularization(
             fixed_scatter=True, Lambdas=Lambdas, pixel_mask=pixel_mask,
-            initial_theta=True, model_filename_format="convexity-proof-17label-{}.pkl",
-            overwrite=True, xtol=1e-6, ftol=1e-6)
+            initial_theta=None, model_filename_format="convexity-proof-3label-{}.pkl",
+            overwrite=True, xtol=1e-4, ftol=1e-4)
 
     with open(filename, "wb") as fp:
         pickle.dump((regularizations, chi_sq, log_det, all_models), fp, -1)
@@ -160,8 +163,8 @@ else:
         regularizations, chi_sq, log_det, all_models = pickle.load(fp)
 
 
-
 scaled_chi_sq = chi_sq - chi_sq[0]
+
 
 fig, ax = plt.subplots()
 
@@ -172,13 +175,123 @@ for i in range(scaled_chi_sq.shape[1]):
     ax.scatter(np.log10(Lambdas), scaled_chi_sq[:, i], facecolor=colours[i % len(colours)])
     ax.plot(np.log10(Lambdas), scaled_chi_sq[:, i], c=colours[i % len(colours)])
 
-ax.set_xlim(Lambdas[0], Lambdas[-1])
+ax.set_xlim(np.log10(Lambdas[0]), np.log10(Lambdas[-1]))
 
-ax.set_xlabel(r"$\Lambda$")
+ax.set_xlabel(r"$\log_{10}\Lambda$")
 ax.set_ylabel(r"$\chi^2 + \Delta$")
+ax.set_title(r"3-label $\theta_{init}={1,0...}$ + $s^2 = 0$ + Fixed_s2 + Powell + No_theta_passing + tol=1e-4")
 
 
-fig.savefig("convexity-proof-17label.pdf", dpi=300)
+"""
+
+"""
+# Check the effect of tolerances
+wavelengths = [wavelengths[2], wavelengths[15]]
+Lambdas = 10**np.hstack([[0, 1, 2], np.arange(3, 6, 0.2)])
+pixel_mask = np.searchsorted(dispersion, wavelengths)
+
+regularizations, chi_sq, log_det, all_models = \
+        regularized_cannon.validate_regularization(
+            fixed_scatter=True, Lambdas=Lambdas, pixel_mask=pixel_mask,
+            initial_theta=None, xtol=1e-4, ftol=1e-4)
+
+regularizations2, chi_sq2, log_det2, all_models2 = \
+        regularized_cannon.validate_regularization(
+            fixed_scatter=True, Lambdas=Lambdas, pixel_mask=pixel_mask,
+            initial_theta=None, op_kwargs={"xtol":1e-8, "ftol":1e-8})
+
+scaled_chi_sq = chi_sq - chi_sq[0]
+scaled_chi_sq2 = chi_sq2 - chi_sq2[0]
+
+
+colours = ("#4C72B0", "#55A868", "#C44E52", "#8172B2", "#64B5CD")
+
+
+fig, ax = plt.subplots()
+for i in range(scaled_chi_sq.shape[1]):
+    ax.plot(np.log10(Lambdas), scaled_chi_sq[:, i], c=colours[i % len(colours)])
+
+
+for i in range(scaled_chi_sq.shape[1]):
+    ax.plot(np.log10(Lambdas), scaled_chi_sq2[:, i], c=colours[i % len(colours)], lw=2)
+    
+"""
+
+#wavelengths = [wavelengths[2], wavelengths[15]]
+Lambdas = 10**np.hstack([[0, 1, 2], np.arange(3, 6, 0.5)])
+pixel_mask = np.searchsorted(dispersion, wavelengths)
+
+# BFGS
+regularizations, chi_sq, log_det, all_models = \
+        regularized_cannon.validate_regularization(
+            fixed_scatter=True, Lambdas=Lambdas, pixel_mask=pixel_mask,
+            initial_theta=None,            
+            op_kwargs={"xtol": 1e-10, "ftol": 1e-10},
+            op_bfgs_kwargs={"factr": 0.10, "pgtol": 1e-6})# "factr": 10.0, "epsilon": 1e-3})
+
+# Load old stuff.
+"""
+import cPickle as pickle
+with open("foo.pkl", "rb") as fp:
+    Lambdas, chi_sq_fmin_xtol4, chi_sq_fmin_xtol8 = pickle.load(fp)
+"""
+
+
+def calculate_optimal_lambda(Lambda, Q, tolerance=0.1, full_output=False):
+    # Return just the minimum:
+    #return Lambda[np.argmin(Q)]
+    #if full_output:
+    #    return (Lambda[np.argmin(Q)], np.argmin(Q))
+
+    # Return max({Lambda: Q(Lambda) < Q_min + tolerance })
+    index = np.where(Q < np.min(Q) + tolerance)[0][-1]
+    if full_output:
+        return (Lambda[index], index)
+    return Lambda[index]
+
+colours = ("#4C72B0", "#55A868", "#C44E52", "#8172B2", "#64B5CD")
+
+
+fig, ax = plt.subplots()
+"""
+for i in range(chi_sq_fmin_xtol4.shape[1]):
+    ax.plot(np.log10(Lambdas), chi_sq_fmin_xtol4[:, i], c=colours[i % len(colours)])
+
+for i in range(chi_sq_fmin_xtol8.shape[1]):
+    ax.plot(np.log10(Lambdas), chi_sq_fmin_xtol8[:, i], c=colours[i % len(colours)], lw=2)
+"""
+
+scaled_chi_sq_bfgs = chi_sq - chi_sq[0]
+
+for i in range(scaled_chi_sq_bfgs.shape[1]):
+    ax.plot(np.log10(Lambdas), scaled_chi_sq_bfgs[:, i], c=colours[i % len(colours)], lw=2)
+    best_Lambda, index = calculate_optimal_lambda(Lambdas, scaled_chi_sq_bfgs[:,i], full_output=True)
+    ax.scatter([np.log10(best_Lambda)], [scaled_chi_sq_bfgs[index,i]], facecolor=colours[i % len(colours)], s=100, zorder=100)
+
+
+
+
+raise a
+
+raise a
+
+
+# Do pixel 10 with a higher ftol:
+Lambdas = 10**np.hstack([[0, 1, 2], np.arange(3, 6, 0.1)])
+
+pixel_mask = np.searchsorted(dispersion, [wavelengths[10]])
+regularizations, chi_sq, log_det, all_models = \
+    regularized_cannon.validate_regularization(
+        fixed_scatter=True, Lambdas=Lambdas, pixel_mask=pixel_mask,
+        initial_theta=None, xtol=1e-7, ftol=1e-7)
+
+scaled_chi_sq = chi_sq - chi_sq[0]
+
+fig, ax = plt.subplots()
+ax.scatter(np.log10(Lambdas), scaled_chi_sq, facecolor="k")
+ax.plot(np.log10(Lambdas), scaled_chi_sq, c='k')
+ax.set_title(dispersion[pixel_mask][0])
+
 
 raise a
 # Do a full training

@@ -8,6 +8,8 @@ Functionality to continuum-normalize spectra.
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.optimize as op
+from astropy.io import fits
+
 
 def build_continuum_design_matrix(disp, L, order):
     """
@@ -25,7 +27,7 @@ def build_continuum_design_matrix(disp, L, order):
 
 
 def fit_continuum(dispersion, normalized_flux, normalized_ivar, continuum_pixels,
-    L=1400, order=5, regions=None, fill_value=1.0, full_output=False, **kwargs):
+    L=1400, order=3, regions=None, fill_value=1.0, full_output=False, **kwargs):
     """
     Fit the flux values of pre-defined continuum pixels using a sum of sine and
     cosine functions.
@@ -52,6 +54,7 @@ def fit_continuum(dispersion, normalized_flux, normalized_ivar, continuum_pixels
     if regions is None:
         regions = [(dispersion[0], dispersion[-1])]
 
+    """
     # Look for bad edge pixels?
     if kwargs.pop("__fix_edges", True):
         # MAGIC below.
@@ -82,7 +85,7 @@ def fit_continuum(dispersion, normalized_flux, normalized_ivar, continuum_pixels
                     print("set ivar = 0 for bad points:")
                     print(dispersion[bad_points_at])
                     print(bad_points_at)
-
+    """
 
     scalar = kwargs.pop("__magic_scalar", 1e-6)
 
@@ -124,6 +127,7 @@ def fit_continuum(dispersion, normalized_flux, normalized_ivar, continuum_pixels
         for region_mask, region_matrix, continuum_mask, continuum_matrix \
         in zip(region_masks, region_matrices, continuum_masks, continuum_matrices):
             if continuum_mask.size == 0:
+                print("Skipping")
                 object_metadata.append([order, L, fill_value, scalar, [], None])
                 continue
 
@@ -143,8 +147,7 @@ def fit_continuum(dispersion, normalized_flux, normalized_ivar, continuum_pixels
             condition_number = max(eigenvalues)/min(eigenvalues)
 
             amplitudes = np.linalg.solve(MTM, MTy)
-            continuum[i, region_mask] *= np.dot(region_matrix.T, amplitudes)
-
+            continuum[i, region_mask] = np.dot(region_matrix.T, amplitudes)
             object_metadata.append(
                 (order, L, fill_value, scalar, amplitudes, condition_number))
 
@@ -152,7 +155,236 @@ def fit_continuum(dispersion, normalized_flux, normalized_ivar, continuum_pixels
 
     if full_output:
         return (continuum, metadata)
-    return (continuum, normalized_flux, normalized_ivar)
+    return continuum
+
+
+
+def normalize_individual_visit(dispersion, apStar_flux, apStar_ivar,
+    apStar_bitmask, continuum_pixels, conservatism=(2.0, 0.1),
+    normalized_ivar_floor=1e-4,
+    **kwargs): # MAGIC
+    """
+    Stack an invividual visit from an apStar file, while properly accounting for
+    the inverse variances.
+
+    RTFD.
+
+    Note: Revise ivar floor in 2027.
+    """
+
+    assert dispersion.size == apStar_flux.size
+    assert apStar_flux.ndim == 1
+    assert apStar_flux.shape == apStar_ivar.shape
+
+
+    # Re-weight bad pixels based on their distance to the median.
+    bad = apStar_bitmask > 0
+    median_flux = np.median(apStar_flux)
+
+    deltas = np.max(np.array([
+            conservatism[0] * np.abs(apStar_flux[bad] - median_flux),
+            conservatism[1] * median_flux * np.ones(bad.sum())
+        ]), axis=0)
+    adjusted_ivar = apStar_ivar
+    adjusted_ivar[bad] = apStar_ivar[bad] / (1. + deltas**2 * apStar_ivar[bad])
+
+    # Fit continuum first.
+    kwds = kwargs.copy()
+    kwds["full_output"] = False
+    continuum = fit_continuum(dispersion, apStar_flux, adjusted_ivar,
+        continuum_pixels, **kwds)
+
+    # Flatten the continuum since fit_continuum can take many spectra at once.
+    continuum = continuum.flatten()
+    normalized_flux = apStar_flux / continuum
+    # We do continuum * adj_ivar * continuum instead of continuum**2 to account
+    # for the super high S/N spectra, where continuum**2 --> inf.
+    normalized_ivar = continuum * adjusted_ivar * continuum
+
+    # Clean up bad pixels.
+    bad = (normalized_ivar < normalized_ivar_floor) \
+        + ~np.isfinite(normalized_flux * normalized_ivar)
+    normalized_flux[bad] = 1.0
+    normalized_ivar[bad] = normalized_ivar_floor
+
+    zero = normalized_flux == 0
+    normalized_flux[zero] = 1.0
+    normalized_ivar[zero] = 0.0
+
+    return (normalized_flux, normalized_ivar)
+
+
+def normalize_individual_visits(filename, continuum_pixels, 
+    ignore_bitmask_values=(9, 10, 11), full_output=False, **kwargs):
+    """
+    Stack individual visits in a given apStar file.
+    """
+
+    # Extensions for the apStar files.
+    ext_flux, ext_error, ext_bitmask = (1, 2, 3) # Easy as A, B, C.
+
+    image = fits.open(filename)
+    flux_array = np.atleast_2d(image[ext_flux].data)
+    error_array = np.atleast_2d(image[ext_error].data)
+    bitmask_array = np.atleast_2d(image[ext_bitmask].data)
+
+    # Fix this.
+    if ignore_bitmask_values is not None:
+        for b in ignore_bitmask_values:
+            bad = (bitmask_array & 2**b) > 0
+            bitmask_array[bad] -= 2**b
+
+    N_visits = max([1, flux_array.shape[0] - 2])
+    offset = 2 if N_visits > 1 else 0
+
+    # Calculate the dispersion array.
+    dispersion = 10**(image[1].header["CRVAL1"] + \
+        np.arange(flux_array.shape[1]) * image[1].header["CDELT1"])
+
+    # Normalize the individual visit spectra.
+    normalized_visit_flux = np.zeros((N_visits, dispersion.size))
+    normalized_visit_ivar = np.zeros((N_visits, dispersion.size))
+
+    metadata = {"SNR": []}
+    for i in range(N_visits):
+
+        # The first two indices contain stacked spectra with incorrect weights.
+        flux = flux_array[offset + i]
+        ivar = 1.0/(error_array[offset + i])**2
+        bitmask = bitmask_array[offset + i]
+
+        normed_flux, normed_ivar = normalize_individual_visit(dispersion,
+            flux, ivar, bitmask, continuum_pixels, **kwargs)
+
+        normalized_visit_flux[i, :] = normed_flux
+        normalized_visit_ivar[i, :] = normed_ivar
+        metadata["SNR"].append(image[0].header["SNRVIS{}".format(i+1)])
+
+    numerator = np.sum(normalized_visit_flux * normalized_visit_ivar, axis=0)
+    denominator = np.sum(normalized_visit_ivar, axis=0)
+
+    stacked = (numerator/denominator, denominator)
+    if full_output:
+        return (stacked, (normalized_visit_flux, normalized_visit_ivar), metadata)
+    return stacked
+
+    """
+
+    # Stack the individual visits.
+    fig, ax = plt.subplots()
+    error = 1.0/np.sqrt(normalized_visit_ivar[2])
+    ax.plot(dispersion, normalized_visit_flux[2] + error, drawstyle='steps-mid')
+    ax.plot(dispersion, normalized_visit_flux[2] - error, drawstyle='steps-mid')
+
+    bad = bitmask_array[2 + offset] > 0
+    ax.scatter(dispersion[bad], np.ones(bad.sum()), facecolor='r')
+
+    fig, ax = plt.subplots()
+    err = 1.0/np.sqrt(stacked_ivar)
+    ax.plot(dispersion, stacked_flux, drawstyle='steps-mid', c='k')
+    ax.plot(dispersion, stacked_flux - err, c="#666666", drawstyle='steps-mid',
+        zorder=-1)
+    ax.plot(dispersion, stacked_flux + err, c="#666666", drawstyle='steps-mid',
+        zorder=-1)
+    ax.set_ylim(0.7, 1.1)
+
+
+    fig, ax = plt.subplots()
+    for i in range(N_visits):
+        ax.plot(dispersion, normalized_visit_flux[i] + i)
+        bad = bitmask_array[offset + i] > 0
+        ax.scatter(dispersion[bad], normalized_visit_flux[i][bad] + i, facecolor='r')
+
+
+
+
+
+
+    plt.show()
+    raise a
+    """
+
+
+
+
+
+def plot_continuum_fit(dispersion, flux, ivar, continuum, continuum_pixels,
+    title=None):
+
+    # Start plotting.
+
+    fig, axes = plt.subplots(2, figsize=(14, 6))
+    if title is not None:
+        axes[0].set_title(title)
+
+    # Colour continuum pixels by their relative inverse variance.
+    rgba_colors = np.zeros((continuum_pixels.size, 4))
+    rgba_colors[:, :3] = 0.0
+    rgba_colors[:, 3] = \
+        ivar[continuum_pixels]/np.median(ivar[ivar[continuum_pixels] > 0]) 
+    rgba_colors = np.clip(rgba_colors, 0, 1)
+
+    axes[0].scatter(dispersion[continuum_pixels], flux[continuum_pixels],
+        c=rgba_colors, zorder=10)
+
+    axes[0].plot(dispersion, flux, alpha=0.25, zorder=-1, c='k',
+        drawstyle='steps-mid')
+    
+    axes[0].plot(dispersion, continuum, c='r', lw=2, zorder=1)
+    axes[0].set_xticklabels([])
+    axes[0].set_ylabel("Flux")
+
+    axes[1].axhline(1, c='r', lw=2, zorder=1)
+    axes[1].scatter(
+        dispersion[continuum_pixels], (flux/continuum)[continuum_pixels],
+        c=rgba_colors, zorder=10)
+
+    axes[1].plot(dispersion, flux/continuum, alpha=0.25, zorder=-1, c='k',
+        drawstyle='steps-mid')
+
+
+    axes[0].set_xlim(dispersion[0], dispersion[-1])
+    axes[1].set_xlim(dispersion[0], dispersion[-1])
+    axes[0].set_ylim(0, axes[0].get_ylim()[1])
+    axes[1].set_ylim(0.9, 1.1)
+    axes[1].set_xlabel("Wavelength")
+    axes[1].set_ylabel("Normalized flux")
+    fig.tight_layout()
+
+    return fig
+
+
+if __name__ == "__main__":
+
+
+    continuum_pixels = np.loadtxt("continuum.list", dtype=int)
+    regions = ([15140, 15812], [15857, 16437], [16472, 16960])
+
+    from glob import glob
+
+
+
+    files = glob("/Users/arc/research/apogee/apogee-rg-apStar/*/*.fits")
+    filename = np.random.choice(files)
+    print(filename)
+
+    filename = "/Users/arc/research/apogee/apogee-rg-apStar/4540/apStar-r5-2M19191555+1906093.fits"
+    
+    # This is the 8 visit stuff
+    #filename = "/Users/arc/research/apogee/apogee-rg-apStar/4601/apStar-r5-2M06123730+4036001.fits"
+    foo = stack_individual_visits(filename,
+        continuum_pixels=continuum_pixels, regions=regions, order=2)
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -220,50 +452,6 @@ if __name__ == "__main__":
     continuum, flux, ivar = [each.flatten() for each in (continuum, flux, ivar)]
 
 
-    def plot_continuum_fit(dispersion, flux, ivar, continuum, continuum_pixels,
-        title=None):
-
-        # Start plotting.
-
-        fig, axes = plt.subplots(2, figsize=(14, 6))
-        if title is not None:
-            axes[0].set_title(title)
-
-        # Colour continuum pixels by their relative inverse variance.
-        rgba_colors = np.zeros((continuum_pixels.size, 4))
-        rgba_colors[:, :3] = 0.0
-        rgba_colors[:, 3] = \
-            ivar[continuum_pixels]/np.median(ivar[ivar[continuum_pixels] > 0]) 
-        rgba_colors = np.clip(rgba_colors, 0, 1)
-
-        axes[0].scatter(dispersion[continuum_pixels], flux[continuum_pixels],
-            c=rgba_colors, zorder=10)
-
-        axes[0].plot(dispersion, flux, alpha=0.25, zorder=-1, c='k',
-            drawstyle='steps-mid')
-        
-        axes[0].plot(dispersion, continuum, c='r', lw=2, zorder=1)
-        axes[0].set_xticklabels([])
-        axes[0].set_ylabel("Flux")
-
-        axes[1].axhline(1, c='r', lw=2, zorder=1)
-        axes[1].scatter(
-            dispersion[continuum_pixels], (flux/continuum)[continuum_pixels],
-            c=rgba_colors, zorder=10)
-
-        axes[1].plot(dispersion, flux/continuum, alpha=0.25, zorder=-1, c='k',
-            drawstyle='steps-mid')
-
-
-        axes[0].set_xlim(dispersion[0], dispersion[-1])
-        axes[1].set_xlim(dispersion[0], dispersion[-1])
-        axes[0].set_ylim(0, axes[0].get_ylim()[1])
-        axes[1].set_ylim(0.9, 1.1)
-        axes[1].set_xlabel("Wavelength")
-        axes[1].set_ylabel("Normalized flux")
-        fig.tight_layout()
-
-        return fig
 
 
     fig = plot_continuum_fit(dispersion, flux, ivar, continuum, continuum_pixels,

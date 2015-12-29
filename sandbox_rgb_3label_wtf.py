@@ -14,6 +14,7 @@ import AnniesLasso as tc
 
 np.random.seed(123) # For reproducibility.
 
+from time import time
 # Some "configurable" opions..
 threads = 1
 mod = 10
@@ -33,6 +34,10 @@ normalized_ivar = np.memmap(
     os.path.join(PATH, FILE_FORMAT).format("normalized-ivar"),
     mode="r", dtype=float).reshape(normalized_flux.shape)
 
+#normalized_flux = normalized_flux[:, :2000]
+#normalized_ivar = normalized_ivar[:, :2000]
+#dispersion = dispersion[:2000]
+
 elements = [label_name for label_name in labelled_set.dtype.names \
     if label_name not in ("PARAM_M_H", "SRC_H") and label_name.endswith("_H")]
 
@@ -46,7 +51,7 @@ assert np.sum(np.hstack([validate_set, test_set, train_set])) == q.size
 
 # Create a vectorizer for all models.
 vectorizer = tc.vectorizer.NormalizedPolynomialVectorizer(labelled_set,
-    tc.vectorizer.polynomial.terminator(["TEFF", "LOGG"] + elements, 2))
+    tc.vectorizer.polynomial.terminator(["TEFF", "LOGG", "FE_H"], 2))
 
 
 # Create a regularized Cannon model to try at different Lambda values.
@@ -213,16 +218,21 @@ for i in range(scaled_chi_sq.shape[1]):
     
 """
 
-wavelengths = [wavelengths[2], wavelengths[15]]
-Lambdas = 10**np.hstack([[0, 1, 2], np.arange(3, 6, 0.2)])
+#wavelengths = [wavelengths[2], wavelengths[15]]
+Lambdas = 10**np.hstack([[0, 1, 2], np.arange(3, 6, 0.1)])
 pixel_mask = np.searchsorted(dispersion, wavelengths)
 
+t_init = time()
 # BFGS
 regularizations, chi_sq, log_det, all_models = \
         regularized_cannon.validate_regularization(
             fixed_scatter=True, Lambdas=Lambdas, pixel_mask=pixel_mask,
-            initial_theta=True, op_kwargs={"xtol":1e-8, "ftol":1e-8})
+            initial_theta=None, 
+            op_kwargs={"xtol": 1e-10, "ftol": 1e-10},
+            op_bfgs_kwargs={"factr": 0.10, "pgtol": 1e-6})# "factr": 10.0, "epsilon": 1e-3})
 
+t = time() - t_init
+print(t)
 # Load old stuff.
 """
 import cPickle as pickle
@@ -231,9 +241,21 @@ with open("foo.pkl", "rb") as fp:
 """
 
 
+def calculate_optimal_lambda(Lambda, Q, tolerance=0.1, full_output=False):
+    # Return just the minimum:
+    #return Lambda[np.argmin(Q)]
+    #if full_output:
+    #    return (Lambda[np.argmin(Q)], np.argmin(Q))
+
+    # Return max({Lambda: Q(Lambda) < Q_min + tolerance })
+    index = np.where(Q < np.min(Q) + tolerance)[0][-1]
+    if full_output:
+        return (Lambda[index], index)
+    return Lambda[index]
+
 colours = ("#4C72B0", "#55A868", "#C44E52", "#8172B2", "#64B5CD")
 
-
+print(t)
 fig, ax = plt.subplots()
 """
 for i in range(chi_sq_fmin_xtol4.shape[1]):
@@ -248,7 +270,13 @@ scaled_chi_sq_bfgs = chi_sq - chi_sq[0]
 for i in range(scaled_chi_sq_bfgs.shape[1]):
     ax.plot(np.log10(Lambdas), scaled_chi_sq_bfgs[:, i], c=colours[i % len(colours)], lw=2)
 
+    best_Lambda, index = calculate_optimal_lambda(Lambdas, scaled_chi_sq_bfgs[:,i], full_output=True)
+    ax.scatter([np.log10(best_Lambda)], [scaled_chi_sq_bfgs[index,i]], facecolor=colours[i % len(colours)], s=100, zorder=100)
 
+ax.set_xlim(0, 6)
+ax.set_ylim(scaled_chi_sq_bfgs.min() - 1, 10)
+
+raise a
 
 raise a
 

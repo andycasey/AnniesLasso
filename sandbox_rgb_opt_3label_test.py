@@ -33,8 +33,6 @@ normalized_ivar = np.memmap(
     os.path.join(PATH, FILE_FORMAT).format("normalized-ivar"),
     mode="r", dtype=float).reshape(normalized_flux.shape)
 
-raise
-
 elements = [label_name for label_name in labelled_set.dtype.names \
     if label_name not in ("PARAM_M_H", "SRC_H") and label_name.endswith("_H")]
 
@@ -48,21 +46,18 @@ assert np.sum(np.hstack([validate_set, test_set, train_set])) == q.size
 
 # Create a vectorizer for all models.
 vectorizer = tc.vectorizer.NormalizedPolynomialVectorizer(labelled_set,
-    tc.vectorizer.polynomial.terminator(["TEFF", "LOGG"] + elements, 2))
+    tc.vectorizer.polynomial.terminator(["TEFF", "LOGG", "FE_H"], 2))
+"""
 
 # Create a zero regularization model and train it on 7/10ths the subset.
-standard_cannon = tc.L1RegularizedCannonModel(labelled_set[train_set],
+standard_cannon = tc.CannonModel(labelled_set[train_set],
     normalized_flux[train_set], normalized_ivar[train_set],
     dispersion=dispersion, threads=threads)
 standard_cannon.vectorizer = vectorizer
-standard_cannon.s2 = 0.0
-standard_cannon.regularization = 0.0
 
-"""
 model_filename = "apogee-rg-standard-cannon.model"
 if not os.path.exists(model_filename):
-    standard_cannon.train(fixed_scatter=True,
-        use_neighbouring_pixel_theta=True)
+    standard_cannon.train()
     standard_cannon.save(model_filename, overwrite=True)
 else:
     standard_cannon.load(model_filename)
@@ -72,77 +67,13 @@ aspcap_labels = np.array([labelled_set[label_name][test_set] \
     for label_name in vectorizer.label_names]).T
 standard_cannon_predicted_labels = standard_cannon.fit(
     normalized_flux[test_set], normalized_ivar[test_set])
+
 """
-
-
+# Create a regularized Cannon model to try at different Lambda values.
 regularized_cannon = tc.L1RegularizedCannonModel(labelled_set[train_set],
     normalized_flux[train_set], normalized_ivar[train_set],
     dispersion=dispersion, threads=threads)
 regularized_cannon.vectorizer = vectorizer
-regularized_cannon.regularization = 10**4
-
-"""
-model_filename = "apogee-rg-regularized-cannon.model"
-if not os.path.exists(model_filename):
-    regularized_cannon.train(initial_theta=True,
-        use_neighbouring_pixel_theta=True)
-    regularized_cannon.save(model_filename, overwrite=True)
-else:
-    regularized_cannon.load(model_filename)
-"""
-
-filenames = [
-    "apogee-rg-17label-regularized/10.35-theta.pickle",
-    "apogee-rg-17label-regularized/10.4-theta.pickle",
-    "apogee-rg-17label-regularized/10.45-theta.pickle",
-    "apogee-rg-17label-regularized/10.5-theta.pickle",
-]
-
-
-for filename in filenames:
-    print("Running on {}".format(filename))
-
-    output_filename = filename.replace(".pickle", "-differences.pickle")
-    if os.path.exists(output_filename): continue
-
-    with open(filename, "rb") as fp:
-        theta = pickle.load(fp)
-    regularized_cannon.theta = theta
-    regularized_cannon.s2 = 0.0
-
-
-    # Predict labels for the last 1/10th set and compare them to ASPCAP.
-    aspcap_labels = np.array([labelled_set[label_name][test_set] \
-        for label_name in vectorizer.label_names]).T
-    regularized_cannon_predicted_labels = regularized_cannon.fit(
-        normalized_flux[test_set], normalized_ivar[test_set])
-
-
-    with open(filename.replace(".pickle", "-differences.pickle"), "wb") as fp:
-        pickle.dump((aspcap_labels, regularized_cannon_predicted_labels), fp, -1)
-
-
-
-for filename in filenames:
-
-    filename = filename.replace(".pickle", "-differences.pickle")
-    print(filename)
-    with open(filename, "rb") as fp:
-        aspcap_labels, predicted_labels = pickle.load(fp)
-
-
-    print("INDEX NAME MEAN MEDIAN RMS RMEDIANS")
-    for i, label_name in enumerate(regularized_cannon.vectorizer.label_names):
-
-        difference = predicted_labels[:, i] - aspcap_labels[:, i]
-        print("{0} {1}: {2:.3f} {3:.3f} {4:.3f} {5:.3f}".format(i, label_name, 
-            np.mean(difference), np.median(difference),
-            np.sqrt(np.mean(difference**2)), np.sqrt(np.median(difference**2))))
-
-
-
-
-raise a
 
 
 # For ~50 pixels, try some Lambda values.
@@ -226,17 +157,19 @@ wavelengths.extend(
 
 
 # Set the model up for validation.
-Lambdas = 10**np.arange(1, 8.2, 0.2)
-regularized_cannon.s2 = 0.0
-pixel_mask = np.searchsorted(model.dispersion, wavelengths)
+Lambdas = 10**np.arange(1, 6, 0.1)
+pixel_mask = np.searchsorted(dispersion, wavelengths)
 
-output_filename = "apogee-rg-validation-all.pkl"
+assert len(wavelengths) > 1
+
+output_filename = "apogee-rg-validation-3-label-opt-test-4-new-init+bfgs+free_scatter-all.pkl"
 if not os.path.exists(output_filename):
     regularizations, chi_sq, log_det, all_models = \
         regularized_cannon.validate_regularization(
-            fixed_scatter=True, Lambdas=Lambdas, pixel_mask=pixel_mask, 
-            model_filename_format="apogee-rg-validation-{}.pkl", overwrite=True,
-            include_training_data=True)
+            fixed_scatter=False, Lambdas=Lambdas, pixel_mask=pixel_mask, 
+            initial_theta=True,
+            model_filename_format="apogee-rg-validation-3-label-opt-test-4-new-init+bfgs+free_scatter-{}.pkl", overwrite=True,
+            include_training_data=True, op_kwargs={"ftol": 1e-4, "xtol": 1e-4})
 
     with open(output_filename, "wb") as fp:
         pickle.dump((regularizations, chi_sq, log_det), fp, -1)
@@ -246,6 +179,7 @@ else:
         regularizations, chi_sq, log_det = pickle.load(fp)
 
 
+raise a
 # Do a full training
 
 

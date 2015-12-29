@@ -95,13 +95,15 @@ class BaseCannonModel(object):
         `normalized_ivar`, and the `dispersion` (when applicable).
     """
 
-    _descriptive_attributes = ["_vectorizer"]
     _trained_attributes = ["_s2", "_theta"]
-    _data_attributes \
-        = ["labelled_set", "dispersion", "normalized_flux", "normalized_ivar"]
+    _descriptive_attributes = ["_dispersion", "_vectorizer"]
+    _data_attributes = ["_labelled_set", "_normalized_flux", "_normalized_ivar"]
     
     def __init__(self, labelled_set, normalized_flux, normalized_ivar,
         dispersion=None, threads=1, pool=None, copy=False, verify=True):
+
+        if labelled_set is None and normalized_flux is None and normalized_ivar is None:
+            return None
 
         self._labelled_set = labelled_set
         self._normalized_flux = np.atleast_2d(normalized_flux)
@@ -336,7 +338,7 @@ class BaseCannonModel(object):
         Set the intrisic variance term for all pixels.
 
         :param s2:
-            A 1-d array of s2 values.
+            A 1-d array of `s^2` (intrinsic variance) values.
         """
 
         if s2 is None:

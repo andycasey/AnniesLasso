@@ -60,7 +60,7 @@ def load_model(filename, **kwargs):
     kwds.update(**kwargs)
 
     model = _class(
-        *[contents[attr] for attr in contents["metadata"]["data_attributes"]],
+        *[contents.get(attr, None) for attr in contents["metadata"]["data_attributes"]],
         **kwds)
 
     # Update information.

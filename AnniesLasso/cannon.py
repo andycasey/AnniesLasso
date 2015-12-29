@@ -144,6 +144,8 @@ class CannonModel(model.BaseCannonModel):
                 if use_neighbouring_pixel_theta:
                     previous_theta[-1] = results[-1][:-1]
 
+                logger.debug("Theta: {}".format(results[-1][:-1]))
+
             results = np.array(results)
 
         else:
@@ -209,6 +211,7 @@ class CannonModel(model.BaseCannonModel):
 
         # Unpack the results.
         self.theta, self.s2 = (results[:, :-1], results[:, -1]**2)
+
         assert np.all(self.s2 == 0.0)
         return None
 
@@ -256,13 +259,14 @@ class CannonModel(model.BaseCannonModel):
         }
         args = [normalized_flux, normalized_ivar]
         
-        f = utils.wrapper(_fit_spectrum, None, kwds, N_spectra, message=message)
+        f = utils.wrapper(_fit_spectrum_fmin, None, kwds, N_spectra, message=message)
 
         # Do the grunt work.
         mapper = map if self.pool is None else self.pool.map
-        labels, cov = map(np.array, zip(*mapper(f, [r for r in zip(*args)])))
+        labels = map(np.array, zip(*mapper(f, [r for r in zip(*args)])))
+        return labels
 
-        return (labels, cov) if kwargs.get("full_output", False) else labels
+        #return (labels) if kwargs.get("full_output", False) else labels
 
 
 def _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar,
@@ -335,8 +339,7 @@ def _fit_spectrum(normalized_flux, normalized_ivar, vectorizer, theta, s2,
     kwds = {
         "p0": vectorizer.fiducials,
         "maxfev": 10**6,
-        "sigma": np.sqrt(1.0/inv_var[use]),
-        "absolute_sigma": True
+        "sigma": inv_var[use],
     }
     kwds.update(kwargs)
     
@@ -344,6 +347,181 @@ def _fit_spectrum(normalized_flux, normalized_ivar, vectorizer, theta, s2,
     labels, cov = op.curve_fit(f, theta[use], normalized_flux[use], **kwds)
     return (labels, cov)
 
+
+
+
+
+def _fit_spectrum_fmin_powell(normalized_flux, normalized_ivar, vectorizer, theta, s2,
+    **kwargs):
+    """
+    Solve the labels for given pixel fluxes and uncertainties for a single star.
+
+    :param normalized_flux:
+        The normalized fluxes. These should be on the same dispersion scale
+        as the trained data.
+
+    :param normalized_ivar:
+        The 1-sigma uncertainties in the fluxes. This should have the same
+        shape as `normalized_flux`.
+
+    :param vectorizer:
+        The model vectorizer.
+
+    :param theta:
+        The theta coefficients obtained from the training phase.
+
+    :param s2:
+        The intrinsic pixel variance.
+
+    :returns:
+        The labels and covariance matrix.
+    """
+
+    """
+    # TODO: Re-visit this.
+    # Get an initial estimate of the label vector from a matrix inversion,
+    # and then ask the vectorizer to interpret that label vector into the 
+    # (approximate) values of the labels that could have produced that 
+    # label vector.
+    lv = _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar)
+    initial = vectorizer.get_approximate_labels(lv)
+    """
+
+    # Overlook the bad pixels.
+    inv_var = normalized_ivar/(1. + normalized_ivar * s2)
+    use = np.isfinite(inv_var * normalized_flux)
+
+    flux = normalized_flux[use]
+    ivar = normalized_ivar[use]
+
+    def objective(labels):
+        m = np.dot(theta, vectorizer(labels).T).flatten()
+        stuff = np.sum(ivar * (flux - m[use])**2)
+        print(labels, stuff)
+        return stuff
+
+    return op.fmin_powell(objective, kwargs.get("p0", vectorizer.fiducials),
+        xtol=1e-6, ftol=1e-6)
+
+
+
+
+def _fit_spectrum_leastsq(normalized_flux, normalized_ivar, vectorizer, theta, s2,
+    **kwargs):
+    """
+    Solve the labels for given pixel fluxes and uncertainties for a single star.
+
+    :param normalized_flux:
+        The normalized fluxes. These should be on the same dispersion scale
+        as the trained data.
+
+    :param normalized_ivar:
+        The 1-sigma uncertainties in the fluxes. This should have the same
+        shape as `normalized_flux`.
+
+    :param vectorizer:
+        The model vectorizer.
+
+    :param theta:
+        The theta coefficients obtained from the training phase.
+
+    :param s2:
+        The intrinsic pixel variance.
+
+    :returns:
+        The labels and covariance matrix.
+    """
+
+    """
+    # TODO: Re-visit this.
+    # Get an initial estimate of the label vector from a matrix inversion,
+    # and then ask the vectorizer to interpret that label vector into the 
+    # (approximate) values of the labels that could have produced that 
+    # label vector.
+    lv = _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar)
+    initial = vectorizer.get_approximate_labels(lv)
+    """
+
+    # Overlook the bad pixels.
+    inv_var = normalized_ivar/(1. + normalized_ivar * s2)
+    use = np.isfinite(inv_var * normalized_flux)
+
+    flux = normalized_flux[use]
+    inv_sigma = np.sqrt(normalized_ivar[use])
+
+    def objective(labels):
+        print(labels)
+        m = np.dot(theta, vectorizer(labels).T).flatten()
+        return (flux - m[use])
+
+    # leastsq uses:
+    # x = arg min(sum(func(y)**2, axis=0))
+    #          y
+    # so our func should be (delta/sqrt(ivar))
+
+    return op.leastsq(objective, kwargs.get("p0", vectorizer.fiducials),
+        maxfev=10**6, xtol=1e-6, ftol=1e-6)
+
+
+
+
+def _fit_spectrum_fmin(normalized_flux, normalized_ivar, vectorizer, theta, s2,
+    **kwargs):
+    """
+    Solve the labels for given pixel fluxes and uncertainties for a single star.
+
+    :param normalized_flux:
+        The normalized fluxes. These should be on the same dispersion scale
+        as the trained data.
+
+    :param normalized_ivar:
+        The 1-sigma uncertainties in the fluxes. This should have the same
+        shape as `normalized_flux`.
+
+    :param vectorizer:
+        The model vectorizer.
+
+    :param theta:
+        The theta coefficients obtained from the training phase.
+
+    :param s2:
+        The intrinsic pixel variance.
+
+    :returns:
+        The labels and covariance matrix.
+    """
+
+    """
+    # TODO: Re-visit this.
+    # Get an initial estimate of the label vector from a matrix inversion,
+    # and then ask the vectorizer to interpret that label vector into the 
+    # (approximate) values of the labels that could have produced that 
+    # label vector.
+    lv = _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar)
+    initial = vectorizer.get_approximate_labels(lv)
+    """
+
+    # Overlook the bad pixels.
+    inv_var = normalized_ivar/(1. + normalized_ivar * s2)
+    use = np.isfinite(inv_var * normalized_flux)
+
+    def objective(labels):
+        m = np.dot(theta, vectorizer(labels).T).flatten()
+        return np.sum(normalized_ivar[use] * (normalized_flux[use] - m[use])**2)
+
+    return op.fmin(objective, vectorizer.fiducials, disp=False, maxfun=np.inf,
+        maxiter=np.inf, xtol=1e-6, ftol=1e-6)
+
+    kwds = {
+        "p0": vectorizer.fiducials,
+        "maxfev": 10**6,
+        "sigma": inv_var[use],
+    }
+    kwds.update(kwargs)
+    
+    f = lambda t, *l: np.dot(t, vectorizer(l).T).flatten()
+    labels, cov = op.curve_fit(f, theta[use], normalized_flux[use], **kwds)
+    return (labels, cov)
 
 def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
     fixed_scatter=False, **kwargs):
