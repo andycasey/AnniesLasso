@@ -2,8 +2,8 @@
 layout: post
 title: "A project idea"
 description: "Custom written post descriptions are the way to go... if you're not lazy."
-tags: [sample post, video]
+tags: 
 categories: project
 ---
 
-Test project
+Test project.
