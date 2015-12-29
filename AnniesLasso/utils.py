@@ -47,7 +47,9 @@ class wrapper(object):
 
 
     def _update_progressbar(self):
-        
+        """
+        Increment the progressbar by one iteration.
+        """
         global _counter, _counter_lock
         with _counter_lock:
             _counter.value += 1

@@ -464,7 +464,8 @@ def L1Norm(Q):
 
 
 def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
-    normalized_flux, normalized_ivar, regularization, design_matrix):
+    normalized_flux, normalized_ivar, regularization, design_matrix,
+    gradient=True):
     """
     Fit the normalized flux for a single pixel (across many stars) given the
     theta parameters, a fixed scatter, and a fixed regularization term.
@@ -502,6 +503,9 @@ def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
     L1 = L1 - np.abs(theta[0])
 
     f = csq + regularization * L1
+    if not gradient:
+        return f
+
     g = d_csq + regularization * d_L1
     logger.debug(" --> {0:.2f} {1:.2f}".format(float(f), np.sum(np.abs(g))))
 
@@ -593,16 +597,23 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
     # Any actual information?
     if np.sum(normalized_ivar) < 1. * normalized_ivar.size: # MAGIC 
         return_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])
-        return np.hstack([return_theta, scatter if fixed_scatter else 0])
-
-    if initial_theta is None:
-        initial_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])
+        metadata = { "message": "No pixel information." }
+        return (np.hstack([return_theta, scatter if fixed_scatter else 0]), 
+            metadata)
 
     assert initial_theta is not True
+
+    if initial_theta is None:
+        #initial_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])
+        logger.debug("Calculating an initial theta from linear algebra")
+        initial_theta, _, __ = cannon._fit_theta(
+            normalized_flux, normalized_ivar, scatter, design_matrix)
+
+
     #elif initial_theta is True:
     #    initial_theta, _, __ = cannon._fit_theta(
-    #        normalized_flux, normalized_ivar, scatter, design_matrix)
-
+    #        normalized_flux, normalized_ivar, scatter, design_matrix)\
+    
     logger.debug("Using initial theta: {}".format(initial_theta))
     if fixed_scatter:
         p0 = initial_theta
@@ -613,6 +624,23 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
         p0 = np.hstack([initial_theta, scatter])
         func = _fit_pixel_with_fixed_regularization
         args = (normalized_flux, normalized_ivar, regularization, design_matrix)
+
+    """
+    option_a, _ = func(p0, *args)
+
+    from time import time
+    ta = time()
+
+    t_done = time() - ta
+    option_b, _ = func(alternative_p0, *args)
+    logger.info("Option {0} is {3:.0f}x better: {1} {2}".format(
+        "AB"[int(option_b < option_a)],
+        option_a, option_b,float(option_a/option_b)))
+    
+    args = list(args)
+    args[-1] = option_b
+    args = tuple(args)
+    """
 
     # Prepare keywords for optimization.
     kwds = {
@@ -630,29 +658,47 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
     op_params, fopt, d = op.fmin_l_bfgs_b(func, p0, fprime=None,
         approx_grad=False, **kwds)
 
+    metadata = {
+        "bfgs_fopt": fopt,
+        "bfgs_dict": d
+    }
+
     if d["warnflag"] > 0:
         logger.warning("BFGS stopped prematurely: {}".format(d["task"]))
 
         # Run Powell's method instead.
         #xtol, ftol = kwargs.get(("xtol", "ftol"), (1e-4, 1e-4))
-        kwds.update(kwargs.get("op_kwargs", {}))
+        kwds.update(kwargs.get("op_fmin_kwargs", {}))
         for k in bfgs_terms:
             del kwds[k]
 
         #print("using ftol xtol {0} {1}".format(xtol, ftol))
-        """
+
+        # Add 'False' to args so that we don't return gradient because fmin does
+        # not want it.
+        kwds["args"] = tuple(list(kwds["args"]) + [False])        
+
+        logger.debug("Passing keywords to FMIN: {}".format(kwds))
         op_params, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
             func, op_params, full_output=True, **kwds)
 
         if warnflag > 0:
             logger.warn("Powell optimization failed: {}".format([
-                    "Maximum number of function evaluations.",
-                    "Maximum number of iterations."
+                    "MAXIMUM NUMBER OF FUNCTION EVALUATIONS.",
+                    "MAXIMUM NUMBER OF ITERATIONS."
                 ][warnflag - 1]))
         else:
             logger.info("Powell optimization completed successfully.")
-        """        
-    return np.hstack([op_params, scatter]) if fixed_scatter else op_params
+        
+        metadata.update({
+            "fmin_fopt": fopt,
+            "fmin_niter": n_iter,
+            "fmin_nfuncs": n_funcs,
+            "fmin_warnflag": warnflag
+        })
+
+    result = np.hstack([op_params, scatter]) if fixed_scatter else op_params
+    return (result, metadata)
 
 
 

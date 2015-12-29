@@ -116,6 +116,7 @@ class CannonModel(model.BaseCannonModel):
         args = [self.normalized_flux.T, self.normalized_ivar.T, p0_scatter]
         args.extend(kwargs.get("additional_args", []))
 
+        pixel_metadata = []
         if self.pool is None:
             mapper = map
             
@@ -134,7 +135,9 @@ class CannonModel(model.BaseCannonModel):
                 #row[-1] = initial_theta
                 #row = tuple(row)
                 #print("ACTUALLY SENDING {}".format(initial_theta))
-                results.append(fitter(*row, **kwds))
+                result, metadata = fitter(*row, **kwds)
+                results.append(result)
+                pixel_metadata.append(metadata)
                 if use_neighbouring_pixel_theta:
                     previous_theta[-1] = results[-1][:-1]
 
@@ -155,13 +158,21 @@ class CannonModel(model.BaseCannonModel):
             # Wrap the function so we can parallelize it out.
             try:
                 f = utils.wrapper(fitter, None, kwds, N, message=message)
-                results = np.array(mapper(f, [row for row in zip(*args)]))
+                output = mapper(f, [row for row in zip(*args)])
 
             except KeyboardInterrupt:
                 logger.debug("Removing temporary filenames:\n{}".format(
                     "\n".join(temporary_filenames)))
                 map(os.remove, temporary_filenames)
 
+            else:
+                results = []
+                metadata = []
+                for r, m in output:
+                    results.append(r)
+                    metadata.append(m)
+
+                results = np.array(results)
 
         #self.theta = theta
         #self.s2 = scatter**2
