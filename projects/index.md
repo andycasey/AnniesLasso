@@ -1,10 +1,12 @@
 ---
 layout: post-index
-title: "Welcome to the Neo-HPSTR Blog"
-description: "Describe this nonsense."
-tags: [Jekyll, theme, themes, responsive, blog, modern]
+title: "Projects using The Cannon"
+tags: [theme, themes, responsive, blog, modern]
 comments: false
 ---
+
+
+There are too many exciting projects using The Cannon for us to do them all. Here we list projects that we are currently working on, projects we plan to work on in the future, and projects that are <i>free for all</i>.
 
 {% for post in site.categories.project %}
 <article class="hentry">
