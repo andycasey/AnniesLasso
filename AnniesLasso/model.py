@@ -102,33 +102,7 @@ class BaseCannonModel(object):
     def __init__(self, labelled_set, normalized_flux, normalized_ivar,
         dispersion=None, threads=1, pool=None, copy=False, verify=True):
 
-        if labelled_set is None and normalized_flux is None and normalized_ivar is None:
-            return None
-
-        self._labelled_set = labelled_set
-        self._normalized_flux = np.atleast_2d(normalized_flux)
-        self._normalized_ivar = np.atleast_2d(normalized_ivar)
-        self._dispersion = np.array(dispersion).flatten() \
-            if dispersion is not None \
-            else np.arange(self._normalized_flux.shape[1], dtype=int)
-
-        if copy:
-            self._labelled_set, self._dispersion \
-                = map(deepcopy, (self._labelled_set, self._dispersion))
-            self._normalized_flux, self._normalized_ivar, \
-                = map(deepcopy, (self._normalized_flux, self._normalized_ivar))
-
-        # Initialise descriptive attributes for the model and verify the data.
-        for attribute in self._descriptive_attributes:
-            setattr(self, attribute, None)
-        if verify: self._verify_training_data()
-        self.reset()
-
-        # Initialize a random, yet reproducible group of subsets.
-        np.random.seed(123)
-        self._metadata = {
-            "q": np.random.randint(0, 10, len(labelled_set))
-        }
+        self._metadata = {}
         if threads == 1:
             self.pool = None
         else:
@@ -141,6 +115,38 @@ class BaseCannonModel(object):
 
             self.pool = pool or utils.InterruptiblePool(threads,
                 initializer=init, initargs=(utils._counter,))
+
+        # Initialise descriptive attributes for the model and verify the data.
+        for attribute in self._descriptive_attributes:
+            setattr(self, attribute, None)
+
+        # Load in the labelled set.
+        if  labelled_set is None \
+        and normalized_flux is None \
+        and normalized_ivar is None:
+            self.reset()
+            return None
+
+        self._labelled_set = labelled_set
+        self._normalized_flux = np.atleast_2d(normalized_flux)
+        self._normalized_ivar = np.atleast_2d(normalized_ivar)
+        self._dispersion = np.array(dispersion).flatten() \
+            if dispersion is not None \
+            else np.arange(self._normalized_flux.shape[1], dtype=int)
+
+        # Initialize a random, yet reproducible group of subsets.
+        np.random.seed(123)
+        self._metadata["q"] = np.random.randint(0, 10, len(labelled_set))
+        
+        if copy:
+            self._labelled_set, self._dispersion \
+                = map(deepcopy, (self._labelled_set, self._dispersion))
+            self._normalized_flux, self._normalized_ivar, \
+                = map(deepcopy, (self._normalized_flux, self._normalized_ivar))
+
+        if verify: self._verify_training_data()
+        self.reset()
+
 
     def __str__(self):
         return "<{module}.{name} {trained}using a training set of {N} stars "\
