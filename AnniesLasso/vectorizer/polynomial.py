@@ -16,7 +16,7 @@ from collections import (Counter, OrderedDict)
 from itertools import combinations_with_replacement
 from six import string_types
 
-from .base import BaseVectorizer
+from AnniesLasso.vectorizer.base import BaseVectorizer
 
 
 class BasePolynomialVectorizer(BaseVectorizer):
@@ -63,7 +63,7 @@ class BasePolynomialVectorizer(BaseVectorizer):
             raise ValueError("labels must be a 1-d or 2-d array")
 
         # Offset and scale the labels before building the vector.
-        scaled_labels = (labels - self.fiducials)/self.scales
+        scaled_labels = self._transform(labels)
 
         columns = [np.ones(labels.shape[0], dtype=float)]
         for term in self.terms:
@@ -87,12 +87,36 @@ class BasePolynomialVectorizer(BaseVectorizer):
         """
 
         labels = np.atleast_2d(labels)
+        N_objects, N_labels = labels.shape
         if labels.ndim > 2:
             raise ValueError("labels must be a 1-d or 2-d array")
 
         # Offset and scale the labels before building the vector.
-        scaled_labels = (labels - self.fiducials)/self.scales
-        raise NotImplementedError("soon")
+        scaled_labels = self._transform(labels)
+
+        slices = np.arange(N_labels)
+        columns = [np.zeros((N_objects, N_labels))]
+        for term in self.terms:
+            indices_used_in_term = []
+            column = np.ones((N_objects, N_labels))
+            for index, order in term:
+                f = scaled_labels[:, index]**order
+                g = order * (scaled_labels[:, index]**(order - 1))
+
+                # If it's the index w.r.t. it, take derivative.
+                column[:, slices == index] *= g.reshape((-1, 1))
+                # Otherwise, calculate as normal.
+                column[:, slices != index] *= f.reshape((-1, 1))
+                indices_used_in_term.append(index)
+
+            # If labels are not in this term, the derivative w.r.t. them is zero
+            indices_missing_in_term = np.array(list(set(range(N_labels))\
+                .difference(indices_used_in_term)))
+            column[:, indices_missing_in_term] = 0
+            columns.append(column)
+
+        return np.hstack(columns).reshape((N_objects, -1, N_labels))
+
 
 
     def get_approximate_labels(self, label_vector):
@@ -128,7 +152,7 @@ class BasePolynomialVectorizer(BaseVectorizer):
         # put them as the fiducials)
         labels[~np.isfinite(labels)] = 0.
 
-        return labels * self.scales + self.fiducials
+        return self._inv_transform(labels)
 
 
     @property
