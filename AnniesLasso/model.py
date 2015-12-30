@@ -516,10 +516,9 @@ class BaseCannonModel(object):
         """
         return self.get_labels_array(self.labelled_set)
 
-    
+
     @requires_model_description
-    def get_labels_array(self, labelled_set=None):
-        if labelled_set is None: labelled_set = self.labelled_set
+    def get_labels_array(self, labelled_set):
         return np.vstack([labelled_set[label_name] \
             for label_name in self.vectorizer.label_names]).T
 
