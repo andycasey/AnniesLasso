@@ -202,7 +202,7 @@ class CannonModel(model.BaseCannonModel):
 
 
     @model.requires_training_wheels
-    def fit(self, normalized_flux, normalized_ivar, **kwargs):
+    def fit(self, normalized_flux, normalized_ivar, full_output=False, **kwargs):
         """
         Solve the labels for the given normalized fluxes and inverse variances.
 
@@ -217,6 +217,7 @@ class CannonModel(model.BaseCannonModel):
         :returns:
             The labels.
         """
+        print("OK IN")
         normalized_flux = np.atleast_2d(normalized_flux)
         normalized_ivar = np.atleast_2d(normalized_ivar)
 
@@ -230,13 +231,22 @@ class CannonModel(model.BaseCannonModel):
             "s2": self.s2
         }
         args = [normalized_flux, normalized_ivar]
-        
-        f = utils.wrapper(_fit_spectrum_fmin, None, kwds, N_spectra, message=message)
+        #if self.pool is None:
+
+        f = utils.wrapper(_fit_spectrum_bfgs, None, kwds, N_spectra, message=message)
 
         # Do the grunt work.
         mapper = map if self.pool is None else self.pool.map
-        labels = map(np.array, zip(*mapper(f, [r for r in zip(*args)])))
-        return labels
+
+        # Do a test run first?
+        #labels, cov = map(np.array, zip(*mapper(f, [r for r in zip(*args)[:1]])))
+
+
+
+        labels, cov = map(np.array, zip(*mapper(f, [r for r in zip(*args)])))
+        #labels = np.array(mapper(f, [r for r in zip(*args)]))
+        #return labels
+        return (labels, cov) if full_output else labels
 
         #return (labels) if kwargs.get("full_output", False) else labels
 
@@ -266,6 +276,191 @@ def _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar,
     A = np.dot(theta.T, inv_var[:, None] * theta)
     B = np.dot(theta.T, inv_var * normalized_flux)
     return np.linalg.solve(A, B)
+
+
+
+def _fit_spectrum_bfgs(normalized_flux, normalized_ivar, vectorizer, theta, s2,
+    **kwargs):
+    
+    adjusted_ivar = normalized_ivar/(1. + normalized_ivar * s2)
+    #use = np.isfinite(adjusted_ivar * normalized_flux)
+
+    #t = theta[use]
+    #flux = normalized_flux[use]
+    #adjusted_ivar = adjusted_ivar #np.sqrt(adjusted_ivar)#[use])
+    inv_sigma = np.sqrt(adjusted_ivar)
+
+    def objective(labels):
+        m = np.dot(theta, vectorizer(labels).T).flatten()
+        residual = (m - normalized_flux)
+        #f = adjusted_ivar * residual**2
+        #print(labels, f.sum())
+        #return f.sum()
+        f = inv_sigma * residual
+        #print(labels, f.sum())
+        return f
+
+    # Check the vectorizer whether it has a derivative built in.
+    try:
+        vectorizer.get_label_vector_derivative(vectorizer.fiducials)
+    
+    except NotImplementedError:
+        logger.debug("No label vector derivative available!")
+        Dfun = None
+
+    except:
+        logger.exception("Exception raised when trying to calculate the label "
+                         "vector derivative at the fiducial values:")
+        raise
+
+    else:
+        # Use the label vector derivative.
+        def Dfun(labels):
+            g = np.dot(theta, vectorizer.get_label_vector_derivative(labels)[0])
+            return inv_sigma * g.T
+
+        def gradient(labels):
+            m = np.dot(theta, vectorizer(labels).T).flatten()
+            residual = (m - normalized_flux)
+            g = np.dot(theta, vectorizer.get_label_vector_derivative(labels)[0])
+
+            return 2.0 * np.dot(g.T, adjusted_ivar * residual)
+
+    # MAGIC: GET A GOOD GUESS OF THE PARAMS.
+    kwds = {
+        "f": lambda _, *labels: np.dot(theta, vectorizer(list(labels) + [labels[-1]] * 14).T).flatten(),
+        "xdata": None, # theta is already available.
+        "ydata": normalized_flux,
+        "p0": np.array(vectorizer.fiducials[:3], dtype=float),
+        "sigma": adjusted_ivar,
+        "absolute_sigma": False,
+        #"check_finite": True,
+    }
+    kwds.update({ k: v for k, v in kwargs.items() if k in kwds })
+    
+    initial, cov = op.curve_fit(**kwds)
+    
+    initial = np.array(list(initial) + [initial[-1]] * 14)
+
+    kwds = {
+        "func": objective,
+        "x0": initial, #np.array(vectorizer.fiducials.copy(), dtype=float),
+        "args": (),
+        "Dfun": None,
+        "col_deriv": True,
+        "ftol": 7./3 - 4./3 - 1, # Machine precision.
+        "xtol": 7./3 - 4./3 - 1, # Machine precision.
+        "gtol": 0.0,
+        "maxfev": 10**8,
+        "epsfcn": None,
+        "factor": 0.1,
+        "diag": vectorizer.scales
+    }
+    # Only update the keywords with things that op.leastsq expects.
+    kwds.update({ k: v for k, v in kwargs.items() if k in kwds })
+
+    op_labels, cov, info, message, ier = op.leastsq(full_output=True, **kwds)
+
+    if ier not in range(1, 5):
+        logger.warning("Least-sq result was {0}: {1}".format(ier, message))
+        raise WhoaYouWannaKnowAboutThis
+
+    return (op_labels, cov)
+    """
+
+    """
+
+    kwds = {
+        "func": objective,
+        "x0": initial, #np.array(vectorizer.fiducials.copy(), dtype=float),
+        "fprime": gradient,
+        "args": (),
+        "approx_grad": False,
+        "bounds": None,
+        "m": 10,
+        "factr": 0.1,
+        "pgtol": 1e-6,
+        "epsilon": 1e-8,
+        "iprint": -1,
+        "disp": 0,
+        "maxfun": np.inf,
+        "maxiter": np.inf,
+        "callback": None,
+    }
+    # Only update the keywords with things that op.leastsq expects.
+    kwds.update({ k: v for k, v in kwargs.items() if k in kwds })
+
+    op_labels, fopt, info = op.fmin_l_bfgs_b(**kwds)
+
+    if info["warnflag"] > 0:
+        logger.warning("BFGS stopped prematurely: {}".format(info["task"]))
+    
+        kwds = {
+            "func": objective,
+            "x0": op_labels,
+            "args": (),
+            "xtol": 1e-6,
+            "ftol": 1e-6,
+            "maxiter": 10**8,
+            "maxfun": 10**8,
+            "disp": False,
+            "retall": False
+        }
+        # Only update the keywords with things that op.leastsq expects.
+        kwds.update({ k: v for k, v in kwargs.items() if k in kwds })
+
+        #op_labels, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
+        #    full_output=True, **kwds)
+        op_labels, fopt, n_iter, n_funcs, warnflag = op.fmin(full_output=True,
+            **kwds)
+
+        if warnflag > 0:
+            logger.warn("Powell optimization failed: {}".format([
+                    "MAXIMUM NUMBER OF FUNCTION EVALUATIONS.",
+                    "MAXIMUM NUMBER OF ITERATIONS."
+                ][warnflag - 1]))
+        else:
+            logger.info("Powell optimization completed successfully.")
+
+        metadata = {}
+        metadata.update({
+            "fmin_fopt": fopt,
+            "fmin_niter": n_iter,
+            "fmin_nfuncs": n_funcs,
+            "fmin_warnflag": warnflag
+        })
+
+    return (op_labels, fopt)
+    """
+
+    def f(xdata, *labels):
+        return np.dot(theta, vectorizer(labels).T).flatten()
+        #print(labels, f.sum())
+        #return f
+        
+
+    kwds = {
+        "f": lambda _, *labels: np.dot(theta, vectorizer(labels).T).flatten(),
+        "xdata": None, # theta is already available.
+        "ydata": normalized_flux,
+        #"p0": np.array(vectorizer.fiducials.copy(), dtype=float),
+        "p0": np.array([  4.54917822e+03, 2.36721921e+00, 1.15975127e-01, 3.03657055e-02
+, 9.72300023e-03 ,9.25753042e-02,-1.13341119e-02,5.66763096e-02
+, 2.43287757e-01,3.71136330e-02,5.40449992e-02,3.48223984e-01
+, 1.09878577e-01,2.43512809e-01,2.12157130e-01,5.76438233e-02,
+   -1.01278335e-01]),
+        "sigma": adjusted_ivar,
+        "absolute_sigma": False,
+        #"check_finite": True,
+    }
+    kwds.update({ k: v for k, v in kwargs.items() if k in kwds })
+    
+    op_labels, cov = op.curve_fit(**kwds)
+    print(op_labels)
+    return (op_labels, cov)
+    """
+
+
 
 
 def _fit_spectrum(normalized_flux, normalized_ivar, vectorizer, theta, s2,
@@ -366,6 +561,9 @@ def _fit_spectrum_fmin_powell(normalized_flux, normalized_ivar, vectorizer, thet
     flux = normalized_flux[use]
     ivar = normalized_ivar[use]
 
+    # y = (theta * lv - m)**2 * inv_var
+    # dy/dtheta = 
+
     def objective(labels):
         m = np.dot(theta, vectorizer(labels).T).flatten()
         stuff = np.sum(ivar * (flux - m[use])**2)
@@ -437,6 +635,7 @@ def _fit_spectrum_leastsq(normalized_flux, normalized_ivar, vectorizer, theta, s
 
 
 
+
 def _fit_spectrum_fmin(normalized_flux, normalized_ivar, vectorizer, theta, s2,
     **kwargs):
     """
@@ -477,9 +676,15 @@ def _fit_spectrum_fmin(normalized_flux, normalized_ivar, vectorizer, theta, s2,
     inv_var = normalized_ivar/(1. + normalized_ivar * s2)
     use = np.isfinite(inv_var * normalized_flux)
 
+    ivar = normalized_ivar[use]
+    flux = normalized_flux[use]
+    t = theta[use]
+
     def objective(labels):
-        m = np.dot(theta, vectorizer(labels).T).flatten()
-        return np.sum(normalized_ivar[use] * (normalized_flux[use] - m[use])**2)
+        m = np.dot(t, vectorizer(labels).T).flatten()
+        f = np.sum(normalized_ivar * (normalized_flux - m)**2)
+        #print(labels, f)
+        return f
 
     return op.fmin(objective, vectorizer.fiducials, disp=False, maxfun=np.inf,
         maxiter=np.inf, xtol=1e-6, ftol=1e-6)
@@ -487,12 +692,16 @@ def _fit_spectrum_fmin(normalized_flux, normalized_ivar, vectorizer, theta, s2,
     kwds = {
         "p0": vectorizer.fiducials,
         "maxfev": 10**6,
-        "sigma": inv_var[use],
+        "sigma": ivar,
     }
     kwds.update(kwargs)
     
-    f = lambda t, *l: np.dot(t, vectorizer(l).T).flatten()
-    labels, cov = op.curve_fit(f, theta[use], normalized_flux[use], **kwds)
+    #f = lambda t, *l: np.dot(t, vectorizer(l).T).flatten()
+    def f(t, *l):
+        f = np.dot(t, vectorizer(l).T).flatten()
+        #print(l)
+        return f
+    labels, cov = op.curve_fit(f, t, flux, **kwds)
     return (labels, cov)
 
 def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
