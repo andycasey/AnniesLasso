@@ -60,6 +60,7 @@ class BaseVectorizer(object):
         self._fiducials = fiducials
         self._scales = scales
         self._terms = terms
+        self._inv_scales = 1.0/scales
         return None
 
 
@@ -88,6 +89,21 @@ class BaseVectorizer(object):
         Set the state of the vectorizer.
         """
         self._label_names, self._fiducials, self._scales, self._terms = state
+        self._inv_scales = 1.0/self._scales
+
+
+    def _transform(self, labels):
+        """
+        Transform the labels by the fiducial values and scaling terms.
+        """
+        return (labels - self._fiducials) * self._inv_scales
+
+
+    def _inv_transform(self, labels):
+        """
+        Un-transform the labels.
+        """
+        return labels * self._scales + self._fiducials
 
 
     # Read-only attributes. Don't try and change the state; create a new object.
