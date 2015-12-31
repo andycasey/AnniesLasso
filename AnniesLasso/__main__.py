@@ -45,8 +45,8 @@ def train(model_filename, threads, condor, chunks, memory, save_training_data,
 
     # Load the model.
     model = tc.load_model(model_filename, threads=threads)
+    logger = logging.getLogger("AnniesLasso")
     if model.is_trained:
-        logger = logging.getLogger("AnniesLasso")
         logger.warn("Model loaded from {} is already trained.".format(
             model_filename))
 
