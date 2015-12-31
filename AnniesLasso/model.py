@@ -145,7 +145,7 @@ class BaseCannonModel(object):
     def _init_data_attributes(self, labelled_set, normalized_flux,
         normalized_ivar):
 
-        is_path = lambda p: isinstance(p, string_types) and os.path.exists(p)
+        is_path = lambda p: isinstance(p, string_types) and path.exists(p)
         if is_path(normalized_flux):
             normalized_flux = np.memmap(normalized_flux, mode="c", dtype=float)
             normalized_flux = normalized_flux.reshape((len(labelled_set), -1))
