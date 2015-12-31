@@ -19,6 +19,7 @@ from copy import deepcopy
 from datetime import datetime
 from os import path
 from six.moves import cPickle as pickle
+from six import string_types
 
 from .vectorizer.base import BaseVectorizer
 from . import (utils, __version__ as code_version)
@@ -158,7 +159,7 @@ class BaseCannonModel(object):
         self._normalized_ivar = np.atleast_2d(normalized_ivar)
         
         return None
-        
+
     def __str__(self):
         return "<{module}.{name} {trained}using a training set of {N} stars "\
                "with {M} pixels each>".format(module=self.__module__,
