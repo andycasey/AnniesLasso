@@ -157,12 +157,8 @@ class BaseCannonModel(object):
         self._normalized_flux = np.atleast_2d(normalized_flux)
         self._normalized_ivar = np.atleast_2d(normalized_ivar)
         
-
-
-normalized_flux = np.memmap(
-    os.path.join(PATH, FILE_FORMAT).format("flux"),
-    mode="r", dtype=float).reshape((len(labelled_set), -1))
-
+        return None
+        
     def __str__(self):
         return "<{module}.{name} {trained}using a training set of {N} stars "\
                "with {M} pixels each>".format(module=self.__module__,
