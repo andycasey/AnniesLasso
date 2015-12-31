@@ -5,10 +5,11 @@
 General utility functions.
 """
 
-__all__ = ["InterruptiblePool", "progressbar", "short_hash", "wrapper"]
+__all__ = ["InterruptiblePool", "progressbar", "short_hash", "wrapper", "_init_pool"]
 
 import functools
 import logging
+import multiprocessing
 import signal
 import sys
 from time import time
@@ -16,10 +17,43 @@ from collections import Iterable
 from hashlib import md5
 from multiprocessing.pool import Pool
 from multiprocessing import Lock, TimeoutError, Value
+from six.moves import cPickle as pickle
+from tempfile import mkstemp
+
+#mp = multiprocessing.get_context("spawn")
+
+
 
 logger = logging.getLogger(__name__)
 _counter = Value('i', 0)
 _counter_lock = Lock()
+
+import numpy as np
+
+class LargeSerializedObject(object):
+
+    def __init__(self, value):
+        # Create a temporary file and pickle the value to the file.
+        _, self.path = mkstemp()
+        self.shape = value.shape
+        m = np.memmap(self.path, dtype=float, mode="w+", shape=self.shape)
+        m[:] = value[:]
+        m.flush()
+        del m
+
+        #with open(self.path, "wb") as fp:
+        #    pickle.dump(value, fp, -1)
+
+    def __call__(self):
+        #with open(self.path, "rb") as fp:
+        #    value = pickle.load(fp)
+        m = np.memmap(self.path, dtype=float, mode="c")
+        return m.reshape(self.shape)
+
+
+def _init_pool(args):
+    global _counter
+    _counter = args
 
 class wrapper(object):
     """
@@ -28,10 +62,9 @@ class wrapper(object):
     def __init__(self, f, args, kwargs, N, message=None, size=100):
         self.f = f
         self.args = list(args if args is not None else [])
-        self.kwargs = kwargs
+        self.kwargs = kwargs if kwargs is not None else {}
         self._init_progressbar(message, N)
-
-
+        
     def _init_progressbar(self, message, N):
         """
         Initialise a progressbar.
@@ -44,8 +77,7 @@ class wrapper(object):
             sys.stdout.flush()
             with _counter_lock:
                 _counter.value = 0
-
-
+            
     def _update_progressbar(self):
         """
         Increment the progressbar by one iteration.

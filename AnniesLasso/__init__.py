@@ -6,6 +6,7 @@ __version__ = "0.1.0"
 import logging
 from numpy import RankWarning
 from warnings import simplefilter
+from sys import version_info
 
 from .cannon import *
 from .regularized import *
@@ -38,8 +39,16 @@ def load_model(filename, **kwargs):
     """
     from six.moves import cPickle as pickle # I know.
 
-    with open(filename, "rb") as fp:
-        contents = pickle.load(fp)
+    encodings = ("utf-8", "latin-1")
+    for encoding in encodings:
+        kwds = {"encoding": encoding} if version_info[0] >= 3 else {}
+        try:
+            with open(filename, "rb") as fp:        
+                contents = pickle.load(fp, **kwds)
+
+        except UnicodeDecodeError:
+            if encoding == encodings:
+                raise
 
     class_factory = contents["metadata"]["model_name"]
     if not class_factory.endswith("CannonModel"):
