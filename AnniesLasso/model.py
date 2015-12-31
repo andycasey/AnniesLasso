@@ -121,9 +121,8 @@ class BaseCannonModel(object):
             self.reset()
             return None
 
-        self._labelled_set = labelled_set
-        self._normalized_flux = np.atleast_2d(normalized_flux)
-        self._normalized_ivar = np.atleast_2d(normalized_ivar)
+        self._init_data_attributes(labelled_set, normalized_flux, normalized_ivar)
+
         self._dispersion = np.array(dispersion).flatten() \
             if dispersion is not None \
             else np.arange(self._normalized_flux.shape[1], dtype=int)
@@ -141,6 +140,28 @@ class BaseCannonModel(object):
         if verify: self._verify_training_data()
         self.reset()
 
+
+    def _init_data_attributes(self, labelled_set, normalized_flux,
+        normalized_ivar):
+
+        is_path = lambda p: isinstance(p, string_types) and os.path.exists(p)
+        if is_path(normalized_flux):
+            normalized_flux = np.memmap(normalized_flux, mode="c", dtype=float)
+            normalized_flux = normalized_flux.reshape((len(labelled_set), -1))
+
+        if is_path(normalized_ivar):
+            normalized_ivar = np.memmap(normalized_ivar, mode="c", dtype=float)
+            normalized_ivar = normalized_ivar.reshape((len(labelled_set), -1))
+            
+        self._labelled_set = labelled_set
+        self._normalized_flux = np.atleast_2d(normalized_flux)
+        self._normalized_ivar = np.atleast_2d(normalized_ivar)
+        
+
+
+normalized_flux = np.memmap(
+    os.path.join(PATH, FILE_FORMAT).format("flux"),
+    mode="r", dtype=float).reshape((len(labelled_set), -1))
 
     def __str__(self):
         return "<{module}.{name} {trained}using a training set of {N} stars "\

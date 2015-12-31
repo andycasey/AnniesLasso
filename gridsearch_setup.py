@@ -22,10 +22,10 @@ dispersion = np.memmap(os.path.join(PATH, FILE_FORMAT).format("dispersion"),
     mode="r", dtype=float)
 normalized_flux = np.memmap(
     os.path.join(PATH, FILE_FORMAT).format("flux"),
-    mode="r", dtype=float).reshape((len(labelled_set), -1))
+    mode="c", dtype=float).reshape((len(labelled_set), -1))
 normalized_ivar = np.memmap(
     os.path.join(PATH, FILE_FORMAT).format("ivar"),
-    mode="r", dtype=float).reshape(normalized_flux.shape)
+    mode="c", dtype=float).reshape(normalized_flux.shape)
 
 elements = [label_name for label_name in labelled_set.dtype.names \
     if label_name not in ("PARAM_M_H", "SRC_H") and label_name.endswith("_H")]
@@ -36,9 +36,22 @@ q = np.random.randint(0, 10, len(labelled_set)) % 10
 validate_set = (q == 0)
 train_set = (~validate_set)
 
+# Save the validate flux and ivar to disk.
+validate_flux = np.memmap(os.path.join(PATH, FILE_FORMAT).format("flux-train"),
+    mode="w", dtype=float, shape=normalized_flux[validate_set].shape)
+validate_flux[:] = normalized_flux[validate_set]
+validate_flux.flush()
+del validate_flux
+
+validate_ivar = np.memmap(os.path.join(PATH, FILE_FORMAT).format("ivar-train"),
+    mode="w", dtype=float, shape=normalized_ivar[validate_set].shape)
+validate_ivar[:] = normalized_ivar[validate_set]
+validate_ivar.flush()
+del validate_ivar
+
 
 ###
-scale_factors = [2, 5, 10, 20, 30, 40, 50]
+scale_factors = [0.5, 1, 2, 5, 10, 20, 30, 40, 50]
 Lambdas = 10**np.array([3, 3.5, 4, 4.5, 5])
 
 for scale_factor in scale_factors:
@@ -55,6 +68,8 @@ for scale_factor in scale_factors:
 
         model.s2 = 0.0
         model.regularization = Lambda
+        model._normalized_flux = os.path.join(PATH, FILE_FORMAT).format("flux-train")
+        model._normalized_ivar = os.path.join(PATH, FILE_FORMAT).format("ivar-train")
 
         # Save the model.
         model.save("gridsearch-{0:.0f}-{1:.1f}.model".format(
