@@ -432,7 +432,7 @@ class BaseCannonModel(object):
         }
 
         with open(filename, "wb") as fp:
-            pickle.dump(contents, fp, -1, encoding="utf-8")
+            pickle.dump(contents, fp, -1) 
 
         return None
 
