@@ -37,17 +37,17 @@ validate_set = (q == 0)
 train_set = (~validate_set)
 
 # Save the validate flux and ivar to disk.
-validate_flux = np.memmap(os.path.join(PATH, FILE_FORMAT).format("flux-train"),
-    mode="w+", dtype=float, shape=normalized_flux[validate_set].shape)
-validate_flux[:] = normalized_flux[validate_set]
-validate_flux.flush()
-del validate_flux
+train_flux = np.memmap(os.path.join(PATH, FILE_FORMAT).format("flux-train"),
+    mode="w+", dtype=float, shape=normalized_flux[train_set].shape)
+train_flux[:] = normalized_flux[train_set]
+train_flux.flush()
+del train_flux
 
-validate_ivar = np.memmap(os.path.join(PATH, FILE_FORMAT).format("ivar-train"),
-    mode="w+", dtype=float, shape=normalized_ivar[validate_set].shape)
-validate_ivar[:] = normalized_ivar[validate_set]
-validate_ivar.flush()
-del validate_ivar
+train_ivar = np.memmap(os.path.join(PATH, FILE_FORMAT).format("ivar-train"),
+    mode="w+", dtype=float, shape=normalized_ivar[train_set].shape)
+train_ivar[:] = normalized_ivar[train_set]
+train_ivar.flush()
+del train_ivar
 
 
 ###
