@@ -94,6 +94,8 @@ class BasePolynomialVectorizer(BaseVectorizer):
         # Offset and scale the labels before building the vector.
         scaled_labels = self._transform(labels)
 
+        assert N_objects == 1
+
         slices = np.arange(N_labels)
         columns = [np.zeros((N_objects, N_labels))]
         for term in self.terms:
@@ -115,7 +117,7 @@ class BasePolynomialVectorizer(BaseVectorizer):
             column[:, indices_missing_in_term] = 0
             columns.append(column)
 
-        return np.hstack(columns).reshape((N_objects, -1, N_labels))
+        return np.hstack(columns).reshape((N_objects, -1, N_labels))[0]
 
 
 

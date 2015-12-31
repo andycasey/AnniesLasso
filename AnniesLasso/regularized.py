@@ -11,14 +11,11 @@ from __future__ import (division, print_function, absolute_import,
 __all__ = ["L1RegularizedCannonModel"]
 
 import logging
-import cPickle as pickle
 import numpy as np
-import multiprocessing as mp
 import scipy.optimize as op
 from sys import stdout, maxsize
 from six import string_types
-
-#from autodiff import function, gradient
+from six.moves import cPickle as pickle
 
 from . import (cannon, model, utils)
 

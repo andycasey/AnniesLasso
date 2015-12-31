@@ -17,7 +17,6 @@ import numpy as np
 from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime
-from multiprocessing import Value
 from os import path
 from six.moves import cPickle as pickle
 
@@ -108,13 +107,8 @@ class BaseCannonModel(object):
         else:
             # Allow a negative to set the max number of threads.
             threads = None if threads < 0 else threads
-
-            def init(args):
-                global _counter
-                _counter = args
-
             self.pool = pool or utils.InterruptiblePool(threads,
-                initializer=init, initargs=(utils._counter,))
+                initializer=utils._init_pool, initargs=(utils._counter, ))
 
         # Initialise descriptive attributes for the model and verify the data.
         for attribute in self._descriptive_attributes:
@@ -438,12 +432,12 @@ class BaseCannonModel(object):
         }
 
         with open(filename, "wb") as fp:
-            pickle.dump(contents, fp, -1)
+            pickle.dump(contents, fp, -1, encoding="utf-8")
 
         return None
 
 
-    def load(self, filename, verify_training_data=False):
+    def load(self, filename, verify_training_data=False, **kwargs):
         """
         Load a saved model from disk.
 
@@ -456,9 +450,8 @@ class BaseCannonModel(object):
             to train the model is the same data provided when this model was
             instantiated.
         """
-
         with open(filename, "rb") as fp:
-            contents = pickle.load(fp)
+            contents = pickle.load(fp, **kwargs)
 
         assert contents["metadata"]["model_name"] == type(self).__name__
 
@@ -521,6 +514,7 @@ class BaseCannonModel(object):
     def get_labels_array(self, labelled_set):
         return np.vstack([labelled_set[label_name] \
             for label_name in self.vectorizer.label_names]).T
+
 
     @requires_training_wheels
     def fit_labelled_set(self):
