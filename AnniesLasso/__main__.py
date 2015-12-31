@@ -207,10 +207,10 @@ def main():
     # Training parsers.
     train_parser = subparsers.add_parser("train", parents=[parent_parser],
         help="Train an existing Cannon model.")
+    train_parser.add_argument("--save_training_data", type=bool, default=True,
+        help="Once trained, save the model using the training data.")
     train_parser.add_argument("model_filename", type=str,
         help="The path of the saved Cannon model.")
-    train_parser.add_argument("save_training_data", type=bool, default=True,
-        help="Once trained, save the model using the training data.")
     train_parser.set_defaults(func=train)
 
     # Parse the arguments and take care of any top-level arguments.
