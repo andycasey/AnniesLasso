@@ -32,7 +32,8 @@ def _condorlock_filename(path):
         os.path.dirname(path), os.path.basename(path))
 
 
-def train(model_filename, threads, condor, chunks, memory, **kwargs):
+def train(model_filename, threads, condor, chunks, memory, save_training_data,
+    **kwargs):
     """
     Train an existing model, with the option to distribute the work across many
     threads or condor resources.
@@ -156,7 +157,8 @@ def train(model_filename, threads, condor, chunks, memory, **kwargs):
 
     # Save the model.
     logger.info("Saving model to {}".format(model_filename))
-    model.save(model_filename, include_training_data=True, overwrite=True)
+    model.save(model_filename, include_training_data=save_training_data,
+        overwrite=True)
 
     # Are we a child Condor process?
     condorlock_filename = _condorlock_filename(model_filename)
@@ -205,7 +207,10 @@ def main():
     # Training parsers.
     train_parser = subparsers.add_parser("train", parents=[parent_parser],
         help="Train an existing Cannon model.")
-    train_parser.add_argument("model_filename", type=str)
+    train_parser.add_argument("model_filename", type=str,
+        help="The path of the saved Cannon model.")
+    train_parser.add_argument("save_training_data", type=bool, default=True,
+        help="Once trained, save the model using the training data.")
     train_parser.set_defaults(func=train)
 
     # Parse the arguments and take care of any top-level arguments.
