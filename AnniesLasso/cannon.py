@@ -10,13 +10,13 @@ from __future__ import (division, print_function, absolute_import,
 
 __all__ = ["CannonModel"]
 
-import cPickle as pickle
 import logging
 import numpy as np
 import scipy.optimize as op
 import tempfile
 import os
 from six import string_types
+from six.moves import cPickle as pickle
 
 from . import (model, utils)
 
@@ -217,38 +217,27 @@ class CannonModel(model.BaseCannonModel):
         :returns:
             The labels.
         """
-        print("OK IN")
+        
         normalized_flux = np.atleast_2d(normalized_flux)
         normalized_ivar = np.atleast_2d(normalized_ivar)
-
-        # Prepare the wrapper function and data.
         N_spectra = normalized_flux.shape[0]
+        
+        # Prepare the wrapper function and data.
         message = None if not kwargs.pop("progressbar", True) \
             else "Fitting {0} spectra".format(N_spectra)
-        kwds = {
-            "vectorizer": self.vectorizer,
-            "theta": self.theta,
-            "s2": self.s2
-        }
-        args = [normalized_flux, normalized_ivar]
-        #if self.pool is None:
+        
+        f = utils.wrapper(
+            _fit_spectrum_bfgs, (self.vectorizer, self.theta, self.s2), kwargs, 
+            N_spectra, message=message)
 
-        f = utils.wrapper(_fit_spectrum_bfgs, None, kwds, N_spectra, message=message)
-
-        # Do the grunt work.
+        args = (normalized_flux, normalized_ivar)
         mapper = map if self.pool is None else self.pool.map
 
-        # Do a test run first?
-        #labels, cov = map(np.array, zip(*mapper(f, [r for r in zip(*args)[:1]])))
+        labels, cov, metadata = zip(*mapper(f, zip(*args)))
+        labels, cov = map(np.array, (labels, cov))
 
+        return (labels, cov, metadata) if full_output else labels
 
-
-        labels, cov = map(np.array, zip(*mapper(f, [r for r in zip(*args)])))
-        #labels = np.array(mapper(f, [r for r in zip(*args)]))
-        #return labels
-        return (labels, cov) if full_output else labels
-
-        #return (labels) if kwargs.get("full_output", False) else labels
 
 
 def _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar,
@@ -278,27 +267,23 @@ def _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar,
     return np.linalg.solve(A, B)
 
 
+def foo(x, *labels):
+    t, v = x
+    #print(labels, v)
+    return np.dot(t, v(list(labels) + [labels[-1]] * 14).T).flatten()
+
+
 
 def _fit_spectrum_bfgs(normalized_flux, normalized_ivar, vectorizer, theta, s2,
     **kwargs):
-    
-    adjusted_ivar = normalized_ivar/(1. + normalized_ivar * s2)
-    #use = np.isfinite(adjusted_ivar * normalized_flux)
 
-    #t = theta[use]
-    #flux = normalized_flux[use]
-    #adjusted_ivar = adjusted_ivar #np.sqrt(adjusted_ivar)#[use])
-    inv_sigma = np.sqrt(adjusted_ivar)
+    adjusted_ivar = normalized_ivar/(1. + normalized_ivar * s2)
+    adjusted_inv_sigma = np.sqrt(adjusted_ivar)
+
 
     def objective(labels):
-        m = np.dot(theta, vectorizer(labels).T).flatten()
-        residual = (m - normalized_flux)
-        #f = adjusted_ivar * residual**2
-        #print(labels, f.sum())
-        #return f.sum()
-        f = inv_sigma * residual
-        #print(labels, f.sum())
-        return f
+        model_flux = np.dot(theta, vectorizer(labels).T).flatten()
+        return adjusted_inv_sigma * (model_flux - normalized_flux)
 
     # Check the vectorizer whether it has a derivative built in.
     try:
@@ -315,57 +300,46 @@ def _fit_spectrum_bfgs(normalized_flux, normalized_ivar, vectorizer, theta, s2,
 
     else:
         # Use the label vector derivative.
-        def Dfun(labels):
-            g = np.dot(theta, vectorizer.get_label_vector_derivative(labels)[0])
-            return inv_sigma * g.T
-
-        def gradient(labels):
-            m = np.dot(theta, vectorizer(labels).T).flatten()
-            residual = (m - normalized_flux)
-            g = np.dot(theta, vectorizer.get_label_vector_derivative(labels)[0])
-
-            return 2.0 * np.dot(g.T, adjusted_ivar * residual)
-
-    # MAGIC: GET A GOOD GUESS OF THE PARAMS.
-    kwds = {
-        "f": lambda _, *labels: np.dot(theta, vectorizer(list(labels) + [labels[-1]] * 14).T).flatten(),
-        "xdata": None, # theta is already available.
-        "ydata": normalized_flux,
-        "p0": np.array(vectorizer.fiducials[:3], dtype=float),
-        "sigma": adjusted_ivar,
-        "absolute_sigma": False,
-        #"check_finite": True,
-    }
-    kwds.update({ k: v for k, v in kwargs.items() if k in kwds })
-    
-    initial, cov = op.curve_fit(**kwds)
-    
-    initial = np.array(list(initial) + [initial[-1]] * 14)
+        # Presumably because of the way leastsq works, the adjusted_inv_sigma
+        # does not enter here, otherwise we get incorrect results.
+        
+        # TODO: Revisit this with Hogg.
+        #Dfun = lambda labels: \
+        #    np.dot(theta, vectorizer.get_label_vector_derivative(labels)).T
+        Dfun = None
 
     kwds = {
         "func": objective,
-        "x0": initial, #np.array(vectorizer.fiducials.copy(), dtype=float),
+        "x0": vectorizer.fiducials,
         "args": (),
-        "Dfun": None,
+        "Dfun": Dfun,
         "col_deriv": True,
         "ftol": 7./3 - 4./3 - 1, # Machine precision.
         "xtol": 7./3 - 4./3 - 1, # Machine precision.
         "gtol": 0.0,
-        "maxfev": 10**8,
+        "maxfev": int(2e4), # MAGIC
         "epsfcn": None,
-        "factor": 0.1,
-        "diag": vectorizer.scales
+        "factor": 0.1, # Smallest step size available for gradient approximation
+        "diag": 1.0/vectorizer.scales
     }
     # Only update the keywords with things that op.leastsq expects.
     kwds.update({ k: v for k, v in kwargs.items() if k in kwds })
-
-    op_labels, cov, info, message, ier = op.leastsq(full_output=True, **kwds)
+    op_labels, cov, meta, message, ier = op.leastsq(full_output=True, **kwds)
 
     if ier not in range(1, 5):
-        logger.warning("Least-sq result was {0}: {1}".format(ier, message))
-        raise WhoaYouWannaKnowAboutThis
+        logger.warn("Least-sq result was {0}: {1}".format(ier, message))
+    
+    # Save additional information.
+    meta.update({ 
+        "ier": ier,
+        "message": message,
+        "Dfun": Dfun is not None,
+    })
+    meta.update({ k: kwds[k] for k in \
+        ("ftol", "xtol", "gtol", "maxfev", "factor", "epsfcn") })
 
-    return (op_labels, cov)
+    return (op_labels, cov, meta)
+
     """
 
     """
