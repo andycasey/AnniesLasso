@@ -131,6 +131,8 @@ def train(model_filename, threads, condor, chunks, memory, save_training_data,
                     completed.append(each)
 
             waiting = list(set(waiting).difference(completed))
+            logger.info("Still waiting on {0} jobs:\n{1}".format(
+                len(waiting), "\n".join(waiting)))
 
             if len(waiting) == 0:
                 break
