@@ -71,6 +71,7 @@ def train(model_filename, threads, condor, chunks, memory, save_training_data,
         }
 
         # Split up the model into chunks based on the number of pixels.
+        condor_job = "condor.job" # MAGIC
         chunk_size = int(ceil(model.dispersion.size / float(chunks)))
         chunk_filenames = []
         for i in range(chunks):
@@ -96,11 +97,7 @@ def train(model_filename, threads, condor, chunks, memory, save_training_data,
             logger.info("Saved chunk {0} to {1}".format(i, chunk_filename))
             assert os.path.exists(chunk_filename)
 
-        # OK, now submit all jobs.
-        condor_job = "condor.job" # MAGIC
-        for i, chunk_filename in enumerate(chunk_filenames):
-            assert os.path.exists(chunk_filename)
-
+            # Now submit the jobs
             kwds = condor_kwds.copy()
             kwds.update({
                 "model_filename": chunk_filename,
@@ -174,6 +171,7 @@ def train(model_filename, threads, condor, chunks, memory, save_training_data,
         logger.info("Removing Condor lock {}".format(condorlock_filename))
         os.remove(condorlock_filename)
 
+    logger.info("Done")
     return model
 
 
