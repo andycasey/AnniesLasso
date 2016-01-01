@@ -34,7 +34,7 @@ def _condorlock_filename(path):
 
 
 def train(model_filename, threads, condor, chunks, memory, save_training_data,
-    condor_check_frequency, **kwargs):
+    condor_check_frequency, re_train, **kwargs):
     """
     Train an existing model, with the option to distribute the work across many
     threads or condor resources.
@@ -47,9 +47,11 @@ def train(model_filename, threads, condor, chunks, memory, save_training_data,
     # Load the model.
     model = tc.load_model(model_filename, threads=threads)
     logger = logging.getLogger("AnniesLasso")
-    if model.is_trained:
+    if model.is_trained and not re_train:
         logger.warn("Model loaded from {} is already trained.".format(
             model_filename))
+        logger.info("Exiting..")
+        return model
 
     if condor:
         # We will need some temporary place to put logs etc...
@@ -217,8 +219,11 @@ def main():
     train_parser = subparsers.add_parser("train", parents=[parent_parser],
         help="Train an existing Cannon model.")
     train_parser.add_argument("--save_training_data", default=False,
-        action="store_true",
+        action="store_true", dest="save_training_data",
         help="Once trained, save the model using the training data.")
+    train_parser.add_argument("--re-train", default=False,
+        action="store_true", dest="re_train",
+        help="Re-train the model if it is already trained.")
     train_parser.add_argument("model_filename", type=str,
         help="The path of the saved Cannon model.")
     train_parser.set_defaults(func=train)
