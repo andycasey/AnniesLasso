@@ -11,6 +11,7 @@ import os
 from numpy import ceil, zeros
 from subprocess import check_output
 from tempfile import mkstemp
+from time import sleep
 
 condor_code = """
 executable     = /opt/ioa/software/python/2.7/bin/python 
@@ -33,7 +34,7 @@ def _condorlock_filename(path):
 
 
 def train(model_filename, threads, condor, chunks, memory, save_training_data,
-    **kwargs):
+    condor_check_frequency, **kwargs):
     """
     Train an existing model, with the option to distribute the work across many
     threads or condor resources.
@@ -134,6 +135,7 @@ def train(model_filename, threads, condor, chunks, memory, save_training_data,
             if len(waiting) == 0:
                 break
 
+            sleep(condor_check_frequency)
             # Check for Condor log files  to see if they failed!
 
         logger.info("Collecting results")
@@ -153,7 +155,9 @@ def train(model_filename, threads, condor, chunks, memory, save_training_data,
             os.remove(chunk_filename)
 
     else:
-        model.train()
+        model.train(
+            op_kwargs={"xtol": 1e-6, "ftol": 1e-6},
+            op_bfgs_kwargs={"factr": 0.1, "pgtol": 1e-6})
 
     # Save the model.
     logger.info("Saving model to {}".format(model_filename))
@@ -198,6 +202,9 @@ def main():
         dest="memory", type=int, default=2000,
         help="The amount of memory (MB) to request for each Condor job. "\
              "This argument is ignored if --condor is not used.")
+    parent_parser.add_argument("--condor-check-frequency",
+        dest="condor_check_frequency", type=int, default=1,
+        help="The number of seconds to wait before checking for finished Condor jobs.")
 
 
     # Allow for multiple actions.
