@@ -29,6 +29,8 @@ from glob import glob
 filenames = [
     (_, "{}.model.validation".format(_), "{}.model.individual_visits".format(_)) for _ in glob("gridsearch*.model")]
 
+with open("apogee-rg-individual-visit-normalized.pickle", "rb") as fp:
+    individual_visits = pickle.load(fp, encoding="latin-1")
 
 for model_filename, validation_filename, output_filename in filenames:
 
@@ -85,7 +87,7 @@ for model_filename, validation_filename, output_filename in filenames:
     validation_apogee_ids = labelled_set["APOGEE_ID"][validate_set]
 
     if os.path.exists(output_filename): continue
-    
+
     # Now fit the individual visits.
     snrs = []
     apogee_ids = []
