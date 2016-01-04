@@ -84,7 +84,8 @@ for model_filename, validation_filename, output_filename in filenames:
 
     validation_apogee_ids = labelled_set["APOGEE_ID"][validate_set]
 
-
+    if os.path.exists(output_filename): continue
+    
     # Now fit the individual visits.
     snrs = []
     apogee_ids = []
