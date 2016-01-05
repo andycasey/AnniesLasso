@@ -460,6 +460,74 @@ def L1Norm(Q):
 
 
 
+
+
+
+
+
+def _leastsq_Dfun(theta, scatter,
+    normalized_flux, adjusted_ivar, regularization, design_matrix):
+    
+    residuals = np.dot(theta, design_matrix.T) - normalized_flux
+
+    g = 2.0 * np.dot(design_matrix.T, adjusted_ivar * residuals)
+
+    L1_norm_deriv = np.sign(theta)
+    L1_norm_deriv[0] = 0
+    
+
+    moo = g.T + regularization * np.sum(np.sign(theta[1:]))
+    #return moo
+    #raise a
+    # u
+    L1 = np.sum(np.abs(theta[1:]))
+    u = adjusted_ivar * residuals**2 + regularization * L1
+
+    g =  2.0 * np.dot(u.reshape((-1, 1)), moo.reshape((1, -1)))
+    return g
+
+
+def _leastsq_fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
+    normalized_flux, adjusted_ivar, regularization, design_matrix):
+    """
+    Fit the normalized flux for a single pixel (across many stars) given the
+    theta parameters, a fixed scatter, and a fixed regularization term.
+
+    :param theta:
+        The theta parameters to solve for.
+
+    :param scatter:
+        The fixed scatter term to apply.
+
+    :param normalized_flux:
+        The normalized flux values for a single pixel across many stars.
+
+    :param normalized_ivar:
+        The inverse variance of the normalized flux values for a single pixel
+        across many stars.
+
+    :param design_matrix:
+        The design matrix for the model.
+
+    :param regularization:
+        The regularization term to scale the L1 norm of theta with.
+    """
+
+    residuals = np.dot(theta, design_matrix.T) - normalized_flux
+    chi_sq = adjusted_ivar * residuals**2
+
+    L1 = np.sum(np.abs(theta[1:]))
+
+    f = chi_sq + regularization * L1
+    #print(theta, np.sum(f))
+    print(np.sum(f))
+    return np.sqrt(f)
+
+
+
+
+
+
 def _fit_pixel_with_fixed_regularization_and_fixed_scatter(theta, scatter,
     normalized_flux, normalized_ivar, regularization, design_matrix,
     gradient=True):
@@ -590,7 +658,6 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
         with open(design_matrix, "rb") as fp:
             design_matrix = pickle.load(fp)
 
-
     # Any actual information?
     if np.sum(normalized_ivar) < 1. * normalized_ivar.size: # MAGIC 
         return_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])
@@ -615,7 +682,8 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
     if fixed_scatter:
         p0 = initial_theta
         func = _fit_pixel_with_fixed_regularization_and_fixed_scatter
-        args = (scatter, normalized_flux, normalized_ivar, regularization,
+        adjusted_ivar = normalized_ivar/(1. + normalized_ivar * scatter**2)
+        args = (scatter, normalized_flux, adjusted_ivar, regularization,
             design_matrix)
     else:
         p0 = np.hstack([initial_theta, scatter])
@@ -623,20 +691,46 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
         args = (normalized_flux, normalized_ivar, regularization, design_matrix)
 
     """
-    option_a, _ = func(p0, *args)
+    LEASTSQ
+    """
+    
+    alternative_p0 = np.ones_like(initial_theta)
+    alternative_p0[1:] = 0.0
+
+    if func(alternative_p0, *args) < func(p0, *args):
+        p0 = alternative_p0
+
+    """
+    kwds = {
+        "func": _leastsq_fit_pixel_with_fixed_regularization_and_fixed_scatter,
+        "x0": p0,
+        "Dfun": None,
+        "col_deriv": False,
+        "args": args,
+        "ftol": 7./3 - 4./3 - 1,
+        "xtol": 7./3 - 4./3 - 1,
+        "gtol": 0.0,
+        "maxfev": int(2e6),
+        "epsfcn": None,
+        "factor": 0.1,
+        #"diag": None
+    }
 
     from time import time
     ta = time()
+    op_theta, cov, meta, message, ier = op.leastsq(full_output=True, **kwds)
+    tb = time() - ta
 
-    t_done = time() - ta
-    option_b, _ = func(alternative_p0, *args)
-    logger.info("Option {0} is {3:.0f}x better: {1} {2}".format(
-        "AB"[int(option_b < option_a)],
-        option_a, option_b,float(option_a/option_b)))
-    
-    args = list(args)
-    args[-1] = option_b
-    args = tuple(args)
+    meta.update({
+        "ier": ier,
+        "Dfun": kwds.get("Dfun", None) is not None,
+        "message": message,
+        "leastsq": True
+    })
+    if ier not in range(1, 5):
+        logger.warn("Least-sq result was {0} {1}".format(ier, message))
+
+    raise a
     """
 
     # Prepare keywords for optimization.
@@ -645,12 +739,16 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
         "disp": False,
         "maxfun": np.inf,
         "maxiter": np.inf,
+        "m": p0.size,
     }
     bfgs_terms = kwargs.pop("op_bfgs_kwargs", {})
     kwds.update(bfgs_terms)
 
     logger.debug("Checking that kwds are going in to bFGS: {}".format(kwds))
     assert scatter == 0.0
+
+    from time import time
+    t = time()
 
     op_params, fopt, d = op.fmin_l_bfgs_b(func, p0, fprime=None,
         approx_grad=False, **kwds)
@@ -693,7 +791,9 @@ def _fit_regularized_pixel(normalized_flux, normalized_ivar, scatter,
             "fmin_nfuncs": n_funcs,
             "fmin_warnflag": warnflag
         })
-
+    
+    print(time() - t, func(op_params, *args)[0])
+    
     result = np.hstack([op_params, scatter]) if fixed_scatter else op_params
     return (result, metadata)
 

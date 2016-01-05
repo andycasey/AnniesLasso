@@ -157,8 +157,8 @@ def train(model_filename, threads, condor, chunks, memory, save_training_data,
 
     else:
         model.train(
-            op_kwargs={"xtol": 1e-6, "ftol": 1e-6},
-            op_bfgs_kwargs={"factr": 0.1, "pgtol": 1e-6})
+            op_kwargs={"xtol": kwargs["xtol"], "ftol": kwargs["ftol"]},
+            op_bfgs_kwargs={"factr": kwargs["factr"], "pgtol": kwargs["pgtol"]})
 
     # Save the model.
     logger.info("Saving model to {}".format(model_filename))
@@ -224,6 +224,14 @@ def main():
         help="Re-train the model if it is already trained.")
     train_parser.add_argument("model_filename", type=str,
         help="The path of the saved Cannon model.")
+    train_parser.add_argument("--factr", default=10000000.0, dest="factr",
+        help="BFGS keyword argument")
+    train_parser.add_argument("--pgtol", default=1e-5, dest="pgtol",
+        help="BFGS keyword argument")
+    train_parser.add_argument("--xtol", default=1e-6, dest="xtol",
+        help="fmin_powell keyword argument")
+    train_parser.add_argument("--ftol", default=1e-6, dest="ftol",
+        help="fmin_powell keyword argument")
     train_parser.set_defaults(func=train)
 
     # Parse the arguments and take care of any top-level arguments.
