@@ -10,7 +10,6 @@ from astropy.table import Table
 
 import AnniesLasso as tc
 
-np.random.seed(123) # For reproducibility.
 
 model_filename = "apogee-rg-custom-17label-REGULARIZED-theta_linalg_init-bfgs_factr0.1_pgtol1e-6-fmin_xtol-1e-6-ftol-1e-6.pickle.backup"
 validation_filename = "apogee-rg-custom-17label-REGULARIZED-theta_linalg_init-bfgs_factr0.1_pgtol1e-6-fmin_xtol-1e-6-ftol-1e-6-VALIDATED.pickle"
@@ -26,11 +25,38 @@ output_filename = "apogee-rg-17label-theta_linalg_init-bfgs_factr0.1_pgtol1e-6-f
 #output_filename = "gridsearch-0.5-4.0.model.individual_visits"
 
 from glob import glob
-filenames = [
-    (_, "{}.model.validation".format(_), "{}.model.individual_visits".format(_)) for _ in glob("gridsearch*.model")]
+filenames = [(_, "{}.validation".format(_), "{}.individual_visits".format(_)) \
+    for _ in glob("gridsearch*.model")]
 
 with open("apogee-rg-individual-visit-normalized.pickle", "rb") as fp:
     individual_visits = pickle.load(fp, encoding="latin-1")
+
+# Data.
+PATH, CATALOG, FILE_FORMAT = ("/data/arc/research/AnniesLasso/", "apogee-rg.fits",
+    "apogee-rg-custom-normalization-{}.memmap")
+
+# Load the data.
+labelled_set = Table.read(os.path.join(PATH, CATALOG))
+dispersion = np.memmap(os.path.join(PATH, FILE_FORMAT).format("dispersion"),
+    mode="c", dtype=float)
+normalized_flux = np.memmap(
+    os.path.join(PATH, FILE_FORMAT).format("flux"),
+    mode="c", dtype=float).reshape((len(labelled_set), -1))
+normalized_ivar = np.memmap(
+    os.path.join(PATH, FILE_FORMAT).format("ivar"),
+    mode="c", dtype=float).reshape(normalized_flux.shape)
+
+elements = [label_name for label_name in labelled_set.dtype.names \
+    if label_name not in ("PARAM_M_H", "SRC_H") and label_name.endswith("_H")]
+
+np.random.seed(123) # For reproducibility.
+
+# Split up the data into ten random subsets.
+q = np.random.randint(0, 10, len(labelled_set))
+
+validate_set = (q == 0)
+train_set = (~validate_set)
+
 
 for model_filename, validation_filename, output_filename in filenames:
 
@@ -38,35 +64,16 @@ for model_filename, validation_filename, output_filename in filenames:
     print("Validation filename {}".format(validation_filename))
     print("Output filename {}".format(output_filename))
 
-
-    # Data.
-    PATH, CATALOG, FILE_FORMAT = ("/Users/arc/research/apogee/", "apogee-rg.fits",
-        "apogee-rg-custom-normalization-{}.memmap")
-
-    # Load the data.
-    labelled_set = Table.read(os.path.join(PATH, CATALOG))
-    dispersion = np.memmap(os.path.join(PATH, FILE_FORMAT).format("dispersion"),
-        mode="c", dtype=float)
-    normalized_flux = np.memmap(
-        os.path.join(PATH, FILE_FORMAT).format("flux"),
-        mode="c", dtype=float).reshape((len(labelled_set), -1))
-    normalized_ivar = np.memmap(
-        os.path.join(PATH, FILE_FORMAT).format("ivar"),
-        mode="c", dtype=float).reshape(normalized_flux.shape)
-
-    elements = [label_name for label_name in labelled_set.dtype.names \
-        if label_name not in ("PARAM_M_H", "SRC_H") and label_name.endswith("_H")]
-
-    # Split up the data into ten random subsets.
-    q = np.random.randint(0, 10, len(labelled_set))
-
-    validate_set = (q == 0)
-    train_set = (~validate_set)
-
     # Load the model
-    model = tc.load_model(model_filename, threads=1)
-    if not model.is_trained: continue
+    model = tc.load_model(model_filename, threads=32, encoding="latin-1")
+    if not model.is_trained:
+        print("Not trained..")
+        continue
 
+    if os.path.exists(validation_filename) and os.path.exists(output_filename):
+        print("Done here..")
+        continue
+    
     # Load any high S/N stuff from the validation set.
     if not os.path.exists(validation_filename):
         expected = model.get_labels_array(labelled_set[validate_set])
@@ -77,7 +84,7 @@ for model_filename, validation_filename, output_filename in filenames:
 
     else:
         with open(validation_filename, "rb") as fp:
-            contents = pickle.load(fp, encoding="latin-1")
+            contents = pickle.load(fp, encoding="latin-1") 
 
         if len(contents) == 3:
             expected, inferred, _ = contents
@@ -119,7 +126,7 @@ for model_filename, validation_filename, output_filename in filenames:
         differences_expected.extend(difference_expected)
 
         print(i, apogee_id)
-
+        """
         if i % 10 == 0 and i > 0:
             plt.close("all")
 
@@ -140,7 +147,7 @@ for model_filename, validation_filename, output_filename in filenames:
             
             plt.draw()
             plt.show()
-
+        """
 
     # Now plot all them things.
     single_visit_inferred = np.array(single_visit_inferred)
@@ -151,22 +158,3 @@ for model_filename, validation_filename, output_filename in filenames:
     with open(output_filename, "wb") as fp:
         pickle.dump(data, fp, -1)
     print("Saved to {}".format(output_filename))
-
-"""
-plt.close("all")
-
-for i in range(17):
-
-    fig, ax = plt.subplots(1, 2)
-    ok = single_visit_inferred_[:,1] < 3
-    ax[0].scatter(snrs_[~ok], np.abs(differences_expected_[:, i])[~ok], facecolor="r")
-    ax[0].scatter(snrs_[ok], np.abs(differences_expected_[:, i])[ok], facecolor="k")
-    ax[0].set_title("wrt ASPCAP")
-
-    ax[1].scatter(snrs_[~ok], np.abs(differences_inferred_[:, i])[~ok], facecolor="r")
-    ax[1].scatter(snrs_[ok], np.abs(differences_inferred_[:, i])[ok], facecolor="k")
-    ax[1].set_title("wrt TC")
-    
-plt.draw()
-plt.show()
-"""
