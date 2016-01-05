@@ -98,7 +98,7 @@ if __name__ == "__main__":
             
     # Joint things for prettyness.
     fig.axes[-1].set_ylim(0.1, 100)
-    fig.axes[-1].set_xlim(10**2.5, 10**5.5)
+    fig.axes[-1].set_xlim(fig.axes[-1].get_xlim()[0], 10**5.5)
     
     fig.tight_layout()
 
@@ -113,7 +113,7 @@ if __name__ == "__main__":
     cbar.set_ticks(ticks)
     cbar.set_ticklabels([r"${:.1f}$".format(_) for _ in scale_factors])
     cbar.ax.tick_params(width=0)
-    cbar.set_label(r"$\rm{Scale}$ $\rm{factor}$")
+    cbar.set_label(r"$\rm{Scale}$ $\rm{factor,}$ $f$")
     fig.subplots_adjust(right=0.88)
     
     fig.savefig("papers/sparsity.pdf", dpi=300)
