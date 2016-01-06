@@ -18,6 +18,7 @@
 
 \newcommand{\project}[1]{\textsl{#1}}
 \newcommand{\TheCannon}{\project{The~Cannon}}
+\newcommand{\tc}{\TheCannon}
 \newcommand{\acronym}[1]{{\small{#1}}}
 \newcommand{\sdss}{\project{\acronym{SDSS-IV}}}
 \newcommand{\apogee}{\project{\acronym{APOGEE2}}}
@@ -424,13 +425,7 @@ We employ the \apogee\ Data Release 12 data to demonstrate the effectiveness
 of \TheCannon\ and the regularization approach in a high-dimensional label space.
 We constructed our labelled set (recall that the training and validation sets are subsets of the labelled set) using sensible criteria for  
 stars in version \texttt{v603} from the \aspcap\ 
-pipeline, and used fluxes from the individual \texttt{aspcapStar} data files.
-The \texttt{aspcapStar} files contain (approximately) continuum-normalized 
-spectra, often stacked from multiple visits, and an error array for those 
-fluxes.  All spectra have been placed at rest-frame (vacuum wavelengths), and
-resampled onto a common log-wavelength scale. In total, there are NNNNN science
-objects.
-
+pipeline.
 We employed several quality criteria to distill a robust yet representative 
 labelled set: We removed any stars with problematic flags from the \aspcap\
 pipeline, requiring \texttt{ASPCAPFLAG = 0}.  We excluded stars with 
@@ -446,6 +441,22 @@ labelled set such that $\mathrm{[V/Fe]} > -0.6$.  The distilled sample
 includes 14,141 red giant branch stars that will form our labelled set, with [Fe/H] labels ranging from
 $\mathrm{[Fe/H]} = [-2.10, 0.30]$. 
 
+
+The \texttt{apStar} files contain rest-wavelength, resampled fluxes from
+individual visits for a given star, and an error array for those fluxes.
+Although the \texttt{aspcapStar} files contain stacked, pseudo-continuum normalized
+spectra for a given star, we chose to use the fluxes from the \texttt{apStar}
+data files throughout this work.  Our reasoning is as follows.  The \aspcap\
+pipeline uses a running window to determine the continuum.  For this reason
+it is provably variant with S/N ratios: at low S/N ratios the inferred continuum
+will be systematically shifted with respect to the same star observed in high S/N.
+Although our labelled set only includes high S/N spectra, our model would suffer
+if we employed the \aspcap\ normalization procedure for low S/N spectra in the
+test set.  Adopting a robust, S/N-invariant continuum normalization procedure
+is paramount. Thus, we opted to normalize and stack the fluxes from individual
+visits provided in the \texttt{apStar} files.
+
+
 DWH: How did we combine the ivars and the flags to make better ivars?
 
 DWH: What is different about our continuum normalization from everyone else's?
@@ -457,7 +468,12 @@ DWH: Emphasize that if you use traditional continuum methods,
 
 DWH: We re-stacked the spectra ourselves, because we are that hardcore.
 
-DWH: Line-spread-function variations exist and we suck in this regard.
+%DWH: Line-spread-function variations exist and we suck in this regard.
+The line spread function of \apogee\ spectra is wavelength- and fibre-dependent.
+Given this information, our current implementation of \tc\ is knowingly sub-optimal:
+we assume nothing about differing line spread functions between stars in the labelled
+or unlabelled set. Similarly, we make no effort to accommodate fast-rotating stars, where the effect on the spectrum is approximately represented by convolution with a Gaussian kernel (in the same way a lower resolution would be). 
+
 
 
 %DWH: Define the various possible sets of ``labeled'' stars and the set of ``unlabeled''
@@ -533,6 +549,9 @@ the abundance of another.
 A good example is shown in \figurename~\ref{fig:whatever}, where we
 see WHATEVER.
 DWH: Yada Yada...
+
+
+ARC: The fact that we do so badly for [V/H], yet [V/H] is empirically covariant with [Fe/H] in the same way that other Fe-peak abundance labels are, tells us that there is a fundamental limit to how much empirically covariant information is entering into our results!
 
 
 DWH: No accounting for variable spectroscopic resolution, nor
