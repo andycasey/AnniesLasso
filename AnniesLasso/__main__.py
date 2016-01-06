@@ -102,7 +102,7 @@ def fit(model_filename, spectrum_filenames, threads, clobber, **kwargs):
 
 
     logger.info("Number of failures: {}".format(failures))
-    logger.info("Number of successes: {}",format(N - failures))
+    logger.info("Number of successes: {}".format(N - failures))
 
     return None
 
