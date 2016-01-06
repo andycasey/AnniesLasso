@@ -10,6 +10,7 @@ import logging
 import os
 from numpy import ceil, zeros
 from subprocess import check_output
+from six.moves import cPickle as pickle
 from tempfile import mkstemp
 from time import sleep
 
@@ -31,6 +32,72 @@ queue
 def _condorlock_filename(path):
     return "{0}/.{1}.condorlock".format(
         os.path.dirname(path), os.path.basename(path))
+
+
+def fit(model_filename, spectrum_filenames, threads, clobber, **kwargs):
+    """
+    Fit a series of spectra.
+    """
+
+    import AnniesLasso as tc
+
+    model = tc.load_model(model_filename, threads=threads)
+    logger = logging.getLogger("AnniesLasso")
+    assert model.is_trained
+
+    chunk_size = 1000 if threads > 1 else 1
+    fluxes = []
+    ivars = []
+    output_filenames = []
+    failures = 0
+    N = len(spectrum_filenames)
+    for i, filename in enumerate(spectrum_filenames):
+        logger.info("At spectrum {0}/{1}: {2}".format(i + 1, N, filename))
+
+        basename, _ = os.path.splitext(filename)
+        output_filename = "{}_result.pkl".format(basename)
+
+        if os.path.exists(output_filename) and not clobber:
+            logger.info("Output filename {} already exists and not clobbering."\
+                .format(output_filename))
+            continue
+
+        try:
+            with open(filename, "rb") as fp:
+                flux, ivar = pickle.load(fp)
+                fluxes.append(flux)
+                ivars.append(ivar)
+
+            output_filenames.append(output_filename)
+
+        except:
+            logger.exception("Error occurred loading {}".format(filename))
+            failures += 1
+
+        else:
+            if len(output_filenames) >= chunk_size:
+                results = model.fit(fluxes, ivars)
+
+                for result, output_filename in zip(results, output_filenames):
+                    with open(output_filename, "wb") as fp:
+                        pickle.dump(result, fp, 2) # For legacy.
+                    logger.info("Saved output to {}".format(output_filename))
+                    del output_filenames[0:], fluxes[0:], ivars[0:]
+
+
+    if len(output_filenames) > 0:
+        results = model.fit(fluxes, ivars)
+
+        for result, output_filename in zip(results, output_filenames):
+            with open(output_filename, "wb") as fp:
+                pickle.dump(result, fp, 2) # For legacy.
+            logger.info("Saved output to {}".format(output_filename))
+            del output_filenames[0:], fluxes[0:], ivars[0:]
+
+
+    logger.info("Number of failures: {}".format(failures))
+    
+    return None
 
 
 def train(model_filename, threads, condor, chunks, memory, save_training_data,
@@ -233,6 +300,18 @@ def main():
     train_parser.add_argument("--ftol", default=1e-6, dest="ftol",
         help="fmin_powell keyword argument")
     train_parser.set_defaults(func=train)
+
+
+    # Fitting parser.
+    fit_parser = subparsers.add_parser("fit", parents=[parent_parser],
+        help="Fit stacked spectra using a trained model.")
+    fit_parser.add_argument("model_filename", type=str,
+        help="The path of a trained Cannon model.")
+    fit_parser.add_argument("spectrum_filenames", nargs="+", type=str,
+        help="Paths of spectra to fit.")
+    fit_parser.add_argument("--clobber", dest="clobber", default=False,
+        type=bool, help="Overwrite existing output files.")
+    fit_parser.set_defaults(func=fit)
 
     # Parse the arguments and take care of any top-level arguments.
     args = parser.parse_args()
