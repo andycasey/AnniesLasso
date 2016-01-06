@@ -34,7 +34,8 @@ def _condorlock_filename(path):
         os.path.dirname(path), os.path.basename(path))
 
 
-def fit(model_filename, spectrum_filenames, threads, clobber, **kwargs):
+def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
+    **kwargs):
     """
     Fit a series of spectra.
     """
@@ -50,6 +51,12 @@ def fit(model_filename, spectrum_filenames, threads, clobber, **kwargs):
     ivars = []
     output_filenames = []
     failures = 0
+
+    if from_filename:
+        with open(spectrum_filenames[0], "r") as fp:
+            _ = map(str.strip, fp.readlines())
+        spectrum_filenames = _
+
     N = len(spectrum_filenames)
     for i, filename in enumerate(spectrum_filenames):
         logger.info("At spectrum {0}/{1}: {2}".format(i + 1, N, filename))
@@ -318,6 +325,8 @@ def main():
         help="Paths of spectra to fit.")
     fit_parser.add_argument("--clobber", dest="clobber", default=False,
         type=bool, help="Overwrite existing output files.")
+    fit_parser.add_argument("--from-filename", dest="from_filename",
+        action="store_true", default=False, help="Read spectrum filenames from file")
     fit_parser.set_defaults(func=fit)
 
     # Parse the arguments and take care of any top-level arguments.

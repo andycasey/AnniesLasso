@@ -330,10 +330,14 @@ def _fit_spectrum_bfgs(normalized_flux, normalized_ivar, vectorizer, theta, s2,
         logger.warn("Least-sq result was {0}: {1}".format(ier, message))
     
     # Save additional information.
+    _ = np.sum(meta["fvec"]**2)
     meta.update({ 
         "ier": ier,
         "message": message,
         "Dfun": Dfun is not None,
+        "chi_sq": _,
+        "r_chi_sq": _/(normalized_flux.size - len(vectorizer.fiducials) - 1),
+        "model_flux": np.dot(theta, vectorizer(op_labels).T).flatten()
     })
     meta.update({ k: kwds[k] for k in \
         ("ftol", "xtol", "gtol", "maxfev", "factor", "epsfcn") })
