@@ -76,27 +76,34 @@ def fit(model_filename, spectrum_filenames, threads, clobber, **kwargs):
 
         else:
             if len(output_filenames) >= chunk_size:
-                results = model.fit(fluxes, ivars)
+                
+                results, covs, metas = model.fit(fluxes, ivars, full_output=True)
 
-                for result, output_filename in zip(results, output_filenames):
+                for result, cov, meta, output_filename \
+                in zip(results, covs, metas, output_filenames):
                     with open(output_filename, "wb") as fp:
-                        pickle.dump(result, fp, 2) # For legacy.
+                        pickle.dump((result, cov, meta), fp, 2) # For legacy.
                     logger.info("Saved output to {}".format(output_filename))
-                    del output_filenames[0:], fluxes[0:], ivars[0:]
+                
+                del output_filenames[0:], fluxes[0:], ivars[0:]
 
 
     if len(output_filenames) > 0:
-        results = model.fit(fluxes, ivars)
+        
+        results, covs, metas = model.fit(fluxes, ivars, full_output=True)
 
-        for result, output_filename in zip(results, output_filenames):
+        for result, cov, meta, output_filename \
+        in zip(results, covs, metas, output_filenames):
             with open(output_filename, "wb") as fp:
-                pickle.dump(result, fp, 2) # For legacy.
+                pickle.dump((result, cov, meta), fp, 2) # For legacy.
             logger.info("Saved output to {}".format(output_filename))
-            del output_filenames[0:], fluxes[0:], ivars[0:]
+        
+        del output_filenames[0:], fluxes[0:], ivars[0:]
 
 
     logger.info("Number of failures: {}".format(failures))
-    
+    logger.info("Number of successes: {}",format(N - failures))
+
     return None
 
 
