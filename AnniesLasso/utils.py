@@ -5,11 +5,10 @@
 General utility functions.
 """
 
-__all__ = ["InterruptiblePool", "progressbar", "short_hash", "wrapper", "_init_pool"]
+__all__ = ["InterruptiblePool", "short_hash", "wrapper"]
 
 import functools
 import logging
-import multiprocessing
 import signal
 import sys
 from time import time
@@ -17,57 +16,58 @@ from collections import Iterable
 from hashlib import md5
 from multiprocessing.pool import Pool
 from multiprocessing import Lock, TimeoutError, Value
-from six.moves import cPickle as pickle
-from tempfile import mkstemp
-
-#mp = multiprocessing.get_context("spawn")
-
-
 
 logger = logging.getLogger(__name__)
+
+# Initialize global counter for incrementing between threads.
 _counter = Value('i', 0)
 _counter_lock = Lock()
-
-import numpy as np
-
-class LargeSerializedObject(object):
-
-    def __init__(self, value):
-        # Create a temporary file and pickle the value to the file.
-        _, self.path = mkstemp()
-        self.shape = value.shape
-        m = np.memmap(self.path, dtype=float, mode="w+", shape=self.shape)
-        m[:] = value[:]
-        m.flush()
-        del m
-
-        #with open(self.path, "wb") as fp:
-        #    pickle.dump(value, fp, -1)
-
-    def __call__(self):
-        #with open(self.path, "rb") as fp:
-        #    value = pickle.load(fp)
-        m = np.memmap(self.path, dtype=float, mode="c")
-        return m.reshape(self.shape)
 
 
 def _init_pool(args):
     global _counter
     _counter = args
 
+
 class wrapper(object):
     """
-    A generic multiprocessing wrapper with a progressbar.
+    A generic wrapper with a progressbar, which can be used either in serial or
+    in parallel.
+
+    :param f:
+        The function to apply.
+
+    :param args:
+        Additional arguments to supply to the function `f`.
+
+    :param kwds:
+        Keyword arguments to supply to the function `f`.
+
+    :param N:
+        The number of items that will be iterated over.
+
+    :param message: [optional]
+        An information message to log before showing the progressbar.
+
+    :param size: [optional]
+        The width of the progressbar in characters.
     """
-    def __init__(self, f, args, kwargs, N, message=None, size=100):
+    def __init__(self, f, args, kwds, N, message=None, size=100):
         self.f = f
         self.args = list(args if args is not None else [])
-        self.kwargs = kwargs if kwargs is not None else {}
-        self._init_progressbar(message, N)
+        self.kwds = kwds if kwds is not None else {}
+        self._init_progressbar(N, message)
         
-    def _init_progressbar(self, message, N):
+
+    def _init_progressbar(self, N, message=None):
         """
         Initialise a progressbar.
+
+        :param N:
+            The number of items that will be iterated over.
+        
+        :param message: [optional]
+            An information message to log before showing the progressbar.
         """
         self.N = N
         self.t_init = time()
@@ -78,6 +78,7 @@ class wrapper(object):
             with _counter_lock:
                 _counter.value = 0
             
+
     def _update_progressbar(self):
         """
         Increment the progressbar by one iteration.
@@ -92,7 +93,6 @@ class wrapper(object):
         increment = max(1, int(self.N/100))
         t = time() if index >= self.N else None
 
-        #if index % increment == 0 or index in (0, self.N) and self.N > 0:
         status = "({0}/{1})   ".format(index, self.N) if t is None else \
                  "({0:.0f}s)                      ".format(t-self.t_init)
         sys.stdout.write(
@@ -110,64 +110,13 @@ class wrapper(object):
 
     def __call__(self, x):
         try:
-            result = self.f(*(list(x) + self.args), **self.kwargs)
+            result = self.f(*(list(x) + self.args), **self.kwds)
         except:
             logger.exception("Exception within wrapped function")
             raise
 
         self._update_progressbar()
         return result
-        
-
-
-
-
-def progressbar(iterable, message=None, size=100):
-    """
-    A progressbar.
-
-    :param iterable:
-        Some iterable to show progress for.
-
-    :param message: [optional]
-        A string message to show as the progressbar header.
-
-    :param size: [optional]
-        The size of the progressbar. If the size given is zero or negative,
-        then no progressbar will be shown.
-    """
-
-    # Preparerise.
-    t_init = time()
-    count = len(iterable)
-    def _update(i, t=None):
-        if 0 >= size: return
-        increment = max(1, int(count / 100))
-        #if i % increment == 0 or i in (0, count) and count > 0:
-        status = "({0}/{1})   ".format(i, count) if t is None else \
-                 "({0:.0f}s)                      ".format(t-t_init)
-        sys.stdout.write("\r[{done}{not_done}] {percent:3.0f}% {status}".format(
-            done="=" * int(i/increment),
-            not_done=" " * int((count - i)/increment),
-            percent=100. * i/count,
-            status=status))
-        sys.stdout.flush()
-
-    # Initialise.
-    if size > 0:
-        logger.info((message or "").rstrip())
-        sys.stdout.flush()
-
-    # Updaterise.
-    for i, item in enumerate(iterable):
-        yield item
-        _update(i)
-
-    # Finalise.
-    if size > 0:
-        _update(count, time())
-        sys.stdout.write("\r\n")
-        sys.stdout.flush()
 
 
 def short_hash(contents):

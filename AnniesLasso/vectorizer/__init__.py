@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-The vectorizer and related functionality.
+The vectorizer.
 """
 
 from .polynomial import *

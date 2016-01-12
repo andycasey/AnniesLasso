@@ -56,11 +56,8 @@ class BaseVectorizer(object):
         if not all(np.isfinite(scales)) or not all(scales > 0):
             raise ValueError("scales must be finite and positive values")
 
-        self._label_names = label_names
-        self._fiducials = fiducials
-        self._scales = scales
-        self._terms = terms
-        self._inv_scales = 1.0/scales
+        # Set the state of the vectorizer.
+        self.__setstate__((label_names, fiducials, scales, terms))
         return None
 
 
@@ -87,6 +84,10 @@ class BaseVectorizer(object):
     def __setstate__(self, state):
         """
         Set the state of the vectorizer.
+
+        :param state:
+            The state of the vectorizer. This should be a four-length tuple that
+            contains the label names, fiducials, scales, and terms.
         """
         self._label_names, self._fiducials, self._scales, self._terms = state
         self._inv_scales = 1.0/self._scales
@@ -94,16 +95,26 @@ class BaseVectorizer(object):
 
     def _transform(self, labels):
         """
-        Transform the labels by the fiducial values and scaling terms.
+        Transform the labels by subtracting the fiducial values and dividing it
+        by the scaling terms.
+
+        :param labels:
+            The (un-transformed) values of the labels, as they correspond to the
+            vectorizer's label names.
         """
         return (labels - self._fiducials) * self._inv_scales
 
 
-    def _inv_transform(self, labels):
+    def _inv_transform(self, transformed_labels):
         """
-        Un-transform the labels.
+        De-transform the transformed labels. This multiplies the transformed
+        labels by the scales and adds the fiducial values.
+
+        :param transformed_labels:
+            The transformed values of the labels, as they correspond to the
+            vectorizer's label names.
         """
-        return labels * self._scales + self._fiducials
+        return transformed_labels * self._scales + self._fiducials
 
 
     # Read-only attributes. Don't try and change the state; create a new object.

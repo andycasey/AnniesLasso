@@ -9,7 +9,7 @@ from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
 __all__ = ["BasePolynomialVectorizer", "NormalizedPolynomialVectorizer",
-    "terminator"]
+    "terminator", "get_label_names"]
 
 import numpy as np
 from collections import (Counter, OrderedDict)
@@ -120,7 +120,6 @@ class BasePolynomialVectorizer(BaseVectorizer):
         return np.hstack(columns).reshape((N_objects, -1, N_labels))[0]
 
 
-
     def get_approximate_labels(self, label_vector):
         """
         Return the approximate labels that would produce the given label_vector.
@@ -128,8 +127,7 @@ class BasePolynomialVectorizer(BaseVectorizer):
         trivial. Otherwise, this is a per-vectorizer method.
 
         :param label_vector:
-            The values of the label vector, typically estimated from a matrix
-            inversion using observed fluxes and uncertainties.
+            The values of the label vector.
         """
 
         # Need to match the label vector terms back to real labels.
