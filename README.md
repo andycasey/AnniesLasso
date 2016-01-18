@@ -2,9 +2,9 @@
 *The Cannon* part 2: Compressed sensing edition
 
 ## Authors
-- **Andy Casey** (Cambridge)
+- **Andrew R. Casey** (Cambridge)
 - **David W. Hogg** (NYU) (MPIA) (SCDA)
-- **Melissa K. Ness** (MPIA)
+- **Melissa Ness** (MPIA)
 
 ## License
 **Copyright 2015, 2016 the authors**.
