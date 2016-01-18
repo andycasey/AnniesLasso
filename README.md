@@ -7,7 +7,7 @@
 - **Melissa K. Ness** (MPIA)
 
 ## License
-**Copyright 2015 the authors**.
+**Copyright 2015, 2016 the authors**.
 The code in this repository is released under the open-source **MIT License**.
 See the file `LICENSE` for more details.
 
