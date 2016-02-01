@@ -18,9 +18,9 @@
 \newcommand{\thecannon}{\project{The~Cannon}}
 \newcommand{\acronym}[1]{{\small{#1}}}
 \newcommand{\sdss}{\project{\acronym{SDSS-IV}}}
-\newcommand{\apogee}{\project{\acronym{APOGEE2}}}
+\newcommand{\apogee}{\project{\acronym{APOGEE}}}
 \newcommand{\aspcap}{\project{\acronym{ASPCAP}}}
-\newcommand{\dr}{\acronym{DRXX}}
+\newcommand{\dr}{\acronym{DR12}}
 \newcommand{\logg}{\log g}
 \newcommand{\Teff}{T_{\mathrm{eff}}}
 \newcommand{\argmin}[1]{\underset{#1}{\operatorname{argmin}}\,}
@@ -54,23 +54,26 @@ parameters ($\logg$ and $\Teff$) and metallicity, and then use that model to inf
 unlabeled stars, even stars with lower signal-to-noise observations.
 % aims
 Here we ask whether this is possible when the dimensionality of the chemical
-abundance space is large (15 abundances: Mg, Fe, etc, etc, Al)
+abundance space is large (15 abundances: C, N, O, Na, Mg, Al, Si, S, K, Ca, Ti,
+V, Mn, Fe, Ni)
 and the model is non-linear in its response to abundance and parameter changes.
 % method
 We adopt ideas from compressed sensing to limit overall model complexity (number
 of non-zero parameters) while retaining model freedom.
-The training set is a set of YYY red-giant stars with high signal-to-noise
+The training set is a set of 12,681 red-giant stars with high signal-to-noise
 spectroscopic observations and stellar parameters and abundances taken from the
 \apogee\ Survey.
 % results
 We find that we can successfully train and use a model with 17 stellar labels.
-Cross-validation shows that the model does a good job of inferring all 17 labels
-(with the exception of XXX), even when we degrade the signal-to-noise of the
+Validation tests show that the model does a good job of inferring all 17 labels
+(with the exception of V, which is limited by the training set labels),
+even when we degrade the signal-to-noise of the
 validation set by discarding some of the spectroscopic observing time.
-The model dependencies make sense; the derivatives of the spectral mean model
-with respect to abundances correlate well with known atomic lines.
+The model dependencies make sense: the derivatives of the spectral mean model
+with respect to abundances correlate well with known atomic lines, and we identify
+atomic lines that were previously reported by the \apogee\ team as unknown.
 We deliver open-source code and also stellar parameters and 15 abundances for a
-set of ZZZ stars.
+set of 98,462 stars.
 \end{abstract}
 
 \section{Introduction}

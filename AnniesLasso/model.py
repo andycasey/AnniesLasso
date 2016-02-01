@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 def requires_training_wheels(method):
     """
     A decorator for model methods that require training before being run.
+
+    :param method:
+        A method belonging to a sub-class of BaseCannonModel.
     """
     def wrapper(model, *args, **kwargs):
         if not model.is_trained:
@@ -41,6 +44,9 @@ def requires_training_wheels(method):
 def requires_model_description(method):
     """
     A decorator for model methods that require a full model description.
+
+    :param method:
+        A method belonging to a sub-class of BaseCannonModel.
     """
     def wrapper(model, *args, **kwargs):
         for descriptive_attribute in model._descriptive_attributes:
@@ -60,7 +66,7 @@ class BaseCannonModel(object):
         columns as labels, and stars/objects as rows.
 
     :type labelled_set:
-        :class:`~astropy.table.Table` or a numpy structured array
+        A numpy structured array.
 
     :param normalized_flux:
         An array of normalised fluxes for stars in the labelled set, given as
@@ -122,14 +128,15 @@ class BaseCannonModel(object):
             self.reset()
             return None
 
-        self._init_data_attributes(labelled_set, normalized_flux, normalized_ivar)
+        # Initialize the data arrays.
+        self._init_data_attributes(
+            labelled_set, normalized_flux, normalized_ivar)
 
         self._dispersion = np.array(dispersion).flatten() \
             if dispersion is not None \
             else np.arange(self._normalized_flux.shape[1], dtype=int)
 
         # Initialize a random, yet reproducible group of subsets.
-        np.random.seed(123)
         self._metadata["q"] = np.random.randint(0, 10, len(labelled_set))
         
         if copy:
@@ -141,24 +148,40 @@ class BaseCannonModel(object):
         if verify: self._verify_training_data()
         self.reset()
 
+        return None
+
 
     def _init_data_attributes(self, labelled_set, normalized_flux,
-        normalized_ivar):
+        normalized_ivar, mode="c", dtype=float):
+        """
+        Initialize the labelled set data attributes.
+
+        :param labelled_set:
+            A table of labelled stars.
+
+        :param normalized_flux:
+            An array of normalized fluxes for stars in the labelled set, or a
+            file path to a float-like memory-mapped array.
+
+        :param normalized_ivar:
+            An array of normalized inverse variances for stars in the labelled 
+            set, or a file path to a float-like memory-mapped array.
+        """
 
         is_path = lambda p: isinstance(p, string_types) and path.exists(p)
         if is_path(normalized_flux):
-            normalized_flux = np.memmap(normalized_flux, mode="c", dtype=float)
+            normalized_flux = np.memmap(normalized_flux, mode=mode, dtype=dtype)
             normalized_flux = normalized_flux.reshape((len(labelled_set), -1))
 
         if is_path(normalized_ivar):
-            normalized_ivar = np.memmap(normalized_ivar, mode="c", dtype=float)
+            normalized_ivar = np.memmap(normalized_ivar, mode=mode, dtype=dtype)
             normalized_ivar = normalized_ivar.reshape((len(labelled_set), -1))
             
         self._labelled_set = labelled_set
         self._normalized_flux = np.atleast_2d(normalized_flux)
         self._normalized_ivar = np.atleast_2d(normalized_ivar)
-        
         return None
+
 
     def __str__(self):
         return "<{module}.{name} {trained}using a training set of {N} stars "\
@@ -210,6 +233,9 @@ class BaseCannonModel(object):
     def dispersion(self, dispersion):
         """
         Set the dispersion values for all the pixels.
+
+        :param dispersion:
+            An array of the dispersion values.
         """
         try:
             len(dispersion)
@@ -234,16 +260,26 @@ class BaseCannonModel(object):
 
     @property
     def labelled_set(self):
+        """
+        Return the table of stars (as rows) in the labelled set.
+        """
         return self._labelled_set
 
 
     @property
     def normalized_flux(self):
+        """
+        Return the normalized fluxes of pixels for stars in the labelled set.
+        """ 
         return self._normalized_flux
 
 
     @property
     def normalized_ivar(self):
+        """
+        Return the normalized inverse variances of pixels for stars in the
+        labelled set.
+        """
         return self._normalized_ivar
 
 
@@ -302,6 +338,9 @@ class BaseCannonModel(object):
     # Trained attributes that subclasses are likely to use.
     @property
     def theta(self):
+        """
+        Return the theta coefficients (spectral model derivatives).
+        """
         return self._theta
 
 
@@ -399,7 +438,8 @@ class BaseCannonModel(object):
                                   "implemented by subclasses")
 
 
-    def save(self, filename, include_training_data=False, overwrite=False):
+    def save(self, filename, include_training_data=False, overwrite=False,
+        protocol=-1):
         """
         Serialise the trained model and save it to disk. This will save all
         relevant training attributes, and optionally, the training data.
@@ -413,6 +453,10 @@ class BaseCannonModel(object):
 
         :param overwrite: [optional]
             Overwrite the existing file path, if it already exists.
+
+        :param protocol: [optional]
+            The Python pickling protocol to employ. Use 2 for compatibility with
+            previous Python releases, -1 for performance.
         """
 
         if path.exists(filename) and not overwrite:
@@ -450,7 +494,7 @@ class BaseCannonModel(object):
         }
 
         with open(filename, "wb") as fp:
-            pickle.dump(contents, fp, -1) 
+            pickle.dump(contents, fp, protocol) 
 
         return None
 
@@ -595,11 +639,11 @@ class BaseCannonModel(object):
         return inferred[:N_stop_at, :]
 
 
-def _chi_sq(theta, design_matrix, normalized_flux, inv_var, axis=None):
+def _chi_sq(theta, design_matrix, data, inv_var, axis=None):
     """
     Calculate the chi-squared difference between the spectral model and data.
     """
-    residuals = np.dot(theta, design_matrix.T) - normalized_flux
+    residuals = np.dot(theta, design_matrix.T) - data
 
     return np.sum(inv_var * residuals**2, axis=axis), \
         2.0 * inv_var * residuals * design_matrix.T

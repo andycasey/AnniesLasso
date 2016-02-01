@@ -32,7 +32,7 @@ with open("apogee-rg-individual-visit-normalized.pickle", "rb") as fp:
     individual_visits = pickle.load(fp, encoding="latin-1")
 
 # Data.
-PATH, CATALOG, FILE_FORMAT = ("/data/arc/research/AnniesLasso/", "apogee-rg.fits",
+PATH, CATALOG, FILE_FORMAT = ("/Users/arc/research/apogee/", "apogee-rg.fits",
     "apogee-rg-custom-normalization-{}.memmap")
 
 # Load the data.
@@ -56,7 +56,7 @@ q = np.random.randint(0, 10, len(labelled_set))
 
 validate_set = (q == 0)
 train_set = (~validate_set)
-
+raise a
 
 for model_filename, validation_filename, output_filename in filenames:
 

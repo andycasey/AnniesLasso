@@ -3,10 +3,10 @@
 Setup the models for the grid search for Lambda and f.
 """
 
-import cPickle as pickle
 import numpy as np
 import os
 from astropy.table import Table
+from six.moves import cPickle as pickle
 
 import AnniesLasso as tc
 
@@ -36,6 +36,7 @@ q = np.random.randint(0, 10, len(labelled_set)) % 10
 validate_set = (q == 0)
 train_set = (~validate_set)
 
+
 # Save the validate flux and ivar to disk.
 train_flux = np.memmap(os.path.join(PATH, FILE_FORMAT).format("flux-train"),
     mode="w+", dtype=float, shape=normalized_flux[train_set].shape)
@@ -48,6 +49,7 @@ train_ivar = np.memmap(os.path.join(PATH, FILE_FORMAT).format("ivar-train"),
 train_ivar[:] = normalized_ivar[train_set]
 train_ivar.flush()
 del train_ivar
+
 
 
 ###
@@ -68,11 +70,12 @@ for scale_factor in scale_factors:
 
         model.s2 = 0.0
         model.regularization = Lambda
+        model._labelled_set = model._labelled_set.as_array()
         model._normalized_flux = os.path.join(PATH, FILE_FORMAT).format("flux-train")
         model._normalized_ivar = os.path.join(PATH, FILE_FORMAT).format("ivar-train")
 
         # Save the model.
-        model.save("gridsearch-{0:.0f}-{1:.1f}.model".format(
+        model.save("gridsearch-{0:.1f}-{1:.1f}.model".format(
             scale_factor, np.log10(Lambda)), include_training_data=True)
 
 # Next: Train all the models.

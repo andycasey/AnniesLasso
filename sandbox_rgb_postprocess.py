@@ -6,26 +6,6 @@ from astropy.table import Table
 
 import AnniesLasso as tc
 
-
-# Data.
-PATH, CATALOG, FILE_FORMAT = ("/Users/arc/research/apogee", "apogee-rg.fits",
-    "apogee-rg-{}.memmap")
-
-# Load the data.
-labelled_set = Table.read(os.path.join(PATH, CATALOG))
-dispersion = np.memmap(os.path.join(PATH, FILE_FORMAT).format("dispersion"),
-    mode="r", dtype=float)
-normalized_flux = np.memmap(
-    os.path.join(PATH, FILE_FORMAT).format("normalized-flux"),
-    mode="r", dtype=float).reshape((len(labelled_set), -1))
-normalized_ivar = np.memmap(
-    os.path.join(PATH, FILE_FORMAT).format("normalized-ivar"),
-    mode="r", dtype=float).reshape(normalized_flux.shape)
-
-elements = [label_name for label_name in labelled_set.dtype.names \
-    if label_name not in ("PARAM_M_H", "SRC_H") and label_name.endswith("_H")]
-
-
 # These are taken from sandbox_rgb.py
 # For ~50 pixels, try some Lambda values.
 # Recommended pixels from Melissa, in vacuum.
@@ -107,283 +87,25 @@ wavelengths.extend(
      [15221.158563809242, 15266.17080169663])
 
 
-#wavelengths = [
-#    15770,   # --> logg sensitivity
-#]
-
-pixel_mask = np.searchsorted(dispersion, wavelengths)
-
-
-
-
-i, models = 0, []
-model_filename = "apogee-rg-validation-3-label-opt-test-4-new-init+bfgs-s2_eq_0.05sq-{}.pkl"
-while os.path.exists(model_filename.format(i)):
-    models.append(tc.load_model(model_filename.format(i)))
-    i += 1
-
-
-for model in models:
-    model._dispersion = dispersion[pixel_mask]
-    model._normalized_flux = normalized_flux[:, pixel_mask]
-    model._normalized_ivar = normalized_ivar[:, pixel_mask]
-
-
-#latex_labels = [r"{T_{\rm eff}}", r"\log{g}"] \
-#    + [r"{\rm [%s/H]}" % each.split("_")[0] for each in models[0].vectorizer.label_names[2:]]
-
-# Plot Lambda vs theta for the different models.
-"""
-figs = tc.diagnostics.pixel_regularization_effectiveness(models,
-    pixels=np.array([0, 1, 2, 3]), latex_labels=latex_labels)
-for i, fig in enumerate(figs):
-    fig.savefig("apogee-rg-3pixels-{}.png".format(i))
-"""
-
-# Show Lambda vs Q plot.
-fig = tc.diagnostics.pixel_regularization_validation(models,
-    pixels=np.arange(28), show_legend=False)
-fig.axes[0].set_title("RG validation 3 label w/ BFGS+Powell+Good_Theta+s=0.05")
-
-raise a
-
-
-
-i, models = 0, []
-model_filename = "apogee-rg-validation-3-label-opt-test-4-new-init+bfgs+free_scatter-{}.pkl"
-while os.path.exists(model_filename.format(i)):
-    models.append(tc.load_model(model_filename.format(i)))
-    i += 1
-
-
-for model in models:
-    model._dispersion = dispersion[pixel_mask]
-    model._normalized_flux = normalized_flux[:, pixel_mask]
-    model._normalized_ivar = normalized_ivar[:, pixel_mask]
-
-
-#latex_labels = [r"{T_{\rm eff}}", r"\log{g}"] \
-#    + [r"{\rm [%s/H]}" % each.split("_")[0] for each in models[0].vectorizer.label_names[2:]]
-
-# Plot Lambda vs theta for the different models.
-"""
-figs = tc.diagnostics.pixel_regularization_effectiveness(models,
-    pixels=np.array([0, 1, 2, 3]), latex_labels=latex_labels)
-for i, fig in enumerate(figs):
-    fig.savefig("apogee-rg-3pixels-{}.png".format(i))
-"""
-
-# Show Lambda vs Q plot.
-fig = tc.diagnostics.pixel_regularization_validation(models,
-    pixels=np.arange(28), show_legend=False)
-fig.axes[0].set_title("RG validation 3 label w/ BFGS+Powell+Good_Theta+Free_Scatter")
-
-
-
-
-# For ~50 pixels, try some Lambda values.
-# Recommended pixels from Melissa, in vacuum.
-wavelengths = [
-    16795.77313988085, # --> continuum
-    15339.0, # --> Teff sensitivity
-    15770,   # --> logg sensitivity
-]
-
-# These lines were all given in air, so I have converted them to vacuum.
-# Three Fe I lines from Smith et al. (2013)
-# Air: 15490.339, 15648.510, 15964.867
-# Vac: [15494.571901901722, 15652.785921456885, 15969.22897071544]
-wavelengths.extend(
-    [15494.571901901722, 15652.785921456885, 15969.22897071544])
-
-# Two Mg I lines from Smith et al. (2013)
-# Air: 15765.8, 15879.5
-# Vac: [15770.107823467057, 15883.838750072413]
-wavelengths.extend(
-    [15770.107823467057, 15883.838750072413])
-
-pixel_mask = np.searchsorted(dispersion, wavelengths)
-
-i, models = 0, []
-model_filename = "apogee-rg-validation-opt-test-17label-{}.pkl"
-while os.path.exists(model_filename.format(i)):
-    models.append(tc.load_model(model_filename.format(i)))
-    i += 1
-
-
-for model in models:
-    model._dispersion = dispersion[pixel_mask]
-    model._normalized_flux = normalized_flux[:, pixel_mask]
-    model._normalized_ivar = normalized_ivar[:, pixel_mask]
-
-
-#latex_labels = [r"{T_{\rm eff}}", r"\log{g}"] \
-#    + [r"{\rm [%s/H]}" % each.split("_")[0] for each in models[0].vectorizer.label_names[2:]]
-
-# Plot Lambda vs theta for the different models.
-"""
-figs = tc.diagnostics.pixel_regularization_effectiveness(models,
-    pixels=np.array([0, 1, 2, 3]), latex_labels=latex_labels)
-for i, fig in enumerate(figs):
-    fig.savefig("apogee-rg-3pixels-{}.png".format(i))
-"""
-
-# Show Lambda vs Q plot.
-fig = tc.diagnostics.pixel_regularization_validation(models,
-    pixels=np.arange(8), show_legend=False)
-fig.axes[0].set_title("RG validation 17 label w/ BFGS+Powell+Good_Theta+Free_Scatter")
-
-
-
-
-raise a
-
-
-
-"""
-
 i, models = 0, []
 model_filename = "apogee-rg-validation-{}.pkl"
 while os.path.exists(model_filename.format(i)):
     models.append(tc.load_model(model_filename.format(i)))
     i += 1
 
-"""
 
-i, models = 0, []
-model_filename = "apogee-rg-validation-opt-test-4-new-init-{}.pkl"
-while os.path.exists(model_filename.format(i)):
-    models.append(tc.load_model(model_filename.format(i)))
-    i += 1
-
-
-for model in models:
-    model._dispersion = dispersion[pixel_mask]
-    model._normalized_flux = normalized_flux[:, pixel_mask]
-    model._normalized_ivar = normalized_ivar[:, pixel_mask]
-
-
-#latex_labels = [r"{T_{\rm eff}}", r"\log{g}"] \
-#    + [r"{\rm [%s/H]}" % each.split("_")[0] for each in models[0].vectorizer.label_names[2:]]
+latex_labels = [r"{T_{\rm eff}}", r"\log{g}"] \
+    + [r"{\rm [%s/H]}" % each.split("_")[0] for each in latex_labels[2:]]
 
 # Plot Lambda vs theta for the different models.
-"""
 figs = tc.diagnostics.pixel_regularization_effectiveness(models,
-    pixels=np.array([0, 1, 2, 3]), latex_labels=latex_labels)
-for i, fig in enumerate(figs):
-    fig.savefig("apogee-rg-3pixels-{}.png".format(i))
-"""
-
-# Show Lambda vs Q plot.
-fig = tc.diagnostics.pixel_regularization_validation(models,
-    pixels=np.array([0]), show_legend=True)
-fig.axes[0].set_title("rg validation 17 label")
-
-
-
-i, models = 0, []
-model_filename = "apogee-rg-validation-3-label-opt-test-4-new-init-{}.pkl"
-while os.path.exists(model_filename.format(i)):
-    models.append(tc.load_model(model_filename.format(i)))
-    i += 1
-
-
-for model in models:
-    model._dispersion = dispersion[pixel_mask]
-    model._normalized_flux = normalized_flux[:, pixel_mask]
-    model._normalized_ivar = normalized_ivar[:, pixel_mask]
-
-
-#latex_labels = [r"{T_{\rm eff}}", r"\log{g}"] \
-#    + [r"{\rm [%s/H]}" % each.split("_")[0] for each in models[0].vectorizer.label_names[2:]]
-
-# Plot Lambda vs theta for the different models.
-"""
-figs = tc.diagnostics.pixel_regularization_effectiveness(models,
-    pixels=np.array([0, 1, 2, 3]), latex_labels=latex_labels)
-for i, fig in enumerate(figs):
-    fig.savefig("apogee-rg-3pixels-{}.png".format(i))
-"""
-
-# Show Lambda vs Q plot.
-fig = tc.diagnostics.pixel_regularization_validation(models,
-    pixels=np.array([0]), show_legend=True)
-fig.axes[0].set_title("rg validation 3 label")
-
-
+    wavelengths[:4], latex_labels=latex_labels)
 
 raise a
 
+    )
 
 
-
-
-
-
-raise a
-fig.savefig("apogee-rg-validation.pdf", dpi=300)
-
-
-raise a
-
-figs = tc.diagnostics.pixel_regularization_effectiveness(models,
-    pixels=np.array([0, 1, 2]), latex_labels=latex_labels,
-    same_limits=True)
-for i, fig in enumerate(figs):
-    fig.savefig("apogee-rg-cont+teff-{}-same-limits.png".format(i))
-plt.close("all")
-
-
-figs = tc.diagnostics.pixel_regularization_effectiveness(models,
-    pixels=np.array([0, 3, 4]), latex_labels=latex_labels,
-    same_limits=True)
-for i, fig in enumerate(figs):
-    fig.savefig("apogee-rg-cont+logg-{}-same-limits.png".format(i))
-plt.close("all")
-
-
-figs = tc.diagnostics.pixel_regularization_effectiveness(models,
-    pixels=np.array([10, 11, 12, 13]), latex_labels=latex_labels,
-    same_limits=True)
-for i, fig in enumerate(figs):
-    fig.savefig("apogee-rg-mg+al-{}-same-limits.png".format(i))
-plt.close("all")
-
-
-figs = tc.diagnostics.pixel_regularization_effectiveness(models,
-    pixels=np.array([14, 15, 16, 17]), latex_labels=latex_labels,
-    same_limits=True)
-for i, fig in enumerate(figs):
-    fig.savefig("apogee-rg-si+ca-{}-same-limits.png".format(i))
-plt.close("all")
-
-
-figs = tc.diagnostics.pixel_regularization_effectiveness(models,
-    pixels=np.array([18, 19, 20, 21]), latex_labels=latex_labels,
-    same_limits=True)
-for i, fig in enumerate(figs):
-    fig.savefig("apogee-rg-2cr+co+v-{}-same-limits.png".format(i))
-plt.close("all")
-
-
-figs = tc.diagnostics.pixel_regularization_effectiveness(models,
-    pixels=np.array([22, 23, 24, 25]), latex_labels=latex_labels,
-    same_limits=True)
-for i, fig in enumerate(figs):
-    fig.savefig("apogee-rg-ni+k-{}-same-limits.png".format(i))
-plt.close("all")
-
-
-figs = tc.diagnostics.pixel_regularization_effectiveness(models,
-    pixels=np.array([26, 27]), latex_labels=latex_labels,
-    same_limits=True)
-for i, fig in enumerate(figs):
-    fig.savefig("apogee-rg-mn{}-same-limits.png".format(i))
-plt.close("all")
-
-
-print("Created a bunch of apogee-*.png plots")
-
-
-raise a
-
+def pixel_regularization_effectiveness(models, wavelengths, label_names=None,
+    latex_labels=None, same_limits=False,
+    show_legend=True, **kwargs):

@@ -10,7 +10,7 @@ from sys import version_info
 
 from .cannon import *
 from .regularized import *
-from . import (continuum, diagnostics, normalize, utils, vectorizer)
+from . import (continuum, diagnostics, utils, vectorizer)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO) # TODO: Remove this when stable.

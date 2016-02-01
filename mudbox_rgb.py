@@ -15,7 +15,7 @@ import AnniesLasso as tc
 np.random.seed(123) # For reproducibility.
 
 #base_10_Lambda, scale_factor = sys.argv[1], sys.argv[2]
-base_10_Lambda, scale_factor = 1, 0.5
+#base_10_Lambda, scale_factor = 1, 0.5
 
 print("USING BASE 10 {base_10_Lambda} AND SCALE FACTOR {scale_factor}".format(
     scale_factor=scale_factor, base_10_Lambda=base_10_Lambda))
