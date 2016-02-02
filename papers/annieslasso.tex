@@ -7,6 +7,7 @@
 % - get to zeroth draft
 % - audit for usage of vector and list
 % - search for all occurrences of DWH, AC, or MKN in the text and fix them.
+% - audit 'test-set star', 'training-set star', etc. should X-set be hyphenated in these circumstances?
 
 % Style Notes
 % -----------
@@ -123,7 +124,6 @@ $\sim10^5$---$10^6$ stars across all components of the Galaxy.  This is a
 sharp relative increase in data volume, which has mandated the automation
 of spectral analysis, and encouraged dozens of groups to produce bespoke
 pipelines.
-
 
 
 Most automated pipelines have grown from classical, manual methods.  That is to
@@ -345,9 +345,14 @@ We give the regularization parameter a subscript $j$ because in
 general we can set it differently at every wavelength.
 This makes sense, because different wavelengths have very different
 dependences on different components of the label list $\ell$.
-In what follows, we will set the value of the $\Lambda_j$ by
-validation or cross-validation or possibly based on physical arguments
-about what matters!
+In practice the value of $\Lambda_j$ should be set by full cross-validation,
+and possibly include restrictions based on physical arguments
+(e.g., a particular element does not have any spectral lines near this
+pixel, therefore the contributions from this label must be zero).
+This vastly expands the number of potential hyperparameters, and
+thus the computing expense required to determine them. Thus for the
+purpose of this work we will set a single value of $\Lambda$ (for all $j$ pixels)
+by validation.
 
 
 In the \emph{test step}, we fix the parameters $\vectheta_j,s^2_j$ at all
@@ -360,12 +365,12 @@ that optimizes the likelihood:
     \right]
   \quad .
 \end{eqnarray}
-Because the vectorizing function $\vecv(\ell)$ is non-linear, the
+If the vectorizing function $\vecv(\ell)$ is non-linear (as it is in our quadratic model), the
 test-step optimization is not convex.
 However, the fact that there are many pixels $j$ acting, each of which
 has a different functional dependence on the labels in the label list
-$\ell$, tends to make the optimization (in practice) find a good value
-for the label list $\ell$.
+$\ell$, tends to make the optimization find a good value
+for the label list $\ell$ in practice.
 We call this partial log likelihood---the argument of the
 argmin in equation~(\ref{eq:test})---the \emph{test scalar}.
 
@@ -385,7 +390,9 @@ Another is to divide out a scale, because, for example, $\Teff$ values
 are in the thousands, but $\logg$ values are of order unity.
 If scale is not divided out, the (isotropic in $\vectheta$)
 regularization will be much more harsh, effectively, on some
-parameters than others.
+parameters than others. Indeed, an extended version of this work could
+consider different regularization terms for each $j$ pixel \emph{and}
+every label in $\ell$.
 
 In what follows, we adopt the median value in the training set for
 each label value as the fiducial offset for that label.
@@ -393,9 +400,12 @@ We choose a dimensionless scale factor $f$ times the label range (defined
 as the difference between the 97.5th percentile and the 2.5th
 percentile of the training set along each label direction) as the
 label scale for that label.
-DWH: We need an equation array here giving the above...
 
-For the regularizer $Q(\vectheta)$ we adopt a variant of L1
+%l_norm = (l - l_central)/(f * (p_97.5-p_2.5))
+
+%DWH: We need an equation array here giving the above...
+
+\noindent{}For the regularizer $Q(\vectheta)$ we adopt a variant of L1
 regularization; we set
 \begin{eqnarray}
   Q(\vectheta) &=& \sum_{d=1}^{D-1} |\theta_d|
@@ -410,20 +420,20 @@ pixel $j$''; when we subscript $\theta$ with $d$ we mean ``the single
 parameter along coordinate axis $d$ in the $D$-dimensional $\vectheta$
 vector space.)
 There is a great deal of theory about this kind of regularization; it
-is called L1 or the lasso (DWH CITE STUFF).
+is called L1 or the LASSO (DWH CITE STUFF).
 L1 regularization encourages parameters to vanish precisely but
 doesn't break convexity for convex problems.
 
-DWH: To set the amplitude $\Lambda_j$ at each wavelength pixel $j$, we
-employ a validation of the following form:....
+%DWH: To set the amplitude $\Lambda_j$ at each wavelength pixel $j$, we
+%employ a validation of the following form:....
 
-DWH: Scaling argument that, in general, the best value of $\Lambda_j$
-should be on the same order as the number of stars in the training
-set....
+%DWH: Scaling argument that, in general, the best value of $\Lambda_j$
+%should be on the same order as the number of stars in the training
+%set....
 
-DWH: Note that the vectorizer scales $\Delta$ play into the
-regularization, because the bigger the $\Delta$, the more penalized
-the cross (quadratic) terms become relative to the linear terms...
+%DWH: Note that the vectorizer scales $\Delta$ play into the
+%regularization, because the bigger the $\Delta$, the more penalized
+%the cross (quadratic) terms become relative to the linear terms...
 
 \section{Training, validation, and test data}
 
@@ -433,7 +443,7 @@ We constructed our labelled set (recall that the training and validation sets ar
 stars in version \texttt{v603} from the \aspcap\ 
 pipeline.
 We employed several quality criteria to distill a robust yet representative 
-labelled set: We removed any stars with problematic flags from the \aspcap\
+labelled set: We first removed any stars with problematic flags from the \aspcap\
 pipeline, requiring \texttt{ASPCAPFLAG = 0}.  We excluded stars with 
 S/N ratios outside the range of 200-300, and stars with a radial 
 velocity scatter larger than 1~km~s$^{-1}$.  We further demanded that
@@ -448,15 +458,15 @@ includes 14,141 red giant branch stars that will form our labelled set, with [Fe
 $\mathrm{[Fe/H]} = [-2.10, 0.30]$. 
 
 
-The \texttt{apStar} files contain rest-wavelength, resampled fluxes from
+The \apogee\ \texttt{apStar} files contain rest-wavelength, resampled fluxes from
 individual visits for a given star, and an error array for those fluxes.
 Although the \texttt{aspcapStar} files contain stacked, pseudo-continuum normalized
-spectra for a given star, we chose to use the fluxes from the \texttt{apStar}
+spectra for a given star, we chose to only use the fluxes from the \texttt{apStar}
 data files throughout this work.  Our reasoning is as follows.  The \aspcap\
-pipeline uses a running window to determine the continuum.  For this reason
+pipeline uses a running filter window to determine the continuum.  For this reason
 it is provably variant with S/N ratios: at low S/N ratios the inferred continuum
 will be systematically shifted with respect to the same star observed in high S/N.
-Although our labelled set only includes high S/N spectra, our model would suffer
+Although our labelled set only includes high S/N spectra, our results would suffer
 if we employed the \aspcap\ normalization procedure for low S/N spectra in the
 test set.  Adopting a robust, S/N-invariant continuum normalization procedure
 is paramount. Thus, we opted to normalize and stack the fluxes from individual
