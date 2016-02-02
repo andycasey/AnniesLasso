@@ -318,7 +318,7 @@ for all training set stars $n$.
 We seek, at each wavelength pixel $j$, the $[D+1]$ parameters
 $\vectheta_j,s^2_j$ that optimize a penalized likelihood:
 \begin{eqnarray}\label{eq:train}
-  \vectheta_j,s^2_j &\leftarrow& \argmin{\vectheta,s^2}\left[
+  \vectheta_j,s^2_j &\leftarrow& \argmin{\vectheta,s}\left[
     \sum_{n=0}^{N-1} \frac{[y_{jn}-\vecv(\ell_n)\cdot\vectheta]^2}{\sigma^2_{jn}+s^2}
     + \sum_{n=0}^{N-1} \ln(\sigma^2_{jn}+s^2)
     + \Lambda_j\,Q(\vectheta)
