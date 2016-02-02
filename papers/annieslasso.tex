@@ -453,6 +453,16 @@ distilled sample includes 14,141 red giant branch stars that will form our
 labelled set, with [Fe/H] labels ranging from $\mathrm{[Fe/H]} = [-2.10, 0.30]$. 
 
 
+For the purposes of post-validation of our constructed model, we have assigned
+each star in the labelled set a uniformly-distributed integer $q$ between 0
+and 9, inclusive.  We assign stars with $q > 0$ as belonging to the
+training set, and those with $q = 0$ will form the validation set.  In all
+experiments, we have ensured that the same $q$ integer is assigned to each
+star within the labelled set.  The training set comprises 12,681 red giant
+branch stars, and the validation set includes 1,460 stars.
+
+
+Here we describe the preparatory methods required before we can train the spectral model.
 The \apogee\ \texttt{apStar} files contain rest-wavelength, resampled fluxes 
 from individual visits for a given star, and an error array for those fluxes.
 Although the \texttt{aspcapStar} files contain stacked, pseudo-continuum 
@@ -468,34 +478,56 @@ fluxes from individual visits provided in the \texttt{apStar} files.
 
 
 Individual spectra in the \texttt{apStar} files contain associated error arrays
-for each observation, although the error arrays do not encapsulate all knowledge
-about reduction issues.  Every pixel from a single observation contains a bitmask
-flag that highlights BLAH, BLAH and BLAH.  While flagged, these issues are not
-reflected by larger uncertainties for that particular pixel.  For this reason we
-opted to combine information from the flags to produce more representative
-inverse variance arrays.  Specifically we added  XYZ to the inverse variance
-arrays for flags ABC to each individual spectrum.  
+for each observation. The error arrays themselves do not encapsulate all
+knowledge about technical, observational, or reduction issues.  Instead, every
+pixel from a single observation contains a bitmask flag that documents any of 
+these issues.  Although flagged, these issues are not reflected in the error
+arrays (i.e., by having larger error values).  For this reason we chose to 
+increase the error arrays for pixels that are flagged.  Specifically for
+flagged pixels we adjusted the inverse variance such that:
+
+\begin{equation}
+adjusted_{ivar} = \frac{ivar}{1 + \Delta^2 * ivar}
+\end{equation}
+
+\noindent{}where:
+
+\begin{equation}
+\Delta_{j} = \max{[C_{0} \cdot |y_{j} - med{y}|,C_{1} * med{y} * N_{flagged}]}
+\end{equation}
+
+Here $N_{flagged}$ is the number of flagged pixels in the spectrum, and (what
+we call the conservatism) constants $C_0$ and $C_1$ have been chosen as 
+$\{2.0,0.1\}$, which produces reasonable inverse variance values for flagged
+pixels.  However we chose to ignore bitmask values associated with persistence 
+(specifically values 9, 10, and 11) as frequently every pixel in a spectrum
+would be flagged by these values, thereby producing unrealistically large 
+uncertainties at every pixel in the blue CCD.
 
 
 After updating the inverse variance arrays to account for flagged pixels, we
-pseduo-continuum-normalized the individual observations, and later stacked all the
-normalized spectra for every star to produce a single high S/N spectrum.
-The continuum normalization was performed as follows.  We identified a distilled
-list of continuum pixels from the spectra, and for each observation we fit those
-pixels with a function of sines and cosines:
+pseduo-continuum-normalized the individual observations. The spectra were 
+normalized in three different regions, corresponding to each CCD, between
+wavelength regions 15090--15822~\AA, 15823--16451~\AA, and 16452--16971~\AA.
+We produced a distilled list of continuum pixels from the spectra (following
+the initial identification in \citet{tc}), and for each observation we fit
+the fluxes in those pixels (within a region) as a sum of sine and cosines:
+
+\begin{equation}
+y_j = \sum_{k=0}^{K} A_{2k}\sin{\left(\frac{2k\lambda_{j}\pi}{L}\right)} + A_{(2k+1)}\cos{\left(\frac{2k\lambda_{j}\pi}{L}\right)}
+\end{equation}
+
+We chose the length scale $L = 1400$, using $K = 3$, and solved for the
+amplitudes $A$ in each region separately. 
 
 
-
-Using a function of sines and cosines for pseudo-continuum normalization has a
+Using a sum of sines and cosines for pseudo-continuum normalization has a
 number of advantages over alternative functions used for continuum normalization.
-Firstly, it is a linear operation on the spectrum fluxes.  Moreover, once the
-design matrix X has been produced -- because the continuum pixels do not change
-between observations -- the same design matrix can be used for many observations.
-Therefore, the normalization is a cheap operation.  More importantly, the use of
-sine and cosine functions implies that edges of the continuum function are going
-to be bounded (more bounded than a polynomial function), and are therefore less
-susceptible to issues with overfitting where the edge of the continuum function
-will be unbounded.
+Firstly, it is a linear operation on the spectrum fluxes and therefore cheap.
+More importantly, the use of sine and cosine functions implies that edges of the
+continuum function are going to be bounded (more bounded than a polynomial
+function), and are therefore less susceptible to issues with overfitting 
+where the edge of the continuum function will be unbounded.
 
 
 It is important to note that our approach is \emph{pseudo}-continuum normalization.
@@ -517,12 +549,16 @@ functions, linear operations, and repeatability between spectra), we emphasize
 that if traditional continuum methods are employed, \TheCannon\ will (likely) 
 give \emph{very bad results}.  Adopting a robust continuum normalization 
 procedure is paramount.  After normalizing all individual spectra in the
-\texttt{apStar} files, we re-stacked the spectra using the inverse variance of
-each pixel (in each spectrum) as weights.  Therefore for all stars observed by
+\texttt{apStar} files, we re-stacked the spectra using the (adjusted) inverse variance of
+each pixel as weights.  Therefore for all stars observed by
 \apogee, we have normalized individual and combined spectra, allowing for 
-explorations of label determination at low S/N (see later section).
+a self-consistent examination of label determination at low S/N (see later section).
 
 
+
+
+
+% ARC: Should we move this paragraph somewhere else?
 The line spread function of \apogee\ spectra is wavelength- and fibre-dependent.
 Given this information, our current implementation of \tc\ is knowingly 
 sub-optimal: we assume nothing about differing line spread functions between 
@@ -532,12 +568,6 @@ approximately represented by convolution with a Gaussian kernel (in the same way
 a lower resolution would be). 
 
 
-%DWH: Define the various possible sets of ``labeled'' stars and the set of ``unlabeled''
-%stars, for our various purposes.
-
-%DWH: Any training set must be a subset of the
-%labeled stars.
-%We are going to use different subsets for different trainings of \TheCannon.
 
 %To demonstrate the predictive power and accuracy of the method, we
 %will (below) perform a conservative cross-validation using cyclic
@@ -566,9 +596,6 @@ a lower resolution would be).
 \section{Experiments}
 
 \paragraph{Validation for hyper-parameter selection:}
-Hello World!
-
-\paragraph{Three-label case:}
 Hello World!
 
 \paragraph{Seventeen-label case:}
