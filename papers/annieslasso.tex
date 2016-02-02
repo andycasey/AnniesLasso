@@ -8,6 +8,7 @@
 % - audit for usage of vector and list
 % - search for all occurrences of DWH, AC, or MKN in the text and fix them.
 % - audit 'test-set star', 'training-set star', etc. should X-set be hyphenated in these circumstances?
+% - audit: sparsity definition
 
 % Style Notes
 % -----------
@@ -74,9 +75,9 @@ observations and stellar parameters and abundances taken from the \apogee\
 Survey.
 % Results
 We find that we can successfully train and use a model with 17 stellar labels.
-Validation shows that the model does a good job of inferring all 17 labels, even
+Validation shows that the model does a good job of inferring all 17 labels (typical precision is 0.04~dex), even
 when we degrade the signal-to-noise of the validation set by discarding some of
-the spectroscopic observing time.  The model dependencies make sense; the 
+the spectroscopic observing time.  The model dependencies make sense: the 
 derivatives of the spectral mean model with respect to abundances correlate well
 with known atomic lines, and we are able to identify elements belonging to 
 atomic lines that were previously unknown.  We deliver open-source code and also
@@ -402,7 +403,7 @@ are rescaled as:
 
 \noindent{}For the regularizer $Q(\vectheta)$ we adopt a variant of L1
 regularization; we set
-\begin{eqnarray}
+\begin{eqnarray}\label{eq:l1-variant}
   Q(\vectheta) &=& \sum_{d=1}^{D-1} |\theta_d|
   \quad,
 \end{eqnarray}
@@ -453,11 +454,11 @@ distilled sample includes 14,141 red giant branch stars that will form our
 labelled set, with [Fe/H] labels ranging from $\mathrm{[Fe/H]} = [-2.10, 0.30]$. 
 
 
-For the purposes of post-validation of our constructed model, we have assigned
-each star in the labelled set a uniformly-distributed integer $q$ between 0
+For the purposes of post-validation of our constructed model, we have randomly
+assigned each star in the labelled set a uniformly-distributed integer $q$ between 0
 and 9, inclusive.  We assign stars with $q > 0$ as belonging to the
 training set, and those with $q = 0$ will form the validation set.  In all
-experiments, we have ensured that the same $q$ integer is assigned to each
+experiments described in the following section, we have ensured that the same $q$ integer is assigned to each
 star within the labelled set.  The training set comprises 12,681 red giant
 branch stars, and the validation set includes 1,460 stars.
 
@@ -513,21 +514,22 @@ We produced a distilled list of continuum pixels from the spectra (following
 the initial identification in \citet{tc}), and for each observation we fit
 the fluxes in those pixels (within a region) as a sum of sine and cosines:
 
+
 \begin{equation}
-y_j = \sum_{k=0}^{K} A_{2k}\sin{\left(\frac{2k\lambda_{j}\pi}{L}\right)} + A_{(2k+1)}\cos{\left(\frac{2k\lambda_{j}\pi}{L}\right)}
+y_j = \sum_{w=0}^{W} A_{2w}\sin{\left(\frac{2w\pi\lambda_{j}}{L}\right)} + A_{(2w+1)}\cos{\left(\frac{2w\pi\lambda_{j}}{L}\right)}
 \end{equation}
 
-We chose the length scale $L = 1400$, using $K = 3$, and solved for the
+We chose the length scale $L = 1400$, using $W = 3$, and solved for the
 amplitudes $A$ in each region separately. 
 
 
 Using a sum of sines and cosines for pseudo-continuum normalization has a
 number of advantages over alternative functions used for continuum normalization.
 Firstly, it is a linear operation on the spectrum fluxes and therefore cheap.
-More importantly, the use of sine and cosine functions implies that edges of the
-continuum function are going to be bounded (more bounded than a polynomial
+More importantly, the use of sine and cosine functions implies that edge behaviour of the
+continuum function will be bounded (more bounded than a polynomial
 function), and are therefore less susceptible to issues with overfitting 
-where the edge of the continuum function will be unbounded.
+where the edge of the continuum function demonstrates large wiggles.
 
 
 It is important to note that our approach is \emph{pseudo}-continuum normalization.
@@ -594,19 +596,89 @@ a lower resolution would be).
 % ARC: Figure: HRD (coloured by [Fe/H]) of the labelled set.
 
 \section{Experiments}
+\label{sec:experiments}
 
-\paragraph{Validation for hyper-parameter selection:}
-Hello World!
+\subsection{Hyper-parameter selection and validation}
+\label{sec:hyper-parameter-validation}
+In the simplest case we have two hyper-parameters that still need to be 
+determined: $\Lambda$ and $f$.  The strength of the regularization (at all 
+pixels) is set by $\Lambda$, and the scale factor $f$ controls the scaling on 
+individual labels.  In practice large $\Lambda$ values encourage zero 
+coefficients (unless it is well-fit by the data) and thus enforce sparsity.  
+High scale factor acts to penalize cross-terms moreso than the linear labels. 
+Because these hyper-parameters act in conjunction with each other, we need to
+explore many combinations of $\Lambda$ and $f$.
 
-\paragraph{Seventeen-label case:}
-Hello World!
 
-\paragraph{Label recovery as a function of signal-to-noise:}
-Hello World!
+Here we use a single training set and perform a grid search to evaluate models
+with different values of $\Lambda$ and $f$.  Specifically we vary $\Lambda$ in
+logarithmic steps from $10^0$ to $10^5$, and linearly increase the scale factor
+$f$ from 0.5 to 50.  For each combination of $(\Lambda, f)$ we trained the full
+17-label model and estimated labels for all (individual and stacked) spectra in
+the validation set.
+
+
+We must chose on a heuristic to select the optimal regularization $\Lambda$ and
+scale factor $f$.  Many metrics are available, including: the predictive power
+in spectral fluxes (e.g., the $\chi^2$ value for the validation set), the 
+label precision at low S/N, or opting to maximize the model sparsity (the
+fraction of zero-value model coefficients).  In practice these metrics must be
+balanced if we want a sparse (interpretable) model that yields precise labels
+even at low S/N values.
+
+
+We define the model sparsity as the percent of zero-value model coefficients.
+The sparsity could be calculated across just the linear coefficients, only
+the cross-term coefficients, or some combination thereof.  Note that we never
+include the baseline spectrum coefficients $\theta_0$ when calculating 
+sparsity metrics because this parameter is not regularized (see Equation 
+\ref{eq:l1-variant}).  In Figure \ref{fig:sparsity} we show three different
+sparsity metrics for many permutations of $\Lambda$ and $f$.  Specifically we
+show the sparsity of the linear model coefficients $\vectheta_{1...17}$, the 
+cross-term coefficients $\vectheta_{18...170}$, and the combination of linear
+and cross-term coefficients.  It is clear that the total model sparsity does
+not change (regardless of $f$) until $\Lambda \gtrsim 10^3$.  In this regime
+the linear and second-order coefficient sparsity metrics exhibit very
+different responses.  The cross-term sparsity changes far faster than the
+linear terms, with a clear dependence on the scale factor $f$.  Note also
+that there is an `optimal' scale factor $f \approx 20$ which produces the 
+sparsest model for the given regularization factor.
+
+
+While sparser models are preferred, our ultimate goal is to have an
+interpretable (sparse) model that predicts spectral fluxes and returns precise
+stellar labels.  In Figures \ref{fig:gridsearch-all} and XXXXX we show the
+median absolute difference (MAD) between our estimated label value at low 
+S/N values (from individual spectra) and the corresponding high S/N (stacked)
+spectrum.  This is an internally-consistent check: we will validate our high-
+(and low-) S/N label determination against the \aspcap\ values in the next
+section.  It is clear from these figures that the optimal combination of 
+$(\Lambda, f)$ is dependent on the label of interest.  However for all 
+labels it is clear that a combination of decreasing $f$ with increasing
+$\Lambda$ will yield good results.  
+
+
+% ARC The chi^2 value figure.
+
+
+Our grid search has revealed that a regularization factor of $\Lambda = X$ and
+a scale factor $f = Y$ yields: a relatively sparse (interpretable) model that
+predicts spectral fluxes well (better than the unregularized case), and provides
+precise stellar labels at low S/N.  We adopt these values for the remainder of
+this work.
+
+
+\subsection{Label recovery as a function of signal-to-noise}
+
 
 \section{Results}
 
-DWH: Do we need this section?
+ARC: high s/n values for low and high S/N
+
+ARC: Globular clusters
+
+ARC: Open clusters
+
 
 DWh: What can we say about chemical abundance precision and accuracy?
 
