@@ -38,11 +38,11 @@
 \title{\textsl{The Cannon 2:} A data-driven model of stellar spectra \\
        for detailed chemical abundance analyses}
 \author{Andrew~R.~Casey\altaffilmark{1},
-		David~W.~Hogg\altaffilmark{2,3,4,5},
-		Melissa~Ness\altaffilmark{5},
-		Hans-Walter~Rix\altaffilmark{5},
-		Daniel~Foreman-Mackey\altaffilmark{6,7},
-	and~Gerry~Gilmore\altaffilmark{1}}
+        David~W.~Hogg\altaffilmark{2,3,4,5},
+        Melissa~Ness\altaffilmark{5},
+        Hans-Walter~Rix\altaffilmark{5},
+        Daniel~Foreman-Mackey\altaffilmark{6,7},
+    and~Gerry~Gilmore\altaffilmark{1}}
 \altaffiltext{1}{Institute of Astronomy, University of Cambridge, Madingley Road, Cambridge CB3~0HA, UK}    
 \altaffiltext{2}{Simons Center for Data Analysis, 160 Fifth Avenue, 7th Floor, New York, NY 10010, USA}
 \altaffiltext{3}{Center for Cosmology and Particle Physics, Department of Physics,
@@ -55,48 +55,48 @@
 
 
 \begin{abstract}
-% context
-In previous work, \citet{tc} have shown that it is possible to train a generative
-probabilistic model for stellar spectra using a training set of stars, each labeled with known
-physical attributes ($\Teff$, $\logg$, $\mh$), and then use that model to infer labels for
-unlabeled stars, even stars with lower signal-to-noise observations.
-% aims
+% Context
+In previous work it has been shown that it is possible to train a generative
+probabilistic model for stellar spectra using a training set of stars, each 
+labeled with known physical attributes ($\Teff$, $\logg$, $\mh$), and then use 
+that model to infer labels for unlabeled stars, even stars with lower 
+signal-to-noise observations \citet{tc}.
+% Aims
 Here we ask whether this is possible when the dimensionality of the chemical
-abundance space is large
-(15 abundances: C, N, O, Na, Mg, Al, Si, S, K, Ca, Ti, V, Mn, Fe, Ni)
-and the model is non-linear in its response to abundance and parameter changes.
-% methods
+abundance space is large (15 abundances: C, N, O, Na, Mg, Al, Si, S, K, Ca, Ti, 
+V, Mn, Fe, Ni) and the model is non-linear in its response to abundance and 
+parameter changes.
+% Methods
 We adopt ideas from compressed sensing to limit overall model complexity (number
-of non-zero model parameters) while retaining model freedom.
-The training set consists of 12,681 red-giant stars with high signal-to-noise
-spectroscopic observations and stellar parameters and abundances taken from the
-\apogee\ Survey.
-% results
+of non-zero model parameters) while retaining model freedom.  The training set 
+consists of 12,681 red-giant stars with high signal-to-noise spectroscopic 
+observations and stellar parameters and abundances taken from the \apogee\ 
+Survey.
+% Results
 We find that we can successfully train and use a model with 17 stellar labels.
-Validation shows that the model does a good job of inferring all 17 labels,
-even when we degrade the signal-to-noise of the
-validation set by discarding some of the spectroscopic observing time.
-The model dependencies make sense; the derivatives of the spectral mean model
-with respect to abundances correlate well with known atomic lines, and we are
-able to identify elements belonging to atomic lines that were previously unknown.
-We deliver open-source code and also stellar parameters and 15 abundances for a
-set of 98,462 stars.
+Validation shows that the model does a good job of inferring all 17 labels, even
+when we degrade the signal-to-noise of the validation set by discarding some of
+the spectroscopic observing time.  The model dependencies make sense; the 
+derivatives of the spectral mean model with respect to abundances correlate well
+with known atomic lines, and we are able to identify elements belonging to 
+atomic lines that were previously unknown.  We deliver open-source code and also
+stellar parameters and 15 abundances for a set of 98,462 stars.
 \end{abstract}
 
 
 
 \section{Introduction}
-The detailed surface abundances of a star reflect its formation environment
-and the supernova(e) that preceded it.  Minute perturbations in the properties
-of either can produce subtle chemical abundance differences on successive
+The detailed surface abundances of a star reflect its formation environment and
+the supernova(e) that preceded it.  Minute perturbations in the properties of 
+either can produce subtle chemical abundance differences on successive
 generations of stars.  This chemical abundance signature largely remains 
-unchanged in the photosphere throughout a star's lifetime, thereby 
-providing a fossilised record of the gas composition during formation and an 
-imprinted signature of stars that preceded it.  The variation between these
-signatures is small, implying that it is difficult to distinguish subtle 
-chemical patterns from different formation sites.  However if they were 
-distinguishable, a sufficiently large collection of precise stellar abundances would 
-unambiguously unravel the complete chemical evolution of the Milky Way.
+unchanged in the photosphere throughout a star's lifetime, thereby providing a 
+fossilised record of the gas composition during formation and an imprinted 
+signature of stars that preceded it.  The variation between these signatures is 
+small, implying that it is difficult to distinguish subtle chemical patterns 
+from different formation sites.  However if they were distinguishable, a 
+sufficiently large collection of precise stellar abundances would unambiguously
+unravel the complete chemical evolution of the Milky Way.
 
 
 There are some exceptions to this line of reasoning: the abundances of some
@@ -108,40 +108,40 @@ other scenarios.  In the same way that precise abundances are required to
 identify unique chemical formation signatures, precise abundances are necessary
 to distinguish minute evolutionary or environment differences between subsets of
 stars.  In these scenarios we argue most astrophysicists care less about
-accuracy; it is the abundance \emph{precision} that imparts discovery and understanding
-of these astrophysical phenomena.  Indeed, in most studies of stellar
-astrophysics \textit{an increase in precision yields far more astrophysical 
-insight than a comparable increase in accuracy}.
+accuracy; it is the abundance \emph{precision} that imparts discovery and 
+understanding of these astrophysical phenomena.  Indeed, in most studies of 
+stellar astrophysics \textit{an increase in precision yields far more 
+astrophysical insight than a comparable increase in accuracy}.
 
 
-For these reasons a comprehensive catalog of precise detailed chemical
+For these reasons a comprehensive catalog of precise detailed chemical 
 abundances would revolutionise our understanding of planetary, stellar, and 
 galactic astrophysics.  This goal has only recently become feasible given the 
 increasing volume and quality of stellar spectra obtained in the last decade.  
 Specifically, large surveys are obtaining high-resolution 
 ($\mathcal{R} \gtrsim 20,000$), high signal-to-noise (S/N) ratio spectra for
-$\sim10^5$---$10^6$ stars across all components of the Galaxy.  This is a
-sharp relative increase in data volume, which has mandated the automation
-of spectral analysis, and encouraged dozens of groups to produce bespoke
-pipelines.
+$\sim10^5$---$10^6$ stars across all components of the Galaxy.  This is a sharp
+relative increase in data volume, which has mandated the automation of spectral
+analysis, and encouraged dozens of groups to produce bespoke pipelines.
 
 
 Most automated pipelines have grown from classical, manual methods.  That is to
 say, there has been relatively little work on unconventional methods to analyse
-spectra.  Spectroscopists have sought to hard-code their experience (or subjectivity),
-with arbitrary heuristics enforced for wavelength masks, convergence
-criteria, and similar analysis issues.  Most of these decisions are based on optimizing the resultant
-accuracy for a few stars with extremely high quality data (e.g., high S/N).  As
-a result, these heuristics are frequently incompatible for data with more
-modest (and representative) S/N ratios.  Therefore, for most stars in the sample,
-it can be shown from repeat or blind experiments that that individual
-pipelines yield demonstrably imprecise abundances for data with more typical S/N ratios.
-Moreover, results from individual pipelines vary 
-significantly with respect to each other, with abundance differences an order
-of magnitude larger than any of the aforementioned astrophysical signatures of interest.
-Thus, while there has been substantial effort in automating classical analysis
-techniques, they are generally imprecise at modest S/N ratios, and yield
-imprecise or inaccurate results when compared against each other.
+spectra.  Spectroscopists have sought to hard-code their experience (or 
+subjectivity), with arbitrary heuristics enforced for wavelength masks, 
+convergence criteria, and similar analysis issues.  Most of these decisions are 
+based on optimizing the resultant accuracy for a few stars with extremely high 
+quality data (e.g., high S/N).  As a result, these heuristics are frequently 
+incompatible for data with more modest (and representative) S/N ratios.  
+Therefore, for most stars in the sample, it can be shown from repeat or blind 
+experiments that that individual pipelines yield demonstrably imprecise 
+abundances for data with more typical S/N ratios.  Moreover, results from 
+individual pipelines vary significantly with respect to each other, with 
+abundance differences an order of magnitude larger than any of the 
+aforementioned astrophysical signatures of interest.  Thus, while there has been
+substantial effort in automating classical analysis techniques, they are 
+generally imprecise at modest S/N ratios, and yield imprecise or inaccurate 
+results when compared against each other.
 
 
 Considerable efforts have also been spent on improving the accuracy of physical
@@ -169,14 +169,14 @@ spectroscopy at the precision with which we are currently observing.  The data
 quality have outgrown the classical methods used to analyse them.  This led us 
 to build \TheCannon\footnote{It is important (to us) to note that \TheCannon\ 
 is named not after a weapon but instead after Annie Jump Cannon, who was the 
-first to correctly order stellar spectra in temperature order \citep[and who did so
-by looking at the data, and without any use of physics-based models, see][]{Cannon_1911}.} 
-(\citealt{tc}), a data-driven---as opposed to physics-based---model for stellar
-spectra.  \TheCannon\ is a data-driven model, but it differs from standard 
-machine-learning approaches because it contains an explicit noise model. Given a
-representative set of stars with known labels of high-fidelity (see below), 
-\TheCannon\ provides a generative model for stellar spectra based on a linear 
-combination of the labels.  
+first to correctly order stellar spectra in temperature order \citep[and who did
+so by looking at the data, and without any use of physics-based models, see][]
+{Cannon_1911}.} (\citealt{tc}), a data-driven---as opposed to 
+physics-based---model for stellar spectra.  \TheCannon\ is a data-driven model, 
+but it differs from standard machine-learning approaches because it contains an 
+explicit noise model. Given a representative set of stars with known labels of 
+high-fidelity (see below), \TheCannon\ provides a generative model for stellar 
+spectra based on a linear combination of the labels.  
 
 %DWH: Cite some relevant literature.
 
@@ -188,22 +188,21 @@ the phrase ``stellar parameters and chemical abundances'' to a word, and
 connects to relevant terminology for supervised methods in the machine-learning
 and statistics literatures.  Consider a spectroscopic survey that contains 
 \emph{survey objects}.  Within that set of survey objects is a subset of stars 
-where the data have high S/N ratios such that we can assert the 
-labels are reported with high fidelity.  We will call this sample the 
-\emph{labelled set}, whereas all other survey objects are categorized to the
-\emph{unlabelled set}.  That is to say, although objects in the 
-\emph{unlabelled set} may have reported labels (e.g., from a Survey pipeline), we are going to construct
-(train) \TheCannon\ using data in the labelled set and estimate (test) labels 
-for those in the unlabelled set.  In practice the data used for training is
-only a subset of the labelled set; we can assign a subset of stars in the labelled set
-that are not used for training, but are later used to confirm (validate) the
-predictive power of our model.  This means that \TheCannon\ can transfer 
-labels from high S/N training set stars to low S/N 
-test-set stars; that is, the training set and the test set do not need to be 
-statistically identical.  This is related to the fact that \TheCannon\ is an 
-interpretable model; the internals of the model are the dependencies of the 
-spectral expectation and variance on wavelength and physical parameters of the 
-star. 
+where the data have high S/N ratios such that we can assert the labels are 
+reported with high fidelity.  We will call this sample the \emph{labelled set}, 
+whereas all other survey objects are categorized to the \emph{unlabelled set}.  
+That is to say, although objects in the \emph{unlabelled set} may have reported 
+labels (e.g., from a Survey pipeline), we are going to construct (train) 
+\TheCannon\ using data in the labelled set and estimate (test) labels for those
+in the unlabelled set.  In practice the data used for training is only a subset 
+of the labelled set; we can assign a subset of stars in the labelled set that 
+are not used for training, but are later used to confirm (validate) the 
+predictive power of our model.  This means that \TheCannon\ can transfer labels
+from high S/N training set stars to low S/N test-set stars; that is, the 
+training set and the test set do not need to be statistically identical.  This 
+is related to the fact that \TheCannon\ is an interpretable model; the internals
+of the model are the dependencies of the spectral expectation and variance on
+wavelength and physical parameters of the star. 
 
 
 %DWH: Labels for data at wavelengths where there are no good labels.
@@ -234,10 +233,10 @@ The capacity to extend to a larger set of $K$ labels without significant
 computational detriment offers tantalizing opportunities.  The most 
 straightforward would be to include abundances of individual elements as labels.
 However in doing so, it can be shown that a standard \emph{Cannon} model yields
-coefficients (spectral derivatives; see next section) that are incompatible with expectations
-from physics: there may be an abundance label with non-zero contributions at all
-pixels, however physically we know that spectral lines of a single element do not 
-contribute at all wavelengths. 
+coefficients (spectral derivatives; see next section) that are incompatible with 
+expectations from physics: there may be an abundance label with non-zero 
+contributions at all pixels, however physically we know that spectral lines of a
+single element do not contribute at all wavelengths. 
 
 
 For this reason alone we know that the problem is sparse.  Here we exploit this 
@@ -256,8 +255,6 @@ of globular and open clusters.
 \section{Method}
 
 \noindent{}We assume the following about \TheCannon\ and the \apogee\ \dr:
-
-%The assumptions of \TheCannon\ are the following:
 \begin{itemize}
 \item
 Stars with similar labels (parameters and abundances) have similar spectra.
@@ -294,29 +291,31 @@ normalization procedure is invariant with respect to S/N ratios.
   y_{jn} &=& \vecv(\ell_n)\cdot\vectheta_j + e_{jn}
   \label{eq:model}\quad ,
 \end{eqnarray}
-where $y_{jn}$ is the data for star $n$ at wavelength pixel $j$,
-$\vecv(\ell_n)$ is a function that takes as input
-the label list $\ell_n$ of length $K$ for star $n$
-and outputs a vector of length $D>K$ of functions of those labels,
-$\vectheta_j$ is a vector of length $D$ of parameters controlling the model at wavelength pixel $j$,
-and $e_{jn}$ is a noise draw or residual.  We refer to $\vecv(\ell_n)$ as ``the vectorizing function'', which allows for arbitrarily complex functions that might not be simple polynomial expansions of the label list $\ell_n$ (e.g., sums of sines and cosines).  
-Inasmuch as the model is good, the noise values $e_{jn}$ can be taken to be
-drawn from a Gaussian with zero mean and variance $\sigma^2_{jn}+s^2_j$,
-where $\sigma^2_{jn}$ is the pipeline-reported uncertainty variance on datum
-$y_{jn}$ and $s^2_j$ is a parameter describing excess variance at wavelength pixel $j$.
+where $y_{jn}$ is the data for star $n$ at wavelength pixel $j$, $\vecv(\ell_n)$
+is a function that takes as input the label list $\ell_n$ of length $K$ for star
+$n$ and outputs a vector of length $D>K$ of functions of those labels,
+$\vectheta_j$ is a vector of length $D$ of parameters controlling the model at 
+wavelength pixel $j$, and $e_{jn}$ is a noise draw or residual.  We refer to 
+$\vecv(\ell_n)$ as ``the vectorizing function'', which allows for arbitrarily 
+complex functions that might not be simple polynomial expansions of the label 
+list $\ell_n$ (e.g., sums of sines and cosines).  Inasmuch as the model is good,
+the noise values $e_{jn}$ can be taken to be drawn from a Gaussian with zero 
+mean and variance $\sigma^2_{jn}+s^2_j$, where $\sigma^2_{jn}$ is the 
+pipeline-reported uncertainty variance on datum $y_{jn}$ and $s^2_j$ is a 
+parameter describing excess variance at wavelength pixel $j$.
 
-Two comments about the model (\ref{eq:model}).
-The first is that, because the $e_{jn}$ are thought of as being drawn from a 
-probability density function (pdf), it is a probabilistic model for the spectral
-data $y_{jn}$.
-The second is that the output of the function $\vecv(\ell)$ can be thought
-of as a row of the ``design matrix'' that defines the possible freedom
-given to the spectrum expectation model.
 
-In the \emph{training step}, we fix the $K$-lists of labels $\ell_n$
-for all training set stars $n$.
-We seek, at each wavelength pixel $j$, the $[D+1]$ parameters
-$\vectheta_j,s^2_j$ that optimize a penalized likelihood:
+Two comments about the model (\ref{eq:model}).  The first is that, because the 
+$e_{jn}$ are thought of as being drawn from a probability density function (pdf),
+it is a probabilistic model for the spectral data $y_{jn}$.  The second is that
+the output of the function $\vecv(\ell)$ can be thought of as a row of the 
+``design matrix'' that defines the possible freedom given to the spectrum 
+expectation model.
+
+
+In the \emph{training step}, we fix the $K$-lists of labels $\ell_n$ for all 
+training set stars $n$.  We seek, at each wavelength pixel $j$, the $[D+1]$ 
+parameters $\vectheta_j,s^2_j$ that optimize a penalized likelihood:
 \begin{eqnarray}\label{eq:train}
   \vectheta_j,s^2_j &\leftarrow& \argmin{\vectheta,s}\left[
     \sum_{n=0}^{N-1} \frac{[y_{jn}-\vecv(\ell_n)\cdot\vectheta]^2}{\sigma^2_{jn}+s^2}
@@ -326,84 +325,80 @@ $\vectheta_j,s^2_j$ that optimize a penalized likelihood:
   \quad ,
 \end{eqnarray}
 where $\Lambda_j$ is a regularization parameter, and $Q(\vectheta)$ is a 
-regularizing function that encourages parameters to take on zero values.
-The regularizing function takes a $D$-vector as input and returns a
-scalar value.
-We call this penalized likelihood---the argument of the
-argmin in equation~(\ref{eq:train})---the \emph{training scalar}.
-We will adopt for the regularizing function $Q(\vectheta)$ in the training scalar a
-modification of L1 regularization, discussed below.
-Although the training-step optimization problem will not in general be
-convex, we can make choices for $Q(\vectheta)$ (and we will) to make the
-problem such that it would be convex at any fixed value of $s^2$; for
-this reason it will tend to optimize well in most cases of interest.
+regularizing function that encourages parameters to take on zero values.  The 
+regularizing function takes a $D$-vector as input and returns a scalar value.
+We call this penalized likelihood---the argument of the argmin in 
+equation~(\ref{eq:train})---the \emph{training scalar}.  We will adopt for the 
+regularizing function $Q(\vectheta)$ in the training scalar a modification of L1
+regularization, discussed below.  Although the training-step optimization 
+problem will not in general be convex, we can make choices for $Q(\vectheta)$ 
+(and we will) to make the problem such that it would be convex at any fixed 
+value of $s^2$; for this reason it will tend to optimize well in most cases of 
+interest.
 
-The regularization parameter $\Lambda_j$ sets the strength of the
-regularization; as $\Lambda_j$ increases, the number of non-zero
-components of the parameter vector $\vectheta_j$ will decrease.
-We give the regularization parameter a subscript $j$ because in
-general we can set it differently at every wavelength.
-This makes sense, because different wavelengths have very different
-dependences on different components of the label list $\ell$.
-In practice the value of $\Lambda_j$ should be set by full cross-validation,
-and possibly include restrictions based on physical arguments
-(e.g., a particular element does not have any spectral lines near this
-pixel, therefore the contributions from this label must be zero).
-This vastly expands the number of potential hyperparameters, and
-thus the computing expense required to determine them. Thus for the
-purpose of this work we will set a single value of $\Lambda$ (for all $j$ pixels)
-by validation.
+
+The regularization parameter $\Lambda_j$ sets the strength of the 
+regularization; as $\Lambda_j$ increases, the number of non-zero components of 
+the parameter vector $\vectheta_j$ will decrease.  We give the regularization 
+parameter a subscript $j$ because in general we can set it differently at every
+wavelength.  This makes sense, because different wavelengths have very different
+dependences on different components of the label list $\ell$.  In practice the
+value of $\Lambda_j$ should be set by full cross-validation, and possibly 
+include restrictions based on physical arguments (e.g., a particular element 
+does not have any spectral lines near this pixel, therefore the contributions
+from this label must be zero).  This vastly expands the number of potential 
+hyperparameters, and thus the computing expense required to determine them.  
+Thus for the purpose of this work we will set a single value of $\Lambda$ (for 
+all $j$ pixels) by validation.
 
 
 In the \emph{test step}, we fix the parameters $\vectheta_j,s^2_j$ at all
-wavelength pixels $j$.
-We seek, for each test-set star $m$, the $K$-list of labels $\ell_m$
-that optimizes the likelihood:
+wavelength pixels $j$.  We seek, for each test-set star $m$, the $K$-list of 
+labels $\ell_m$ that optimizes the likelihood:
 \begin{eqnarray}\label{eq:test}
   \ell_m &\leftarrow& \argmin{\ell}\left[
     \sum_{j=0}^{J-1} \frac{[y_{jm}-\vecv(\ell)\cdot\vectheta_j]^2}{\sigma^2_{jm}+s^2_j}
     \right]
   \quad .
 \end{eqnarray}
-If the vectorizing function $\vecv(\ell)$ is non-linear (as it is in our quadratic model), the
-test-step optimization is not convex.
-However, the fact that there are many pixels $j$ acting, each of which
-has a different functional dependence on the labels in the label list
-$\ell$, tends to make the optimization find a good value
-for the label list $\ell$ in practice.
-We call this partial log likelihood---the argument of the
-argmin in equation~(\ref{eq:test})---the \emph{test scalar}.
+If the vectorizing function $\vecv(\ell)$ is non-linear (as it is in our 
+quadratic model), the test-step optimization is not convex.  However, the fact
+that there are many pixels $j$ acting, each of which has a different functional
+dependence on the labels in the label list $\ell$, tends to make the 
+optimization find a good value for the label list $\ell$ in practice.  We call
+this partial log likelihood---the argument of the argmin in 
+equation~(\ref{eq:test})---the \emph{test scalar}.
 
-The model freedom of \TheCannon\ is set by the vectorizing function
-$\vecv(\ell)$---which takes the $K$-element label list $\ell$ and expands
-it into a $D$-dimensional vector of components for the linear
-model---and the regularization $\Lambda_j\,Q(\vectheta)$.
-Because we want the (simple, see below) regularization to treat the
-different parameters (the different components of $\vectheta$) in some
-sense ``equally'', we have to make sensible choices in the vectorizing
-function $\vecv(\ell)$.
-One thing that the vectorizing function $\vecv(\ell)$ can do is offset the
-labels by some kind of fiducial (mean, median, or other central)
-value, such that $\vecv(\ell)=0$ is at a central location in the label
-space.
-Another is to divide out a scale, because, for example, $\Teff$ values
-are in the thousands, but $\logg$ values are of order unity.
-If scale is not divided out, the (isotropic in $\vectheta$)
-regularization will be much more harsh, effectively, on some
-parameters than others. Indeed, an extended version of this work could
-consider different regularization terms for each $j$ pixel \emph{and}
-every label in $\ell$.
 
-In what follows, we adopt the median value in the training set for
-each label value as the fiducial offset for that label.
-We choose a dimensionless scale factor $f$ times the label range (defined
-as the difference between the 97.5th percentile and the 2.5th
-percentile of the training set along each label direction) as the
-label scale for that label.
+The model freedom of \TheCannon\ is set by the vectorizing function 
+$\vecv(\ell)$---which takes the $K$-element label list $\ell$ and expands it 
+into a $D$-dimensional vector of components for the linear model---and the 
+regularization $\Lambda_j\,Q(\vectheta)$.  Because we want the (simple, see 
+below) regularization to treat the different parameters (the different 
+components of $\vectheta$) in some sense ``equally'', we have to make sensible 
+choices in the vectorizing function $\vecv(\ell)$.  One thing that the 
+vectorizing function $\vecv(\ell)$ can do is offset the labels by some kind of
+fiducial (mean, median, or other central) value, such that $\vecv(\ell)=0$ is at
+a central location in the label space.  Another is to divide out a scale, 
+because, for example, $\Teff$ values are in the thousands, but $\logg$ values
+are of order unity.  If scale is not divided out, the (isotropic in $\vectheta$)
+regularization will be much more harsh, effectively, on some parameters than 
+others.  An extended version of this work might even consider different 
+regularization terms for each $j$ pixel \emph{and} every label in $\ell$.
 
-%l_norm = (l - l_central)/(f * (p_97.5-p_2.5))
 
-%DWH: We need an equation array here giving the above...
+In what follows, we adopt the median value in the training set for each label 
+value as the fiducial offset for that label.  We choose a dimensionless scale
+factor $f$ times the label range (defined as the difference between the 97.5th
+percentile and the 2.5th percentile of the training set along each label 
+direction) as the scale for that label such that, for example, $\Teff$ values
+are rescaled as:
+
+% ARC do hat notation for rescaling?
+\begin{eqnarray}\label{eq:label-norm}
+  T_{{\rm eff},n} = \frac{T_{{\rm eff},n} - \langle\Teff\rangle}{f\cdot|p(\Teff,97.5) - p(\Teff,2.5)|}
+\end{eqnarray}
+
 
 \noindent{}For the regularizer $Q(\vectheta)$ we adopt a variant of L1
 regularization; we set
@@ -411,18 +406,18 @@ regularization; we set
   Q(\vectheta) &=& \sum_{d=1}^{D-1} |\theta_d|
   \quad,
 \end{eqnarray}
-where the sum is over the $[D-1]$ components of $\vectheta$, excluding
-the zeroth component because we don't ever expect that component to
-vanish.
-(Forgive a notational similarity here: When we subscript $\vectheta$ with
-$j$ we mean ``the $D$-vector of parameters associated with wavelength
-pixel $j$''; when we subscript $\theta$ with $d$ we mean ``the single
-parameter along coordinate axis $d$ in the $D$-dimensional $\vectheta$
-vector space.)
-There is a great deal of theory about this kind of regularization; it
-is called L1 or the LASSO (DWH CITE STUFF).
+where the sum is over the $[D-1]$ components of $\vectheta$, excluding the 
+zeroth component because we don't ever expect that component to vanish. 
+(Forgive a notational similarity here: When we subscript $\vectheta$ with $j$ we
+mean ``the $D$-vector of parameters associated with wavelength pixel $j$''; when
+we subscript $\theta$ with $d$ we mean ``the single parameter along coordinate
+axis $d$ in the $D$-dimensional $\vectheta$ vector space.)  There is a great 
+deal of theory about this kind of regularization; it is called L1 or the LASSO
+(DWH CITE STUFF).  
 L1 regularization encourages parameters to vanish precisely but
 doesn't break convexity for convex problems.
+
+% SPACING UP TO HERE.
 
 %DWH: To set the amplitude $\Lambda_j$ at each wavelength pixel $j$, we
 %employ a validation of the following form:....
@@ -435,42 +430,42 @@ doesn't break convexity for convex problems.
 %regularization, because the bigger the $\Delta$, the more penalized
 %the cross (quadratic) terms become relative to the linear terms...
 
+
 \section{Training, validation, and test data}
 
-We employ the \apogee\ Data Release 12 data to demonstrate the effectiveness
-of \TheCannon\ and the regularization approach in a high-dimensional label space.
-We constructed our labelled set (recall that the training and validation sets are subsets of the labelled set) using sensible criteria for  
-stars in version \texttt{v603} from the \aspcap\ 
-pipeline.
-We employed several quality criteria to distill a robust yet representative 
-labelled set: We first removed any stars with problematic flags from the \aspcap\
-pipeline, requiring \texttt{ASPCAPFLAG = 0}.  We excluded stars with 
-S/N ratios outside the range of 200-300, and stars with a radial 
-velocity scatter larger than 1~km~s$^{-1}$.  We further demanded that
-our training set include reported abundances in all 15 elements (C, N, O, Na, 
-Mg, Al, Si, S, K, Ca, Ti, V, Mn, Fe, and Ni), and restricted the abundance range
-such that $2 > \mathrm{[X/Fe]} > -2$, $\mathrm{[Fe/H]} > -3$, and 
-$[\alpha/\mathrm{Fe}] > -0.1$.  A visual comparison of the [V/H] labels
-with other (Fe-peak) abundance labels showed that many stars in the training set had
-spurious measurements of [V/H]. For this reason we further constrained the
-labelled set such that $\mathrm{[V/Fe]} > -0.6$.  The distilled sample
-includes 14,141 red giant branch stars that will form our labelled set, with [Fe/H] labels ranging from
-$\mathrm{[Fe/H]} = [-2.10, 0.30]$. 
+We employ the \apogee\ Data Release 12 data to demonstrate the effectiveness of
+\TheCannon\ and the regularization approach in a high-dimensional label space.
+We constructed our labelled set (recall that the training and validation sets 
+are subsets of the labelled set) using sensible criteria for stars in version 
+\texttt{v603} from the \aspcap\ pipeline.  We employed several quality criteria 
+to distill a robust yet representative labelled set: We first removed any stars
+with problematic flags from the \aspcap\ pipeline, requiring 
+\texttt{ASPCAPFLAG = 0}.  We excluded stars with S/N ratios outside the range of
+200-300, and stars with a radial velocity scatter larger than 1~km~s$^{-1}$.  We
+further demanded that our training set include reported abundances in all 15 
+elements (C, N, O, Na, Mg, Al, Si, S, K, Ca, Ti, V, Mn, Fe, and Ni), and 
+restricted the abundance range such that $2 > \mathrm{[X/Fe]} > -2$, 
+$\mathrm{[Fe/H]} > -3$, and $[\alpha/\mathrm{Fe}] > -0.1$.  A visual comparison 
+of the [V/H] labels with other (Fe-peak) abundance labels showed that many stars
+in the training set had spurious measurements of [V/H].  For this reason we 
+further constrained the labelled set such that $\mathrm{[V/Fe]} > -0.6$.  The 
+distilled sample includes 14,141 red giant branch stars that will form our 
+labelled set, with [Fe/H] labels ranging from $\mathrm{[Fe/H]} = [-2.10, 0.30]$. 
 
 
-The \apogee\ \texttt{apStar} files contain rest-wavelength, resampled fluxes from
-individual visits for a given star, and an error array for those fluxes.
-Although the \texttt{aspcapStar} files contain stacked, pseudo-continuum normalized
-spectra for a given star, we chose to only use the fluxes from the \texttt{apStar}
-data files throughout this work.  Our reasoning is as follows.  The \aspcap\
-pipeline uses a running filter window to determine the continuum.  For this reason
-it is provably variant with S/N ratios: at low S/N ratios the inferred continuum
-will be systematically shifted with respect to the same star observed in high S/N.
-Although our labelled set only includes high S/N spectra, our results would suffer
-if we employed the \aspcap\ normalization procedure for low S/N spectra in the
-test set.  Adopting a robust, S/N-invariant continuum normalization procedure
-is paramount. Thus, we opted to normalize and stack the fluxes from individual
-visits provided in the \texttt{apStar} files.
+The \apogee\ \texttt{apStar} files contain rest-wavelength, resampled fluxes 
+from individual visits for a given star, and an error array for those fluxes.
+Although the \texttt{aspcapStar} files contain stacked, pseudo-continuum 
+normalized spectra for a given star, we chose to only use the fluxes from the 
+\texttt{apStar} data files throughout this work.  Our reasoning is as follows. 
+The \aspcap\ pipeline uses a running filter window to determine the continuum.  
+For this reason it is provably variant with S/N ratios: at low S/N ratios the 
+inferred continuum will be systematically shifted with respect to the same star 
+observed in high S/N.  Although our labelled set only includes high S/N spectra,
+our results would suffer if we employed the \aspcap\ normalization procedure for
+low S/N spectra in the test set.  Adopting a robust, S/N-invariant continuum 
+normalization procedure is paramount.  Thus, we opted to normalize and stack the
+fluxes from individual visits provided in the \texttt{apStar} files.
 
 
 DWH: How did we combine the ivars and the flags to make better ivars?
@@ -484,12 +479,13 @@ DWH: Emphasize that if you use traditional continuum methods,
 
 DWH: We re-stacked the spectra ourselves, because we are that hardcore.
 
-%DWH: Line-spread-function variations exist and we suck in this regard.
 The line spread function of \apogee\ spectra is wavelength- and fibre-dependent.
-Given this information, our current implementation of \tc\ is knowingly sub-optimal:
-we assume nothing about differing line spread functions between stars in the labelled
-or unlabelled set. Similarly, we make no effort to accommodate fast-rotating stars, where the effect on the spectrum is approximately represented by convolution with a Gaussian kernel (in the same way a lower resolution would be). 
-
+Given this information, our current implementation of \tc\ is knowingly 
+sub-optimal: we assume nothing about differing line spread functions between 
+stars in the labelled or unlabelled set. Similarly, we make no effort to 
+accommodate fast-rotating stars, where the effect on the spectrum is 
+approximately represented by convolution with a Gaussian kernel (in the same way
+a lower resolution would be). 
 
 
 %DWH: Define the various possible sets of ``labeled'' stars and the set of ``unlabeled''
@@ -499,27 +495,27 @@ or unlabelled set. Similarly, we make no effort to accommodate fast-rotating sta
 %labeled stars.
 %We are going to use different subsets for different trainings of \TheCannon.
 
-To demonstrate the predictive power and accuracy of the method, we
-will (below) perform a conservative cross-validation using cyclic
-training, validation, and test subsets of the labeled data:
-To each star in the input set of labeled stars (the superset of any
-possible training set we might use), we assign an integer $0\leq
-q<10$, with uniform probability across all 10 possible values of $q$.
-This permits a very conservative 10-fold cross-validation, in which we
-choose $8/10$ of the labeled data as the training set, a disjoint
-$1/10$ as a validation set for choosing the hyper-parameters
-$\Lambda_j$, and a mutually disjoint $1/10$ as a test set for
-prediction.
-This train--validate--test framework is very conservative, because there
-is no way, for each choice of train, validate, and test sets from the
-labeled data, for the test set to influence the choice of
-hyper-parameters, or indeed for any information to flow from the test
-set into the training.
+%To demonstrate the predictive power and accuracy of the method, we
+%will (below) perform a conservative cross-validation using cyclic
+%training, validation, and test subsets of the labeled data:
+%To each star in the input set of labeled stars (the superset of any
+%possible training set we might use), we assign an integer $0\leq
+%q<10$, with uniform probability across all 10 possible values of $q$.
+%This permits a very conservative 10-fold cross-validation, in which we
+%choose $8/10$ of the labeled data as the training set, a disjoint
+%$1/10$ as a validation set for choosing the hyper-parameters
+%$\Lambda_j$, and a mutually disjoint $1/10$ as a test set for
+%prediction.
+%This train--validate--test framework is very conservative, because there
+%is no way, for each choice of train, validate, and test sets from the
+%labeled data, for the test set to influence the choice of
+%hyper-parameters, or indeed for any information to flow from the test
+%set into the training.
 
-When \TheCannon\ is used to label the full unlabeled set, we train on
-the entire unlabled data set (the largest possible training set) and
-use values for the hyper-parameters $\Lambda_j$ derived from the
-10-fold cross-validation experiment, as we will describe below.
+%When \TheCannon\ is used to label the full unlabeled set, we train on the entire
+%unlabled data set (the largest possible training set) and
+%use values for the hyper-parameters $\Lambda_j$ derived from the
+%10-fold cross-validation experiment, as we will describe below.
 
 % ARC: Figure: HRD (coloured by [Fe/H]) of the labelled set.
 
@@ -550,20 +546,18 @@ DWH: What can we say about the promise of chemical tagging?
 \section{Discussion}
 
 
-\TheCannon\ is a prediction system: It is designed to predict the
-labels for stars.
-It has a fundamental assumption that the training set is statistically
-identical to the prediction/test set.
-If there are covariances in the label space---that is, if stars in the
-training set are high in label $X$ whenever they are also high in
-label $Y$---then there will be opportunities for \TheCannon\ to get
-information about $Y$ from considering data aspects that depend on
-$X$ (which, according to the training set, is reliably connected to $Y$).
-For this reason, we expect that, given a finite training set, there
-will be situations in which lines from one element are used to predict
-the abundance of another.
-A good example is shown in \figurename~\ref{fig:whatever}, where we
+\TheCannon\ is a prediction system: It is designed to predict the labels for 
+stars.  It has a fundamental assumption that the training set is statistically
+identical to the prediction/test set.  If there are covariances in the label 
+space---that is, if stars in the training set are high in label $X$ whenever
+they are also high in label $Y$---then there will be opportunities for 
+\TheCannon\ to get information about $Y$ from considering data aspects that 
+depend on $X$ (which, according to the training set, is reliably connected to 
+$Y$).  For this reason, we expect that, given a finite training set, there will
+be situations in which lines from one element are used to predict the abundance
+of another.  A good example is shown in \figurename~\ref{fig:whatever}, where we
 see WHATEVER.
+
 DWH: Yada Yada...
 
 
@@ -581,9 +575,10 @@ DWH: All of the code for this project is available with documentation
 at \url{http://thecannon.io/}.
 
 \acknowledgements
-DWH: Dan Foreman-Mackey (UW) and Hans-Walter Rix (MPIA) and other people...
+Some people...
 grants...
 \sdss...
+astropy... topcat... ads...
 
 \begin{thebibliography}{dummy}\raggedright
 \bibitem[Ness et al.(2015a)]{tc} Ness, M., Hogg, D.~W., 
