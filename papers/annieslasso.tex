@@ -463,21 +463,65 @@ For this reason it is provably variant with S/N ratios: at low S/N ratios the
 inferred continuum will be systematically shifted with respect to the same star 
 observed in high S/N.  Although our labelled set only includes high S/N spectra,
 our results would suffer if we employed the \aspcap\ normalization procedure for
-low S/N spectra in the test set.  Adopting a robust, S/N-invariant continuum 
-normalization procedure is paramount.  Thus, we opted to normalize and stack the
+low S/N spectra in the test set.  Thus, we opted to normalize and stack the
 fluxes from individual visits provided in the \texttt{apStar} files.
 
 
-DWH: How did we combine the ivars and the flags to make better ivars?
+Individual spectra in the \texttt{apStar} files contain associated error arrays
+for each observation, although the error arrays do not encapsulate all knowledge
+about reduction issues.  Every pixel from a single observation contains a bitmask
+flag that highlights BLAH, BLAH and BLAH.  While flagged, these issues are not
+reflected by larger uncertainties for that particular pixel.  For this reason we
+opted to combine information from the flags to produce more representative
+inverse variance arrays.  Specifically we added  XYZ to the inverse variance
+arrays for flags ABC to each individual spectrum.  
 
-DWH: What is different about our continuum normalization from everyone else's?
 
-DWH: It is \emph{pseudo-continuum normalization}.
+After updating the inverse variance arrays to account for flagged pixels, we
+pseduo-continuum-normalized the individual observations, and later stacked all the
+normalized spectra for every star to produce a single high S/N spectrum.
+The continuum normalization was performed as follows.  We identified a distilled
+list of continuum pixels from the spectra, and for each observation we fit those
+pixels with a function of sines and cosines:
 
-DWH: Emphasize that if you use traditional continuum methods,
-\TheCannon\ will give \emph{very bad results}.  Don't do that.
 
-DWH: We re-stacked the spectra ourselves, because we are that hardcore.
+
+Using a function of sines and cosines for pseudo-continuum normalization has a
+number of advantages over alternative functions used for continuum normalization.
+Firstly, it is a linear operation on the spectrum fluxes.  Moreover, once the
+design matrix X has been produced -- because the continuum pixels do not change
+between observations -- the same design matrix can be used for many observations.
+Therefore, the normalization is a cheap operation.  More importantly, the use of
+sine and cosine functions implies that edges of the continuum function are going
+to be bounded (more bounded than a polynomial function), and are therefore less
+susceptible to issues with overfitting where the edge of the continuum function
+will be unbounded.
+
+
+It is important to note that our approach is \emph{pseudo}-continuum normalization.
+While our choice of continuum pixels is well-informed, albeit arbitrary, this
+procedure does not require that the chosen pixels are indeed true continuum
+pixels.  The `continuum' pixels could be randomly selected, and as long as the
+same pixels were used to normalize all stars, our approach would work equally
+well: all spectra would be `normalized' in the same way, and the residual flux
+behaviour from a `true'-normalized spectra would be captured by the spectral
+model.  For this reason, we have only attempted to select well-informed 
+continuum pixels in order to maximize model interpretability.  That is to say,
+by using reasonable continuum pixels we can be sure that any spectral model
+derivatives can be interpreted as being physically motivated, and less likely to
+simply be capturing any residual continuum effects.
+
+
+For all of the aforementioned reasons (invariance with respect to S/N, bounded
+functions, linear operations, and repeatability between spectra), we emphasize
+that if traditional continuum methods are employed, \TheCannon\ will (likely) 
+give \emph{very bad results}.  Adopting a robust continuum normalization 
+procedure is paramount.  After normalizing all individual spectra in the
+\texttt{apStar} files, we re-stacked the spectra using the inverse variance of
+each pixel (in each spectrum) as weights.  Therefore for all stars observed by
+\apogee, we have normalized individual and combined spectra, allowing for 
+explorations of label determination at low S/N (see later section).
+
 
 The line spread function of \apogee\ spectra is wavelength- and fibre-dependent.
 Given this information, our current implementation of \tc\ is knowingly 
