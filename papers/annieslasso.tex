@@ -23,6 +23,7 @@
 \newcommand{\tc}{\TheCannon}
 \newcommand{\acronym}[1]{{\small{#1}}}
 \newcommand{\sdss}{\project{\acronym{SDSS-IV}}}
+\newcommand{\sdssiii}{\project{\acronym{SDSS-III}}}
 \newcommand{\apogee}{\project{\acronym{APOGEE}}}
 \newcommand{\aspcap}{\project{\acronym{ASPCAP}}}
 \newcommand{\dr}{\acronym{DR12}}
@@ -395,14 +396,14 @@ percentile and the 2.5th percentile of the training set along each label
 direction) as the scale for that label such that, for example, $\Teff$ values
 are rescaled as:
 
-% ARC do hat notation for rescaling?
 \begin{eqnarray}\label{eq:label-norm}
-  T_{{\rm eff},n} = \frac{T_{{\rm eff},n} - \langle\Teff\rangle}{f\cdot|p(\Teff,97.5) - p(\Teff,2.5)|}
+  \hat{T}_{\mathrm{eff},n} = \frac{T_{{\rm eff},n} - \langle\Teff\rangle}{f\cdot|p_{\Teff,97.5} - p_{\Teff,2.5}|}
 \end{eqnarray}
 
+\noindent{}where $p_{\theta,k}$ is the $k$-th percentile value of $\theta$ in
+the training set labels. For the regularizer $Q(\vectheta)$ we adopt a variant
+of L1 regularization; we set
 
-\noindent{}For the regularizer $Q(\vectheta)$ we adopt a variant of L1
-regularization; we set
 \begin{eqnarray}\label{eq:l1-variant}
   Q(\vectheta) &=& \sum_{d=1}^{D-1} |\theta_d|
   \quad,
@@ -491,18 +492,18 @@ flagged pixels we adjusted the inverse variance such that:
 adjusted_{ivar} = \frac{ivar}{1 + \Delta^2 * ivar}
 \end{equation}
 
-\noindent{}where:
+\noindent{}where
 
 \begin{equation}
-\Delta_{j} = \max{[C_{0} \cdot |y_{j} - med{y}|,C_{1} * med{y} * N_{flagged}]}
+\Delta_{j} = \max{\left[C_{0}|y_{j} - \widetilde{y}|,C_{1}\widetilde{y}N_{flagged}\right]} .
 \end{equation}
 
 Here $N_{flagged}$ is the number of flagged pixels in the spectrum, and (what
 we call the conservatism) constants $C_0$ and $C_1$ have been chosen as 
 $\{2.0,0.1\}$, which produces reasonable inverse variance values for flagged
 pixels.  However we chose to ignore bitmask values associated with persistence 
-(specifically values 9, 10, and 11) as frequently every pixel in a spectrum
-would be flagged by these values, thereby producing unrealistically large 
+(specifically values 9, 10, and 11) as frequently every pixel in the blue CCD
+would be flagged with these values, thereby producing unrealistically large 
 uncertainties at every pixel in the blue CCD.
 
 
@@ -555,8 +556,6 @@ procedure is paramount.  After normalizing all individual spectra in the
 each pixel as weights.  Therefore for all stars observed by
 \apogee, we have normalized individual and combined spectra, allowing for 
 a self-consistent examination of label determination at low S/N (see later section).
-
-
 
 
 
@@ -669,6 +668,25 @@ this work.
 
 
 \subsection{Label recovery as a function of signal-to-noise}
+\label{sec:label-recovery-snr}
+
+Recall that the \emph{labelled set} includes both the \emph{training set} and
+a disjoint \emph{validation set}.  After setting the hyper-parameters $\Lambda$
+and $f$ and training the model, here we seek to understand the model performance
+as a function of S/N ratio.  The stars in the validation set include stacked
+spectra, and the individual normalized observations.  We apply our model to
+all stacked and individual spectra and recover labels for every spectrum. 
+This permits us to understand how well we can recover labels (to some precision)
+for a given S/N.  Crucially, this experiment provides a very model-independent
+metric for method performance.  Analysis pipelines that have larger uncertainties
+at a given S/N are demonstrably imprecise (accuracy is not tested here, unless,
+perhaps, we compare to the ASPCAP labels from the validation set).
+
+% Discuss the figure.
+
+% At S/N X we get precision of what in what.
+
+% At 
 
 
 \section{Results}
