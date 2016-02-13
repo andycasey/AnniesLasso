@@ -11,6 +11,9 @@ import functools
 import logging
 import signal
 import sys
+from six import string_types
+from six.moves import cPickle as pickle
+from tempfile import mkstemp
 from time import time
 from collections import Iterable
 from hashlib import md5
@@ -23,11 +26,9 @@ logger = logging.getLogger(__name__)
 _counter = Value('i', 0)
 _counter_lock = Lock()
 
-
 def _init_pool(args):
     global _counter
     _counter = args
-
 
 class wrapper(object):
     """
@@ -74,9 +75,10 @@ class wrapper(object):
         self.message = message
         if message is not None:
             logger.info(message.rstrip())
-            sys.stdout.flush()
-            with _counter_lock:
-                _counter.value = 0
+        
+        sys.stdout.flush()
+        with _counter_lock:
+            _counter.value = 0
             
 
     def _update_progressbar(self):
@@ -88,7 +90,7 @@ class wrapper(object):
             _counter.value += 1
 
         index = _counter.value
-        if self.message is None: return
+        #if self.message is None: return
 
         increment = max(1, int(self.N/100))
         t = time() if index >= self.N else None
@@ -211,3 +213,33 @@ class InterruptiblePool(Pool):
                 self.join()
                 raise
             # Other exceptions propagate up.
+
+
+
+def _unpack_value(value):
+    """
+    Unpack contents if it is pickled to a temporary file.
+
+    :param value:
+        A non-string variable or a string referring to a pickled file path.
+    """
+
+    if isinstance(value, string_types):
+        with open(value, "rb") as fp:
+            contents = pickle.load(fp)
+        return contents
+    return value
+
+
+def _pack_value(value, protocol=-1):
+    """
+    Pack contents to a temporary file.
+
+    :param value:
+        The contents to temporarily pickle.
+    """
+    
+    _, temporary_filename = mkstemp()
+    with open(temporary_filename, "wb") as fp:
+        pickle.dump(value, fp, protocol)
+    return temporary_filename

@@ -15,8 +15,6 @@ import numpy as np
 import scipy.optimize as op
 import tempfile
 import os
-from six import string_types
-from six.moves import cPickle as pickle
 
 from . import (model, utils)
 
@@ -76,115 +74,110 @@ class CannonModel(model.BaseCannonModel):
 
 
     @model.requires_model_description
-    def train(self, fixed_scatter=False, progressbar=True, initial_theta=None,
-        use_neighbouring_pixel_theta=False,
-        **kwargs):
+    def train(self, fixed_scatter=True, **kwargs):
         """
         Train the model based on the labelled set.
         """
         
-        logger.warn("OVERWRITING S2 AND FIXED SCATTER")
-        self.s2 = 0.0
-        fixed_scatter = True
-
+        # Experimental/asthetic keywords:
+        # use_neighbouring_pixels, progressbar
+        assert fixed_scatter, "Are you refactoring?"
+        if self.s2 is None:
+            logger.warn("Fixing and assuming s2 = 0")
+            self.s2 = 0
 
         if fixed_scatter and self.s2 is None:
             raise ValueError("intrinsic pixel variance (s2) must be set "
                              "before training if fixed_scatter is set to True")
 
-        # Initialize the scatter.
-        p0_scatter = np.sqrt(self.s2) if fixed_scatter \
-            else 0.01 * np.ones_like(self.dispersion)
+        # We default use_neighbouring_pixels to None so that we can default it
+        # to True later if we want, but we can warn the user if they explicitly
+        # set it to True and we intend to ignore it.
+        use_neighbouring_pixels = kwargs.pop("use_neighbouring_pixels", None)
+        if self.theta is None:
+            if use_neighbouring_pixels is None:
+                use_neighbouring_pixels = True
+            initial_theta = [None] * self.dispersion.size
 
-        # Prepare details about any progressbar to show.
-        M, N = self.normalized_flux.shape
-        message = None if not progressbar else \
-            "Training {0}-label {1} with {2} stars and {3} pixels/star".format(
-                len(self.vectorizer.label_names), type(self).__name__, M, N)
+        else:
+            # Since theta is already set, we will ignore neighbouring pixels.
+            if use_neighbouring_pixels is True:
+                use_neighbouring_pixels = False
+                logger.warn("Ignoring neighbouring pixels because theta is "
+                            "already provided.")
+            initial_theta = self.theta.copy()
+    
+        # Initialize the scatter.
+        initial_s2 = self.s2 if fixed_scatter \
+            else 0.01**2 * np.ones_like(self.dispersion)
 
         # Prepare the method and arguments.
-        fitter = kwargs.pop("function", _fit_pixel)
+        fitting_function = kwargs.pop("function", _fit_pixel)
         kwds = {
             "fixed_scatter": fixed_scatter,
+            "design_matrix": self.design_matrix,
             "op_kwargs": kwargs.pop("op_kwargs", {}),
             "op_bfgs_kwargs": kwargs.pop("op_bfgs_kwargs", {})
         }
-        #kwds.update(kwargs)
 
-        temporary_filenames = []
+        N_stars, N_pixels = self.normalized_flux.shape
+        logger.info("Training {0}-label {1} with {2} stars and {3} pixels/star"\
+            .format(len(self.vectorizer.label_names), type(self).__name__,
+                N_stars, N_pixels))
 
-        args = [self.normalized_flux.T, self.normalized_ivar.T, p0_scatter]
+        # Arguments:
+        # initial_theta, initial_s2, flux, ivar, [additional_args], 
+        # design_matrix, **kwargs
+        args = [initial_theta, initial_s2, self.normalized_flux.T, 
+            self.normalized_ivar.T]
         args.extend(kwargs.get("additional_args", []))
 
-        pixel_metadata = []
-        if self.pool is None:
-            mapper = map
-            
-            # Single threaded, so we can supply a large design matrix.            
-            kwds["design_matrix"] = self.design_matrix
+        # Write the design matrix to a temporary file.
+        temporary_filenames = []
+        #temporary_filename = utils._pack_value(self.design_matrix)
+        #kwds["design_matrix"] = temporary_filename
+        #temporary_filenames.append(temporary_filename)
 
-            results = []
-            previous_theta = [None]
-            for j, row in enumerate(utils.progressbar(zip(*args), message=message)):
-                if j > 0 and use_neighbouring_pixel_theta:
-                    row = list(row)
-                    row[-1] = previous_theta[-1]
-                    row = tuple(row)
-                #row = list(row)
-                #raise a
-                #row[-1] = initial_theta
-                #row = tuple(row)
-                #print("ACTUALLY SENDING {}".format(initial_theta))
-                result, metadata = fitter(*row, **kwds)
-                results.append(result)
-                pixel_metadata.append(metadata)
-                if use_neighbouring_pixel_theta:
-                    previous_theta[-1] = results[-1][:-1]
-
-                logger.debug("Theta: {}".format(results[-1][:-1]))
-
-            results = np.array(results)
-
-        else:
-            mapper = self.pool.map
-            
-            # Write the design matrix to a temporary file.
-            _, temporary_filename = tempfile.mkstemp()
-            with open(temporary_filename, "wb") as fp:
-                pickle.dump(self.design_matrix, fp, -1)
-            kwds["design_matrix"] = temporary_filename
-            temporary_filenames.append(temporary_filename)
-
-            # Wrap the function so we can parallelize it out.
-            try:
-                f = utils.wrapper(fitter, None, kwds, N, message=message)
-                output = mapper(f, [row for row in zip(*args)])
-
-            except KeyboardInterrupt:
-                logger.debug("Removing temporary filenames:\n{}".format(
-                    "\n".join(temporary_filenames)))
-                map(os.remove, temporary_filenames)
+        # Wrap the function so we can parallelize it out.
+        mapper = map if self.pool is None else self.pool.map
+        try:
+            f = utils.wrapper(fitting_function, None, kwds, N_pixels)
+            if self.pool is None and use_neighbouring_pixels:
+                output = []
+                neighbour_theta = []
+                for j, row in enumerate(zip(*args)):
+                    if j > 0:
+                        # Update with determined theta from neighbour pixel.
+                        row = list(row)
+                        row[0] = neighbour_theta
+                        row = tuple(row)
+                    output.append(f(*row))
+                    neighbour_theta = output[-1][0][:design_matrix.shape[1]]
 
             else:
-                results = []
-                metadata = []
-                for r, m in output:
-                    results.append(r)
-                    metadata.append(m)
+                output = mapper(f, [row for row in zip(*args)])
 
-                results = np.array(results)
+        except KeyboardInterrupt:
+            logger.debug("Removing temporary filenames:\n{}".format(
+                "\n".join(temporary_filenames)))
+            map(os.remove, temporary_filenames)
 
-        #self.theta = theta
-        #self.s2 = scatter**2
+        else:
+            results = []
+            metadata = []
+            for r, m in output:
+                results.append(r)
+                metadata.append(m)
+
+            results = np.array(results)
 
         # Clean up any temporary files.
         for filename in temporary_filenames:
             if os.path.exists(filename): os.remove(filename)
 
         # Unpack the results.
-        self.theta, self.s2 = (results[:, :-1], results[:, -1]**2)
+        self.theta, self.s2 = (results[:, :-1], results[:, -1])
 
-        assert np.all(self.s2 == 0.0)
         return None
 
 
@@ -238,6 +231,33 @@ class CannonModel(model.BaseCannonModel):
 
         return (labels, cov, metadata) if full_output else labels
 
+
+    @model.requires_training_wheels
+    def _set_s2_by_hogg_heuristic(self):
+        """
+        Set the pixel scatter by Hogg's heuristic.
+
+        See https://github.com/andycasey/AnniesLasso/issues/31 for more details.
+        """
+
+        model_flux = self.predict(self.labels_array)
+        residuals_squared = (model_flux - self.normalized_flux)**2
+
+        def objective_function(s, residuals_squared, ivar):
+            adjusted_ivar = ivar/(1. + ivar * s**2)
+            chi_sq = residuals_squared * adjusted_ivar
+            return (np.mean(chi_sq) - 1.0)**2
+
+        s = []
+        for j in range(self.dispersion.size):
+            s.append(op.fmin(objective_function, 0,
+                args=(residuals_squared[:, j], self.normalized_ivar[:, j]), 
+                disp=False))
+
+        s2 = np.array(s)**2
+        s2[s2 == 0] = np.inf
+        self.s2 = s2
+        return True
 
 
 def _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar,
@@ -708,9 +728,7 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
         if it was supplied by the user.
     """
 
-    if isinstance(design_matrix, string_types):
-        with open(design_matrix, "rb") as fp:
-            design_matrix = pickle.load(fp)
+    design_matrix = utils._unpack_value(design_matrix)
 
     # This initial theta will also be returned if we have no valid fluxes.
     initial_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])
@@ -826,7 +844,7 @@ def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
     """
 
     theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
-        scatter, design_matrix)
+        scatter**2, design_matrix)
 
     return_theta = kwargs.get("__return_theta", False)
     if ATCiAinv is None:
@@ -838,7 +856,7 @@ def _fit_pixel_with_fixed_scatter(scatter, normalized_flux, normalized_ivar,
     return (Q, theta) if return_theta else Q
 
 
-def _fit_theta(normalized_flux, normalized_ivar, scatter, design_matrix):
+def _fit_theta(normalized_flux, normalized_ivar, s2, design_matrix):
     """
     Fit theta coefficients to a set of normalized fluxes for a single pixel.
 
@@ -860,7 +878,7 @@ def _fit_theta(normalized_flux, normalized_ivar, scatter, design_matrix):
         and the total inverse variance.
     """
 
-    ivar = normalized_ivar/(1. + normalized_ivar * scatter**2)
+    ivar = normalized_ivar/(1. + normalized_ivar * s2)
     CiA = design_matrix * np.tile(ivar, (design_matrix.shape[1], 1)).T
     try:
         ATCiAinv = np.linalg.inv(np.dot(design_matrix.T, CiA))
