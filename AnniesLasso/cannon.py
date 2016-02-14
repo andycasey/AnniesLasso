@@ -13,7 +13,6 @@ __all__ = ["CannonModel"]
 import logging
 import numpy as np
 import scipy.optimize as op
-import tempfile
 import os
 
 from . import (model, utils)
@@ -377,12 +376,19 @@ def _fit_spectrum(normalized_flux, normalized_ivar, vectorizer, theta, s2,
     return (op_labels, cov, meta)
 
 
-def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
-    fixed_scatter=False, **kwargs):
+
+def _fit_pixel(initial_theta, initial_s2, normalized_flux, normalized_ivar, 
+    design_matrix, fixed_scatter, **kwargs):
     """
-    Return the optimal vectorizer coefficients and variance term for a pixel
-    given the normalized flux, the normalized inverse variance, and the design
-    matrix.
+    Return the optimal model coefficients and pixel scatter given the normalized
+    flux, the normalized inverse variance, and the design matrix.
+
+    :param initial_theta:
+        The initial model coefficients to optimize from.
+
+    :param initial_s2:
+        The initial pixel scatter (s^2) terms to optimize from (if fixed_scatter
+        is False).
 
     :param normalized_flux:
         The normalized flux values for a given pixel, from all stars.
@@ -394,9 +400,8 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
     :param design_matrix:
         The design matrix for the spectral model.
 
-    :param scatter:
-        Fit the data using a fixed scatter term. If this value is set to None,
-        then the scatter will be calculated.
+    :param fixed_scatter:
+        Keep the pixel scatter term fixed.
 
     :returns:
         The optimised label vector coefficients and scatter for this pixel, even
@@ -405,6 +410,7 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
 
     design_matrix = utils._unpack_value(design_matrix)
 
+    raise a
     # This initial theta will also be returned if we have no valid fluxes.
     initial_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])
 
@@ -443,44 +449,6 @@ def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
     return np.hstack([op_params, scatter]) if fixed_scatter else op_params
 
 
-def _fit_pixel_s2_theta_separately(normalized_flux, normalized_ivar, scatter, design_matrix,
-    fixed_scatter=False, **kwargs):
-
-    """
-    theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
-        scatter, design_matrix)
-
-    # Singular matrix or fixed scatter?
-    if ATCiAinv is None or fixed_scatter:
-        return np.hstack([theta, scatter if fixed_scatter else 0.0])
-
-    # Optimise the pixel scatter, and at each pixel scatter value we will 
-    # calculate the optimal vector coefficients for that pixel scatter value.
-    kwds = {
-        "maxiter": np.inf,
-        "maxfun": np.inf,
-        "disp": False, 
-        "full_output":True
-
-    }
-    kwds.update(kwargs.get("op_kwargs", {}))
-    logger.info("Passing to optimizer: {}".format(kwds))
-
-    op_scatter, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
-        _fit_pixel_with_fixed_scatter, scatter,
-        args=(normalized_flux, normalized_ivar, design_matrix),
-        **kwds)
-
-    if warnflag > 0:
-        logger.warning("Warning: {}".format([
-            "Maximum number of function evaluations made during optimisation.",
-            "Maximum number of iterations made during optimisation."
-            ][warnflag - 1]))
-
-    theta, ATCiAinv, inv_var = _fit_theta(normalized_flux, normalized_ivar,
-        op_scatter, design_matrix)
-    return np.hstack([theta, op_scatter])
-    """
 
 
 def _model_pixel(theta, scatter, normalized_flux, normalized_ivar,
