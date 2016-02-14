@@ -352,6 +352,10 @@ class BaseCannonModel(object):
             A dictionary containing the labels as keys and masks as values.
         """
 
+        if pixel_filters is None:
+            self._pixel_filters = None
+            return None
+
         # Pixel filters can't be set if we don't know what the vectorizer
         # label names are.
         if self.vectorizer is None:
@@ -370,6 +374,10 @@ class BaseCannonModel(object):
         pixel_filters = pixel_filters.copy()
         for each in unrecognized:
             del pixel_filters[each]
+
+        if len(pixel_filters) == 0:
+            self._pixel_filters = None
+            return None
 
         # Check the values in the pixel filters.
         for label_name in pixel_filters.keys():
