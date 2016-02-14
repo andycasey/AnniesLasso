@@ -193,7 +193,8 @@ class CannonModel(model.BaseCannonModel):
 
 
     @model.requires_training_wheels
-    def fit(self, normalized_flux, normalized_ivar, full_output=False, **kwargs):
+    def fit(self, normalized_flux, normalized_ivar, initial_labels=None,
+        full_output=False, **kwargs):
         """
         Solve the labels for the given normalized fluxes and inverse variances.
 
@@ -205,6 +206,10 @@ class CannonModel(model.BaseCannonModel):
             The inverse variances of the normalized flux values. This should
             have the same shape as `normalized_flux`.
 
+        :param initial_labels: [optional]
+            The initial points to optimize from. If not given, only one
+            initialization will be made from the fiducial label point.
+
         :returns:
             The labels.
         """
@@ -212,6 +217,11 @@ class CannonModel(model.BaseCannonModel):
         normalized_flux = np.atleast_2d(normalized_flux)
         normalized_ivar = np.atleast_2d(normalized_ivar)
         N_spectra = normalized_flux.shape[0]
+
+        if initial_labels is None:
+            initial_labels = [None] * N_spectra
+        else:
+            initial_labels = np.atleast_2d(initial_labels)
         
         # Prepare the wrapper function and data.
         message = None if not kwargs.pop("progressbar", True) \
@@ -221,7 +231,7 @@ class CannonModel(model.BaseCannonModel):
             _fit_spectrum, (self.vectorizer, self.theta, self.s2), kwargs, 
             N_spectra, message=message)
 
-        args = (normalized_flux, normalized_ivar)
+        args = (normalized_flux, normalized_ivar, initial_labels)
         mapper = map if self.pool is None else self.pool.map
 
         labels, cov, metadata = zip(*mapper(f, zip(*args)))
@@ -286,8 +296,8 @@ def _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar,
     return np.linalg.solve(A, B)
 
 
-def _fit_spectrum(normalized_flux, normalized_ivar, vectorizer, theta, s2,
-    **kwargs):
+def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
+    theta, s2, **kwargs):
     """
     Fit a single spectrum by least-squared fitting.
     
@@ -296,6 +306,10 @@ def _fit_spectrum(normalized_flux, normalized_ivar, vectorizer, theta, s2,
 
     :param normalized_ivar:
         The inverse variance array for the normalized fluxes.
+
+    :param initial_labels:
+        The point(s) to initialize optimization from. If `None` is given, only
+        one optimization will be performed from the vectorizer fiducials.
 
     :param vectorizer:
         The vectorizer to use when fitting the data.
@@ -336,10 +350,9 @@ def _fit_spectrum(normalized_flux, normalized_ivar, vectorizer, theta, s2,
         #Dfun = lambda labels: \
         #    np.dot(theta, vectorizer.get_label_vector_derivative(labels)).T
         Dfun = None
-
+    
     kwds = {
         "func": objective,
-        "x0": vectorizer.fiducials,
         "args": (),
         "Dfun": Dfun,
         "col_deriv": True,
@@ -353,8 +366,20 @@ def _fit_spectrum(normalized_flux, normalized_ivar, vectorizer, theta, s2,
     }
     # Only update the keywords with things that op.leastsq expects.
     kwds.update({ k: v for k, v in kwargs.items() if k in kwds })
-    op_labels, cov, meta, message, ier = op.leastsq(full_output=True, **kwds)
 
+    if initial_labels is None:
+        initial_labels = [vectorizer.fiducials]
+
+    results = []
+    best_result_metric = []
+    for x0 in initial_labels:
+        kwds["x0"] = x0
+        op_labels, cov, meta, message, ier = op.leastsq(full_output=True, **kwds)
+        results.append((op_labels, cov, meta, message, ier))
+        best_result_metric.append(meta["fvec"]**2)
+
+    op_labels, cov, meta, message, ier = results[np.argmin(best_result_metric)]
+    
     if ier not in range(1, 5):
         logger.warn("Least-squares result was {0}: {1}".format(ier, message))
 
