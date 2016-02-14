@@ -102,7 +102,7 @@ class BaseCannonModel(object):
     """
 
     _trained_attributes = ["_s2", "_theta"]
-    _descriptive_attributes = ["_dispersion", "_vectorizer"]
+    _descriptive_attributes = ["_dispersion", "_vectorizer", "_pixel_filters"]
     _data_attributes = ["_labelled_set", "_normalized_flux", "_normalized_ivar"]
     
     def __init__(self, labelled_set, normalized_flux, normalized_ivar,
@@ -332,6 +332,56 @@ class BaseCannonModel(object):
             raise TypeError("vectorizer must be "
                             "a sub-class of vectorizers.BaseVectorizer")
         self._vectorizer = vectorizer
+        return None
+
+
+    @property
+    def pixel_filters(self):
+        """
+        Return the pixel filters for the labels.
+        """
+        return self._pixel_filters
+
+
+    @pixel_filters.setter
+    def pixel_filters(self, pixel_filters):
+        """
+        Set the pixel filters (for each label) for the model.
+
+        :param pixel_filters:
+            A dictionary containing the labels as keys and masks as values.
+        """
+
+        # Pixel filters can't be set if we don't know what the vectorizer
+        # label names are.
+        if self.vectorizer is None:
+            raise TypeError("the model requires a vectorizer")
+
+        if not isinstance(pixel_filters, dict):
+            raise TypeError("pixel filters must be specified as a dictionary")
+
+        # Ignore unrecognized labels in the pixel filters that aren't in the
+        # vectorizer.
+        unrecognized = set(pixel_filters).difference(self.vectorizer.label_names)
+        if any(unrecognized):
+            logger.warn("Ignoring unrecognized label names in the pixel filter "
+                        "description: {0}".format(", ".join(unrecognized)))
+
+        pixel_filters = pixel_filters.copy()
+        for each in unrecognized:
+            del pixel_filters[each]
+
+        # Check the values in the pixel filters.
+        for label_name in pixel_filters.keys():
+            label_filter = np.array(pixel_filters[label_name], dtype=bool)
+            if label_filter.size != self.dispersion.size:
+                raise ValueError("the label filter must be set for every pixel"
+                                 " (array size {0} != {1})".format(
+                                    label_filter.size, self.dispersion.size))
+
+            pixel_filters[label_name] = label_filter
+        
+        self._pixel_filters = pixel_filters
         return None
 
 
