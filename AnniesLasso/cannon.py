@@ -150,9 +150,8 @@ class CannonModel(model.BaseCannonModel):
                         row = list(row)
                         row[0] = neighbour_theta
                         row = tuple(row)
-                    output.append(f(*row))
-                    neighbour_theta = output[-1][0][:design_matrix.shape[1]]
-
+                    output.append(f(row))
+                    neighbour_theta = output[-1][0][:self.design_matrix.shape[1]]
             else:
                 output = mapper(f, [row for row in zip(*args)])
 
@@ -226,7 +225,7 @@ class CannonModel(model.BaseCannonModel):
         mapper = map if self.pool is None else self.pool.map
 
         labels, cov, metadata = zip(*mapper(f, zip(*args)))
-        labels, cov = map(np.array, (labels, cov))
+        labels, cov = (np.array(labels), np.array(cov))
 
         return (labels, cov, metadata) if full_output else labels
 
@@ -357,7 +356,7 @@ def _fit_spectrum(normalized_flux, normalized_ivar, vectorizer, theta, s2,
     op_labels, cov, meta, message, ier = op.leastsq(full_output=True, **kwds)
 
     if ier not in range(1, 5):
-        logger.warn("Least-sq result was {0}: {1}".format(ier, message))
+        logger.warn("Least-squares result was {0}: {1}".format(ier, message))
 
     # Save additional information.
     _ = np.sum(meta["fvec"]**2)
@@ -374,7 +373,6 @@ def _fit_spectrum(normalized_flux, normalized_ivar, vectorizer, theta, s2,
         ("ftol", "xtol", "gtol", "maxfev", "factor", "epsfcn") })
 
     return (op_labels, cov, meta)
-
 
 
 def _fit_pixel(initial_theta, initial_s2, normalized_flux, normalized_ivar, 
