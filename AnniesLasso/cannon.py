@@ -218,9 +218,9 @@ class CannonModel(model.BaseCannonModel):
         # Prepare the wrapper function and data.
         message = None if not kwargs.pop("progressbar", True) \
             else "Fitting {0} spectra".format(N_spectra)
-        
+
         f = utils.wrapper(
-            _fit_spectrum_bfgs, (self.vectorizer, self.theta, self.s2), kwargs, 
+            _fit_spectrum, (self.vectorizer, self.theta, self.s2), kwargs, 
             N_spectra, message=message)
 
         args = (normalized_flux, normalized_ivar)
@@ -250,6 +250,7 @@ class CannonModel(model.BaseCannonModel):
 
         s = []
         for j in range(self.dispersion.size):
+            print(j)
             s.append(op.fmin(objective_function, 0,
                 args=(residuals_squared[:, j], self.normalized_ivar[:, j]), 
                 disp=False))
@@ -287,19 +288,29 @@ def _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar,
     return np.linalg.solve(A, B)
 
 
-def foo(x, *labels):
-    t, v = x
-    #print(labels, v)
-    return np.dot(t, v(list(labels) + [labels[-1]] * 14).T).flatten()
-
-
-
-def _fit_spectrum_bfgs(normalized_flux, normalized_ivar, vectorizer, theta, s2,
+def _fit_spectrum(normalized_flux, normalized_ivar, vectorizer, theta, s2,
     **kwargs):
+    """
+    Fit a single spectrum by least-squared fitting.
+    
+    :param normalized_flux:
+        The normalized flux values.
+
+    :param normalized_ivar:
+        The inverse variance array for the normalized fluxes.
+
+    :param vectorizer:
+        The vectorizer to use when fitting the data.
+
+    :param theta:
+        The theta coefficients (spectral derivatives) of the trained model.
+
+    :param s2:
+        The pixel scatter (s^2) array for each pixel.
+    """
 
     adjusted_ivar = normalized_ivar/(1. + normalized_ivar * s2)
     adjusted_inv_sigma = np.sqrt(adjusted_ivar)
-
 
     def objective(labels):
         model_flux = np.dot(theta, vectorizer(labels).T).flatten()
@@ -348,10 +359,11 @@ def _fit_spectrum_bfgs(normalized_flux, normalized_ivar, vectorizer, theta, s2,
 
     if ier not in range(1, 5):
         logger.warn("Least-sq result was {0}: {1}".format(ier, message))
-    
+
     # Save additional information.
     _ = np.sum(meta["fvec"]**2)
     meta.update({ 
+        "method": "leastsq",
         "ier": ier,
         "message": message,
         "Dfun": Dfun is not None,
@@ -364,343 +376,6 @@ def _fit_spectrum_bfgs(normalized_flux, normalized_ivar, vectorizer, theta, s2,
 
     return (op_labels, cov, meta)
 
-    """
-
-    """
-
-    kwds = {
-        "func": objective,
-        "x0": initial, #np.array(vectorizer.fiducials.copy(), dtype=float),
-        "fprime": gradient,
-        "args": (),
-        "approx_grad": False,
-        "bounds": None,
-        "m": 10,
-        "factr": 0.1,
-        "pgtol": 1e-6,
-        "epsilon": 1e-8,
-        "iprint": -1,
-        "disp": 0,
-        "maxfun": np.inf,
-        "maxiter": np.inf,
-        "callback": None,
-    }
-    # Only update the keywords with things that op.leastsq expects.
-    kwds.update({ k: v for k, v in kwargs.items() if k in kwds })
-
-    op_labels, fopt, info = op.fmin_l_bfgs_b(**kwds)
-
-    if info["warnflag"] > 0:
-        logger.warning("BFGS stopped prematurely: {}".format(info["task"]))
-    
-        kwds = {
-            "func": objective,
-            "x0": op_labels,
-            "args": (),
-            "xtol": 1e-6,
-            "ftol": 1e-6,
-            "maxiter": 10**8,
-            "maxfun": 10**8,
-            "disp": False,
-            "retall": False
-        }
-        # Only update the keywords with things that op.leastsq expects.
-        kwds.update({ k: v for k, v in kwargs.items() if k in kwds })
-
-        #op_labels, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
-        #    full_output=True, **kwds)
-        op_labels, fopt, n_iter, n_funcs, warnflag = op.fmin(full_output=True,
-            **kwds)
-
-        if warnflag > 0:
-            logger.warn("Powell optimization failed: {}".format([
-                    "MAXIMUM NUMBER OF FUNCTION EVALUATIONS.",
-                    "MAXIMUM NUMBER OF ITERATIONS."
-                ][warnflag - 1]))
-        else:
-            logger.info("Powell optimization completed successfully.")
-
-        metadata = {}
-        metadata.update({
-            "fmin_fopt": fopt,
-            "fmin_niter": n_iter,
-            "fmin_nfuncs": n_funcs,
-            "fmin_warnflag": warnflag
-        })
-
-    return (op_labels, fopt)
-    """
-
-    def f(xdata, *labels):
-        return np.dot(theta, vectorizer(labels).T).flatten()
-        #print(labels, f.sum())
-        #return f
-        
-
-    kwds = {
-        "f": lambda _, *labels: np.dot(theta, vectorizer(labels).T).flatten(),
-        "xdata": None, # theta is already available.
-        "ydata": normalized_flux,
-        #"p0": np.array(vectorizer.fiducials.copy(), dtype=float),
-        "p0": np.array([  4.54917822e+03, 2.36721921e+00, 1.15975127e-01, 3.03657055e-02
-, 9.72300023e-03 ,9.25753042e-02,-1.13341119e-02,5.66763096e-02
-, 2.43287757e-01,3.71136330e-02,5.40449992e-02,3.48223984e-01
-, 1.09878577e-01,2.43512809e-01,2.12157130e-01,5.76438233e-02,
-   -1.01278335e-01]),
-        "sigma": adjusted_ivar,
-        "absolute_sigma": False,
-        #"check_finite": True,
-    }
-    kwds.update({ k: v for k, v in kwargs.items() if k in kwds })
-    
-    op_labels, cov = op.curve_fit(**kwds)
-    print(op_labels)
-    return (op_labels, cov)
-    """
-
-
-
-
-def _fit_spectrum(normalized_flux, normalized_ivar, vectorizer, theta, s2,
-    **kwargs):
-    """
-    Solve the labels for given pixel fluxes and uncertainties for a single star.
-
-    :param normalized_flux:
-        The normalized fluxes. These should be on the same dispersion scale
-        as the trained data.
-
-    :param normalized_ivar:
-        The 1-sigma uncertainties in the fluxes. This should have the same
-        shape as `normalized_flux`.
-
-    :param vectorizer:
-        The model vectorizer.
-
-    :param theta:
-        The theta coefficients obtained from the training phase.
-
-    :param s2:
-        The intrinsic pixel variance.
-
-    :returns:
-        The labels and covariance matrix.
-    """
-
-    """
-    # TODO: Re-visit this.
-    # Get an initial estimate of the label vector from a matrix inversion,
-    # and then ask the vectorizer to interpret that label vector into the 
-    # (approximate) values of the labels that could have produced that 
-    # label vector.
-    lv = _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar)
-    initial = vectorizer.get_approximate_labels(lv)
-    """
-
-    # Overlook the bad pixels.
-    inv_var = normalized_ivar/(1. + normalized_ivar * s2)
-    use = np.isfinite(inv_var * normalized_flux)
-
-    kwds = {
-        "p0": vectorizer.fiducials,
-        "maxfev": 10**6,
-        "sigma": inv_var[use],
-    }
-    kwds.update(kwargs)
-    
-    f = lambda t, *l: np.dot(t, vectorizer(l).T).flatten()
-    labels, cov = op.curve_fit(f, theta[use], normalized_flux[use], **kwds)
-    return (labels, cov)
-
-
-
-
-
-def _fit_spectrum_fmin_powell(normalized_flux, normalized_ivar, vectorizer, theta, s2,
-    **kwargs):
-    """
-    Solve the labels for given pixel fluxes and uncertainties for a single star.
-
-    :param normalized_flux:
-        The normalized fluxes. These should be on the same dispersion scale
-        as the trained data.
-
-    :param normalized_ivar:
-        The 1-sigma uncertainties in the fluxes. This should have the same
-        shape as `normalized_flux`.
-
-    :param vectorizer:
-        The model vectorizer.
-
-    :param theta:
-        The theta coefficients obtained from the training phase.
-
-    :param s2:
-        The intrinsic pixel variance.
-
-    :returns:
-        The labels and covariance matrix.
-    """
-
-    """
-    # TODO: Re-visit this.
-    # Get an initial estimate of the label vector from a matrix inversion,
-    # and then ask the vectorizer to interpret that label vector into the 
-    # (approximate) values of the labels that could have produced that 
-    # label vector.
-    lv = _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar)
-    initial = vectorizer.get_approximate_labels(lv)
-    """
-
-    # Overlook the bad pixels.
-    inv_var = normalized_ivar/(1. + normalized_ivar * s2)
-    use = np.isfinite(inv_var * normalized_flux)
-
-    flux = normalized_flux[use]
-    ivar = normalized_ivar[use]
-
-    # y = (theta * lv - m)**2 * inv_var
-    # dy/dtheta = 
-
-    def objective(labels):
-        m = np.dot(theta, vectorizer(labels).T).flatten()
-        stuff = np.sum(ivar * (flux - m[use])**2)
-        print(labels, stuff)
-        return stuff
-
-    return op.fmin_powell(objective, kwargs.get("p0", vectorizer.fiducials),
-        xtol=1e-6, ftol=1e-6)
-
-
-
-
-def _fit_spectrum_leastsq(normalized_flux, normalized_ivar, vectorizer, theta, s2,
-    **kwargs):
-    """
-    Solve the labels for given pixel fluxes and uncertainties for a single star.
-
-    :param normalized_flux:
-        The normalized fluxes. These should be on the same dispersion scale
-        as the trained data.
-
-    :param normalized_ivar:
-        The 1-sigma uncertainties in the fluxes. This should have the same
-        shape as `normalized_flux`.
-
-    :param vectorizer:
-        The model vectorizer.
-
-    :param theta:
-        The theta coefficients obtained from the training phase.
-
-    :param s2:
-        The intrinsic pixel variance.
-
-    :returns:
-        The labels and covariance matrix.
-    """
-
-    """
-    # TODO: Re-visit this.
-    # Get an initial estimate of the label vector from a matrix inversion,
-    # and then ask the vectorizer to interpret that label vector into the 
-    # (approximate) values of the labels that could have produced that 
-    # label vector.
-    lv = _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar)
-    initial = vectorizer.get_approximate_labels(lv)
-    """
-
-    # Overlook the bad pixels.
-    inv_var = normalized_ivar/(1. + normalized_ivar * s2)
-    use = np.isfinite(inv_var * normalized_flux)
-
-    flux = normalized_flux[use]
-    inv_sigma = np.sqrt(normalized_ivar[use])
-
-    def objective(labels):
-        print(labels)
-        m = np.dot(theta, vectorizer(labels).T).flatten()
-        return (flux - m[use])
-
-    # leastsq uses:
-    # x = arg min(sum(func(y)**2, axis=0))
-    #          y
-    # so our func should be (delta/sqrt(ivar))
-
-    return op.leastsq(objective, kwargs.get("p0", vectorizer.fiducials),
-        maxfev=10**6, xtol=1e-6, ftol=1e-6)
-
-
-
-
-
-def _fit_spectrum_fmin(normalized_flux, normalized_ivar, vectorizer, theta, s2,
-    **kwargs):
-    """
-    Solve the labels for given pixel fluxes and uncertainties for a single star.
-
-    :param normalized_flux:
-        The normalized fluxes. These should be on the same dispersion scale
-        as the trained data.
-
-    :param normalized_ivar:
-        The 1-sigma uncertainties in the fluxes. This should have the same
-        shape as `normalized_flux`.
-
-    :param vectorizer:
-        The model vectorizer.
-
-    :param theta:
-        The theta coefficients obtained from the training phase.
-
-    :param s2:
-        The intrinsic pixel variance.
-
-    :returns:
-        The labels and covariance matrix.
-    """
-
-    """
-    # TODO: Re-visit this.
-    # Get an initial estimate of the label vector from a matrix inversion,
-    # and then ask the vectorizer to interpret that label vector into the 
-    # (approximate) values of the labels that could have produced that 
-    # label vector.
-    lv = _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar)
-    initial = vectorizer.get_approximate_labels(lv)
-    """
-
-    # Overlook the bad pixels.
-    inv_var = normalized_ivar/(1. + normalized_ivar * s2)
-    use = np.isfinite(inv_var * normalized_flux)
-
-    ivar = normalized_ivar[use]
-    flux = normalized_flux[use]
-    t = theta[use]
-
-    def objective(labels):
-        m = np.dot(t, vectorizer(labels).T).flatten()
-        f = np.sum(normalized_ivar * (normalized_flux - m)**2)
-        #print(labels, f)
-        return f
-
-    return op.fmin(objective, vectorizer.fiducials, disp=False, maxfun=np.inf,
-        maxiter=np.inf, xtol=1e-6, ftol=1e-6)
-
-    kwds = {
-        "p0": vectorizer.fiducials,
-        "maxfev": 10**6,
-        "sigma": ivar,
-    }
-    kwds.update(kwargs)
-    
-    #f = lambda t, *l: np.dot(t, vectorizer(l).T).flatten()
-    def f(t, *l):
-        f = np.dot(t, vectorizer(l).T).flatten()
-        #print(l)
-        return f
-    labels, cov = op.curve_fit(f, t, flux, **kwds)
-    return (labels, cov)
 
 def _fit_pixel(normalized_flux, normalized_ivar, scatter, design_matrix,
     fixed_scatter=False, **kwargs):
