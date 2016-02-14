@@ -378,14 +378,16 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
         results.append((op_labels, cov, meta, message, ier))
         best_result_metric.append(meta["fvec"]**2)
 
-    op_labels, cov, meta, message, ier = results[np.argmin(best_result_metric)]
-    
+    best_result_index = np.argmin(best_result_metric)
+    op_labels, cov, meta, message, ier = results[best_result_index]
+
     if ier not in range(1, 5):
         logger.warn("Least-squares result was {0}: {1}".format(ier, message))
 
     # Save additional information.
     _ = np.sum(meta["fvec"]**2)
     meta.update({ 
+        "x0": initial_labels[best_result_index],
         "method": "leastsq",
         "ier": ier,
         "message": message,
