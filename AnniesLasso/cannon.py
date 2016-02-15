@@ -227,11 +227,11 @@ class CannonModel(model.BaseCannonModel):
         message = None if not kwargs.pop("progressbar", True) \
             else "Fitting {0} spectra".format(N_spectra)
 
-        f = utils.wrapper(
-            _fit_spectrum, (self.vectorizer, self.theta, self.s2), kwargs, 
-            N_spectra, message=message)
+        f = utils.wrapper(_fit_spectrum, 
+            (initial_labels, self.vectorizer, self.theta, self.s2),
+            kwargs, N_spectra, message=message)
 
-        args = (normalized_flux, normalized_ivar, initial_labels)
+        args = (normalized_flux, normalized_ivar)
         mapper = map if self.pool is None else self.pool.map
 
         labels, cov, metadata = zip(*mapper(f, zip(*args)))
@@ -369,6 +369,10 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
 
     if initial_labels is None:
         initial_labels = [vectorizer.fiducials]
+    initial_labels = np.atleast_2d(initial_labels)
+
+    logger.debug("Optimizing from K = {0} initialization points".format(
+        initial_labels.shape[0]))
 
     results = []
     best_result_metric = []
@@ -376,7 +380,7 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
         kwds["x0"] = x0
         op_labels, cov, meta, message, ier = op.leastsq(full_output=True, **kwds)
         results.append((op_labels, cov, meta, message, ier))
-        best_result_metric.append(meta["fvec"]**2)
+        best_result_metric.append(np.sum(meta["fvec"]**2))
 
     best_result_index = np.argmin(best_result_metric)
     op_labels, cov, meta, message, ier = results[best_result_index]
@@ -386,7 +390,8 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
 
     # Save additional information.
     _ = np.sum(meta["fvec"]**2)
-    meta.update({ 
+    meta.update({
+        "best_result_index": best_result_index,
         "x0": initial_labels[best_result_index],
         "method": "leastsq",
         "ier": ier,
