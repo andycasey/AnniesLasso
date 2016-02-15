@@ -236,9 +236,11 @@ def _fit_regularized_pixel(initial_theta, initial_s2, normalized_flux,
         "maxiter": np.inf,
     }
 
-    # Keywords specific to BFGS.
+    # Keywords specific to BFGS (and default values).
     bfgs_terms = {
         "m": p0.size,
+        "factr": 10000000.0,
+        "pgtol": 1e-5,
     }
     bfgs_terms.update(kwargs.pop("op_bfgs_kwargs", {}))
     kwds.update(bfgs_terms)
@@ -256,6 +258,11 @@ def _fit_regularized_pixel(initial_theta, initial_s2, normalized_flux,
     if d["warnflag"] > 0:
         
         # Run Powell's method instead.
+        # Default values:
+        kwds.update({
+            "xtol": 1e-6,
+            "ftol": 1e-6
+        })
         kwds.update(kwargs.get("op_fmin_kwargs", {}))
         for k in bfgs_terms:
             del kwds[k]
