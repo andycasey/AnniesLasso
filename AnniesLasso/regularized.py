@@ -221,7 +221,7 @@ def _fit_regularized_pixel(initial_theta, initial_s2, normalized_flux,
 
     # Is the fiducial theta a better starting point?
     fiducial_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])
-    if func(fiducial_theta, *args, False) < func(initial_theta, *args, False):
+    if func(fiducial_theta, *args)[0] < func(initial_theta, *args)[0]:
         initial_theta = fiducial_theta
 
     # Starting point for optimization.
