@@ -426,7 +426,7 @@ constructed the labelled set using sensible criteria for stars analysed with
 version \texttt{v603} of the \aspcap\ pipeline.  We employed several quality 
 criteria to distill a robust yet representative labelled set: We first removed 
 any stars with problematic flags from the \aspcap\ pipeline, requiring 
-\texttt{ASPCAPFLAG = 0}.  We excluded stars with S/N ratios outside the range of
+\texttt{ASPCAPFLAG~=~0}.  We excluded stars with S/N ratios outside the range of
 200-300, and stars with a radial velocity scatter larger than 1~km~s$^{-1}$.  We
 further demanded that our training set include reported abundances in all 15 
 elements (C, N, O, Na, Mg, Al, Si, S, K, Ca, Ti, V, Mn, Fe, and Ni), and 
@@ -437,7 +437,7 @@ in the labelled set had spurious measurements of [V/H].  For this reason we
 required that stars in the labelled set have $\mathrm{[V/Fe]} > -0.6$.  The 
 distilled sample includes 14,141 red giant branch stars that will form our 
 labelled set, with [Fe/H] labels ranging from $\mathrm{[Fe/H]} = -2.10$ to 
-+0.30~dex. 
++0.30~dex.
 
 
 We randomly assigned each star in the labelled set a uniformly-distributed 
@@ -520,14 +520,15 @@ large wiggles.
 The approach we have described is \emph{pseudo}-continuum normalization.  While 
 our choice of continuum pixels is well-informed, albeit arbitrary, our 
 procedure does not require that the chosen pixels to indeed be `true' continuum
-pixels.  The continuum pixels could be randomly selected, and as long as the
-same pixels were used to normalize all stars, our approach would work equally
-well.  All spectra would be `normalized' in the same way, and the residual flux
-behaviour from a `true'-normalized spectra would be captured by the spectral
-model.  We have only attempted to select well-informed continuum pixels in order
-to maximize model interpretability: by using reasonable continuum pixels we can
-be sure that the spectral model derivatives can be interpreted as being
-astrophysically motivated, rather than capturing residual continuum effects.
+pixels.  This is advantageous.  The continuum pixels could be randomly selected, 
+and as long as the same pixels were used to normalize all stars, our approach 
+would work equally well.  All spectra would be `normalized' in the same way, and
+the residual flux behaviour from a `true'-normalized spectra would be captured 
+by the spectral model.  We have only attempted to select well-informed continuum
+pixels in order to maximize model interpretability: by using reasonable 
+continuum pixels we can be sure that the spectral model derivatives can be 
+interpreted as being astrophysically motivated, rather than capturing residual 
+continuum effects.
 
 
 For all of the aforementioned reasons (invariance with respect to S/N, bounded
@@ -663,12 +664,15 @@ to random uncertainties is a good inter-pipeline comparison metric.
 The results from our label recovery for validation stars at low S/N are shown
 in Figure \ref{fig:label-recovery-snr}.  At $S/N \gtrsim 50$ the errors in all
 labels are approximately flat, indicating that we are dominated by systematics.
-In this regime we recover labels to within X.XX-Y.YY for all abundance labels.
-The worst performance is evident for [V/H].  This abundance label is also
-problematic in the \aspcap\ pipeline because there are very few lines, most of
-which are blended.  Indeed, we noted very obvious issues in the [V/H] labels
-in the labelled set which we tried to account for (e.g., Section 
-\ref{sec:training-set}). 
+This is an important transition point, because all \emph{stacked} spectra in
+\apogee\ have $S/N \geq 50$.  In this regime we recover labels to within 
+X.XX-Y.YY for all abundance labels.  The worst performance is evident for 
+[V/H].  This abundance label is also problematic in the \aspcap\ pipeline 
+because there are very few lines, most of which are blended.  Indeed, we noted
+very obvious issues in the [V/H] labels in the labelled set which we tried to
+account for (e.g., Section \ref{sec:training-set}).  Hence although our [V/H]
+label precision is worse than other abundance labels, it is limited by the
+training set.
 
 
 It is clear that the regularized model recovers labels with good precision even
@@ -687,7 +691,7 @@ as \aspcap\ labels are not publicly available for individual visit spectra.
 
 
 The \apogee\ \texttt{EXTRATARG} bitmask flag indicates that there are 4,667
-repeated observations in \dr\.  These are the same targets, but have different
+repeated observations in \dr.  These are the same stars, but they have different
 \texttt{APOGEE\_ID} values.  During our analysis we measured labels for all
 stacked observations using the \texttt{APOGEE\_ID} as a unique identifier.  For
 this reason, we can use the \texttt{EXTRATARG} flag to identify repeated
@@ -791,11 +795,13 @@ This research made use of:
   the \acronym{NASA} \project{Astrophysics Data System},
   \texttt{TOPCAT} \citep{Taylor_2005},
   GitHub, 
-  Travis CI, the 
+  Travis CI, the
+  \texttt{IPython} \citep{Perez_2007}, 
   \texttt{numpy} \citep{van_der_Walt_2011}, 
-  \texttt{scipy} \citep{Jones_2001}, and
-  \texttt{matplotlib} \citep{Hunter_2007} packages, as well as
+  \texttt{matplotlib} \citep{Hunter_2007}, and
+  \texttt{scipy} \citep{Jones_2001} packages, as well as
   Astropy, a community-developed core Python package for Astronomy \citep{astropy}.
+
 
 This project made use of \sdssiii\ data.
 Funding for \sdssiii\ has been provided by the Alfred P. Sloan
@@ -826,15 +832,30 @@ repository at \url{https://github.com/andycasey/AnniesLasso}.
 \begin{thebibliography}{dummy}\raggedright
 \bibitem[Astropy Collaboration et 
 al.(2013)]{astropy} Astropy Collaboration, Robitaille, T.~P., Tollerud, E.~J., et al.\ 2013, Astronomy \& Astrophysics, 558, AA33 
+
 \bibitem[Cannon 
 \& Pickering(1912)]{Cannon_1912} Cannon, A.~J., \& Pickering, E.~C.\ 1912, Annals of Harvard College Observatory, 56, 115 
+
 \bibitem[Ho et al.(2016)]{Ho_2016} Ho, A.~Y.~Q., Ness, M.~K., 
 Hogg, D.~W., et al.\ 2016, arXiv:1602.00303 
+
+\bibitem[Hunter(2007)]{Hunter_2007} Hunter, J.~D.\ 2007, Matplotlib: A 2D Graphics Environment, Computing in Science \& Engineering, 9, 90-95
+
+\bibitem[Jones et al.(2001)]{Jones_2001} Jones, E., Oliphant E., Peterson P., et al.\ 2001, SciPy: Open Source Scientific Tools for Python, http://www.scipy.org/ (Online; accessed 2016-02-16)
+
 \bibitem[Ness et al.(2015a)]{tc} Ness, M., Hogg, D.~W., 
 Rix, H.-W., Ho, A.~Y.~Q., \& Zasowski, G.\ 2015, \apj, 808, 16
+
 \bibitem[Ness et al.(2015b)]{age} Ness, M., Hogg, D.~W., 
 Rix, H., et al.\ 2015, arXiv:1511.08204 
+
+\bibitem[Perez \& Granger(2007)]{Perez_2007} P\'erez, F., \& Granger, B. E.\ 2007, IPython: A System for Interactive Scientific Computing, Computing in Science \& Engineering, 9, 21-29
+
 \bibitem[Taylor(2005)]{Taylor_2005} Taylor, M.~B.\ 2005, Astronomical Data Analysis Software and Systems XIV, 347, 29 
+
+\bibitem[van der Walt et al.(2011)]{van_der_Walt_2011} van der Walt, S., Colbert S.~C., Varoquaux, G.\ 2011, The NumPy Array: A Structure for Efficient Numerical Computation, Computing in Science \& Engineering, 13, 22-30
+
+
 \end{thebibliography}
 
 \clearpage
