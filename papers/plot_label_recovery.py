@@ -9,7 +9,7 @@ from six.moves import cPickle as pickle
 from collections import Counter, OrderedDict
 
 models = {
-    "model1": "gridsearch-2.0-3.0-s2-heuristically-set.model.individual_visits"
+    "model1": "../gridsearch-2.0-3.0-s2-heuristically-set.model.individual_visits"
 }
 
 
@@ -36,7 +36,7 @@ label_names = OrderedDict([
 
 # Load the APOGEE IDs from individual visits from a separate file because I am
 # an idiot.
-with open("apogee_ids_from_individual_visits.pkl", "rb") as fp:
+with open("../apogee_ids_from_individual_visits.pkl", "rb") as fp:
     apogee_ids = pickle.load(fp)
 
 fig, axes = plt.subplots(6, 3, figsize=(8.5, 12.5))
@@ -93,6 +93,7 @@ for i, (model_name, model_filename) in enumerate(models.items()):
     #    color=color, transform=axes[0].transAxes,
     #    horizontalalignment="right", verticalalignment="bottom")
 
+    transition_points = {}
 
     for j, label_name in enumerate(label_names.keys()):
 
@@ -107,6 +108,10 @@ for i, (model_name, model_filename) in enumerate(models.items()):
                 y.append(np.nan)
             else:
                 y.append(metric(differences_cannon[mask, j]))
+
+            if x[k] > 50 and label_name not in transition_points:
+                transition_points[label_name] = y[-1]
+
 
         y = np.array(y)
 
@@ -126,7 +131,7 @@ for i, (model_name, model_filename) in enumerate(models.items()):
             zorder=-1)
         ax.set_ylabel(label_names[label_name])
 
-
+    print(transition_points)
 
 # Set common y-axes for abundance labels?
 ylim = common_ylim  if common_ylim is not None \
@@ -163,6 +168,6 @@ for ax in axes:
 
 fig.tight_layout()
 
-fig.savefig("papers/validation-label-recovery.pdf", dpi=300)
+fig.savefig("validation-label-recovery.pdf", dpi=300)
 
 raise a

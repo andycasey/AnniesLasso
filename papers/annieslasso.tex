@@ -664,11 +664,13 @@ to random uncertainties is a good inter-pipeline comparison metric.
 
 The results from our label recovery for validation stars at low S/N are shown
 in Figure \ref{fig:label-recovery-snr}.  At $S/N \gtrsim 50$ the errors in all
-labels are approximately flat, indicating that we are dominated by systematics.
-This is an important transition point, because all \emph{stacked} spectra in
-\apogee\ have $S/N \geq 50$.  In this regime we recover labels to within 
-X.XX-Y.YY for all abundance labels.  The worst performance is evident for 
-[V/H].  This abundance label is also problematic in the \aspcap\ pipeline 
+labels are either flat or taper towards zero, indicating that we are dominated
+by systematics.  This is an important transition point, because all 
+\emph{stacked} spectra in \apogee\ have $S/N \geq 50$.  In this regime we 
+recover labels from within 0.014~dex ([Fe/H]) to 0.16~dex ([V/H]) for all 
+abundance labels.  The worst performance is found for [V/H], by a factor of
+two: the second-worst label at $S/N \gtrsim 50$ is [Na/H] with 0.08~dex. 
+The [V/H] abundance labels are also problematic in the \aspcap\ pipeline 
 because there are very few lines, most of which are blended.  Indeed, we noted
 very obvious issues in the [V/H] labels in the labelled set which we tried to
 account for (e.g., Section \ref{sec:training-set}).  Hence although our [V/H]
@@ -679,9 +681,9 @@ training set.
 It is clear that the regularized model recovers labels with good precision even
 in the presence of substantial noise.  In our experience the recovered 
 precision is higher than most physics-driven analysis pipelines.  The reason
-for this is unclear, because both approaches (optimizing a data-driven or
-physics-driven model) rely on least-squares (or $\chi^2$) fitting, which will
-typically follow the $1/\sqrt{S/N}$ behaviour we see in Figure 
+for this is not completely understood (by us), because both approaches 
+(optimizing a data-driven or physics-driven model) rely on least-squares 
+fitting, which will typically follow the $1/\sqrt{S/N}$ behaviour we see in Figure 
 \ref{fig:label-recovery-snr}.  Unfortunately we cannot show the same comparison
 for \aspcap\ labels as a function of S/N in Figure \ref{fig:label-recovery-snr}
 as \aspcap\ labels are not publicly available for individual visit spectra.
