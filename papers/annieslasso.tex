@@ -669,7 +669,7 @@ by systematics.  This is an important transition point, because all
 \emph{stacked} spectra in \apogee\ have $S/N \geq 50$.  In this regime we 
 recover labels from within 0.014~dex ([Fe/H]) to 0.16~dex ([V/H]) for all 
 abundance labels.  The worst performance is found for [V/H], by a factor of
-two: the second-worst label at $S/N \gtrsim 50$ is [Na/H] with 0.08~dex. 
+two: the second-worst label at $S/N \geq 50$ is [Na/H] with 0.08~dex. 
 The [V/H] abundance labels are also problematic in the \aspcap\ pipeline 
 because there are very few lines, most of which are blended.  Indeed, we noted
 very obvious issues in the [V/H] labels in the labelled set which we tried to
@@ -818,10 +818,40 @@ our abundance precision and label interpretability.  Indeed, it is our
 firm belief that there is sufficient new information \emph{just} in our
 globular cluster abundance labels that would warrant its own publication.
 We encourage others to pursue this; here we comment on how our results 
-compare to \aspcap, existing studies on globular clusters, and expectations from
-stellar evolution.
+compare to \aspcap, and in the next section we will discuss how our
+results compare to existing studies on globular clusters, and our
+expectations from stellar evolution.  Here we discuss five globular
+clusters that have a considerable of bonafide members in \dr: M~3, M~13,
+M~15, M~53, and M~92.  
+
+In each cluster we attributed stars to be bonafide members based on the
+\aspcap\ radial velocity and \TheCannon\ [Fe/H] label.  The top panel of
+Figures \ref{fig:m15-comparison}-\ref{fig:m92-comparison} shows our 
+membership selection with respect to all other \apogee\ giants in the
+same field (i.e., those that share the same `\texttt{FIELD}` entry).
+Although our membership criteria may suffer from mild contamination by
+field stars, it does not significantly impact our comparisons to 
+\aspcap\ labels or any discussion in the following section.  The 
+remaining panels of each figure show individual abundance projections
+using \aspcap\ labels (left) and those from \TheCannon\ (right). 
+In any projection, the abundance labels from \TheCannon\ show a smaller
+spread than \aspcap\ for the same stars.  In most cases the mean cluster
+labels between \aspcap\ and \TheCannon\ are similar, with correlations
+in the same direction, but a smaller distribution spread is seen in our
+labels.  The most striking difference is seen in M~15 (Figure 
+\ref{fig:m15-comparison}).
 
 
+There are (at least) two possibilities to explain the discrepancies in
+cluster abundances between \aspcap\ and \TheCannon.  The first is that
+there is a large underlying intrinsic abundance spread in these elements
+for each cluster, and -- for whatever reason -- \TheCannon\ is returning
+systematically inaccurate abundances.  The alternative is that the
+intrinsic cluster abundance spreads \emph{are smaller} than what \aspcap\
+labels suggest, and the larger cluster spreads in \aspcap\ abundances are
+simply due to large uncertainties in individual abundances.  On the basis
+of our validation tests, we argue the latter to be a more plausible
+explanation for these abundance discrepancies.
 
 
 \section{Discussion}
