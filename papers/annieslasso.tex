@@ -555,6 +555,7 @@ self-consistent examination of label determination at low S/N (e.g., Section
 \subsection{Hyper-parameter selection and validation}
 \label{sec:hyper-parameter-validation}
 
+
 In the simplest case we have two hyper-parameters that need to be determined: 
 $\Lambda$ and $f$.  The strength of the regularization (at all pixels) is set 
 by $\Lambda$, and the scale factor $f$ controls the scaling on individual 
@@ -650,10 +651,30 @@ remainder of this work.
 \subsection{Validating the regularized model}
 \label{sec:model-validation}
 
-We re-trained the 17-label model (without requiring $s^2 = 0$) using our adopted
-hyper-parameters $\Lambda = 10^3$ and $f = 2.0$.
 
-% ARC: The stuff + plots.
+We re-trained the 17-label model (without requiring $s^2 = 0$) using our adopted
+hyper-parameters.  In this and subsequent sections we validate our model through
+various experiments.  Our first test is to examine how well we can recover
+labels for the validation set stars.  Recall these stars are a random 10\%
+subset of the labelled set and were not used for training.  Comparisons between
+the \aspcap\ validation set labels and our own are shown in Figure
+\ref{fig:regularized-model-validation}, where we find the model shows good
+agreement with the \aspcap\ labels.  No strong biases are seen, and the standard
+deviation of the residuals is low for most abundance labels.  The largest
+disagreement is seen in [V/H] and [Na/H], in different regimes of label space.
+While [Na/H] starts to become discrepant at [Na/H] $< -1$ (perhaps because we
+are reaching the noise floor for this label), [V/H] becomes increasingly discrepant
+near [V/H] $\approx 0$. 
+
+
+The [V/H] abundance labels are problematic in the \aspcap\ pipeline 
+because the signature is subtle even at high S/N ratios: there are very few
+spectral lines, most of which are blended with stronger lines.  Indeed, we noted
+very obvious issues in the [V/H] labels in the labelled set which we tried to
+account for (e.g., Section \ref{sec:training-set}).  Hence although our [V/H]
+label precision is worse than other abundance labels, it is limited by the
+training set.
+
 
 \subsection{Label recovery as a function of signal-to-noise}
 \label{sec:label-recovery-snr}
@@ -678,15 +699,8 @@ labels are either flat or taper towards zero, indicating that we are dominated
 by systematics.  This is an important transition point, because all 
 \emph{stacked} spectra in \apogee\ have $S/N \geq 50$.  In this regime we 
 recover labels from within 0.014~dex ([Fe/H]) to 0.16~dex ([V/H]) for all 
-abundance labels.  The worst performance is found for [V/H], by a factor of
+abundance labels.  The worst performance is again found for [V/H], by a factor of
 two: the second-worst label at $S/N \geq 50$ is [Na/H] with 0.08~dex. 
-The [V/H] abundance labels are also problematic in the \aspcap\ pipeline 
-because the signature is subtle even at high S/N ratios: there are very few
-spectral lines, most of which are blended with stronger lines.  Indeed, we noted
-very obvious issues in the [V/H] labels in the labelled set which we tried to
-account for (e.g., Section \ref{sec:training-set}).  Hence although our [V/H]
-label precision is worse than other abundance labels, it is limited by the
-training set.
 
 
 It is clear that the regularized model recovers labels with good precision even
@@ -784,7 +798,6 @@ we will discuss the implications and interpretations of these abundance
 labels.
 
 
-% High-alpha sequence.
 We trained \TheCannon\ using high-fidelity labels from \aspcap.  As expected,
 our labels agree excellently with \aspcap\ for stars with high S/N ratios.
 This is not the case for stars with S/N ratios below 200.  Here we present
@@ -927,6 +940,7 @@ DWH:  Why is this going to change the World nonetheless?
 DWH: All of the code for this project is available with documentation
 at \url{http://thecannon.io/}.
 
+
 % Let's see if this can slip past Hogg...
 %\section{Conclusions}
 
@@ -980,8 +994,10 @@ Princeton University, the Spanish Participation Group, University of
 Tokyo, University of Utah, Vanderbilt University, University of
 Virginia, University of Washington, and Yale University.
 
-All of the code used to reproduce this research is available in the open-source
-repository at \url{https://github.com/andycasey/AnniesLasso}.
+All of the code used to reproduce this research is available in the
+open-source repository at \url{https://github.com/andycasey/AnniesLasso}.
+This manuscript was compiled using \texttt{git} hash ARC/DWH INCLUDE
+on the \texttt{master} branch.
 
 
 
@@ -1065,6 +1081,21 @@ all training set stars on the right.\label{fig:training_hrd}}
   cross-validation as a function of the signal-to-noise of what we
   give in the test subset.\label{fig:snr}}
 \end{figure}
+
+
+
+
+\begin{figure}[p]
+\includegraphics[width=0.6\textwidth]{regularized-model-validation.pdf}
+\caption{Comparisons between \aspcap\ (x-axis) and \TheCannon\ (y-axis)
+labels for the 1,460 high S/N stars in the validation set.  For clarity
+purposes the label name is shown within each panel, as is the mean
+and standard deviation of the residuals.  A
+dashed one-to-one line is shown.
+\label{fig:regularized-model-validation}}
+\end{figure}
+
+
 
 \begin{figure}[p]
 \includegraphics[width=0.8\textwidth]{validation-label-recovery.pdf}
