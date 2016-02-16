@@ -891,23 +891,35 @@ good reasons to believe that our abundance labels are indeed correct.
 % ARC Anti-correlations in globular clusters
 
 
-There are a number of important implications that arise from our 
-globular cluster abundances.  First, it is critical to
-note that the training set was \emph{not} constructed to purposefully include
-stars from \emph{any} globular clusters.  We selected stars that met
-strict quality criteria, and stars with questionable label fidelity 
-were removed.  This is significant because \emph{the anti-correlations
-seen in globular clusters here and elsewhere are not dominant in our
-training set}.  For this reason the regularized model is measuring sets
-of labels (e.g., a chemical fingerprint) that are \emph{very different}
-to what it was actually trained on.  And the labels have good astrophysical
-interpretations: although [C/Fe], [N/Fe] and [O/Fe] vary across the giant
-branch due to CNO cycling, the sum of [(C,N,O)/3Fe] should remain roughly
-constant for each globular cluster.  This is not the case in the \aspcap\
-labels, where a huge spread in total CNO abundances is seen.  In contrast,
-\TheCannon\ labels remain roughly constant for each globular cluster.  This
-is a simple example where \TheCannon\ allows for an increased understanding
-of astrophysics, directly through improved precision in abundance labels.
+The labelled set described in Section \ref{sec:training-set} was not
+purposefully constructed to include stars in \emph{any} globular
+clusters.  We selected stars that met strict quality criteria, and
+discarded stars with questionable label fidelity.  Given the
+abundance (anti-)correlations we confirm from other high-resolution
+studies, our construction of the labelled set has a number of
+implications.  First, \emph{the anti-correlations seen in globular 
+clusters here and elsewhere are not dominant in our training set}.  
+For this reason the regularized model is measuring sets
+of labels (e.g., chemical fingerprints) that are \emph{very different}
+to what the model was actually trained on.  This is pleasing because
+it reflects the interpretable nature of our model: the spectral
+derivatives \emph{do} have physical meaning, allowing for the model
+to measure labels that are very different from the training set.
+
+
+It's also important because our measured labels have good astrophysical
+interpretations that are consistent with expectations from stellar
+evolution.  The photospheric abundances of [C/H], [N/H] and [O/Fe] 
+will change as a giant experiences CNO cycling.  This pattern is
+present in our data, and to a lesser extent it is visible in the
+\aspcap\ labels.  Whilst these abundances vary, the sum of these
+elemental abundances is expected to remain roughly constant for a
+giant star, regardless of its evolutionary state.  This is not 
+seen in the \aspcap\ labels in any globular cluster described here.  
+A huge spread in total [(C,N,O)/3Fe] abundance labels is seen, 
+which is perhaps reflective of the sum of intrinsic spreads in
+each \aspcap\ C, N, and O abundance label.  In contrast, \TheCannon\
+labels remain roughly constant for each globular cluster.
 
 
 In addition to yielding precise abundance labels, the regularized model
