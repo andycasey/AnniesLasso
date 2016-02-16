@@ -755,13 +755,56 @@ boundaries and distribution of our labels.
 
 % ARC: Rogue gallery of some of the stars with high \chi^2 values?
 
+% ARC TODO: this paragraph is awful. Stop writing terribly.
+The abundance labels that we find are consistent with detailed studies
+of galactic chemical evolution.  In Figure \ref{fig:gce} we show our abundance
+labels (with respect to iron) of $\alpha$-capture (e.g., O, Mg, Ca, Si), odd-Z
+(Al, Na), light (C, N), and Fe-peak (Ti, Mn, Ni) elements for all bonafide
+giant stars in \apogee\ \dr.  These abundances trace nucleosynthetic pathways
+from different sources (e.g., supernovae, AGB stars) and reflect the environmental
+conditions at the time of their formation.  In Section \ref{sec:discussion} 
+we will discuss the implications and interpretations of these chemical 
+abundances.
 
-% Galactic chemical evolution.
 
 % High-alpha sequence.
+We trained \TheCannon\ using high-fidelity labels from \aspcap.  As expected,
+our labels agree excellently with \aspcap\ for stars with high S/N ratios.
+This is not the case for stars with S/N ratios below 200.  Here we present
+abundance label projections for some astrophysically interesting subsets of
+the \apogee\ sample, and show comparisons between \TheCannon\ and \aspcap.
+Our first comparison is shown in Figures \ref{fig:high-alpha-aspcap} and
+\ref{fig:high-alpha-tc}, where we have selected a sequence of stars with
+high [$\alpha$/Fe] abundance ratios and shown six well-behaved (precise)
+abundance labels that trace different nucleosynthetic pathways.  Points are
+coloured by their S/N ratio, and the black lines indicate density contours.
+Labels from \TheCannon\ are shown in Figure \ref{fig:high-alpha-tc}, where
+substantial structure is present, illustrative of chemical enrichment on a
+galactic (non-local) scale.
 
-% Globular clusters.
 
+Abundance projections using \aspcap\ labels of the same stars are shown
+in Figure \ref{fig:high-alpha-aspcap}.  The differences between \TheCannon\
+and \aspcap\ projections are striking, particularly in [Al/Fe], [Ni/Fe],
+and the commonly-used $\alpha$ element ratios [O/Fe] and [Mg/Fe].  Labels
+from \aspcap\ have a much larger range than those from \TheCannon,
+however nearly all stars that fill this difference in label range are those
+with low S/N ratios.  This implies that either those stars with lower S/N
+are sampling a different (presumably more distant) part of the Milky Way,
+or the precision in \aspcap\ labels degrades much faster than \TheCannon.
+Our validation tests have demonstrated that our label precision remains
+approximately constant (systematic-dominated) at $S/N \gtrsim 50$ (i.e.,
+for all combined spectra in \apogee\ \dr).  For these reasons we argue
+that the difference in abundance projections between \TheCannon\ and
+\aspcap\ for the high [$\alpha$/Fe] set are likely because \aspcap\
+yields imprecise results for spectra with S/N below $\sim$200.  Although
+the imprecise \aspcap\ results can presumably be discarded with some 
+quality cuts, a substantial fraction of the \apogee\ sample would have
+to be removed.
+
+
+Globular and open clusters are excellent laboratories for us to validate
+our abundance precision and label interpretability.
 
 
 
