@@ -878,17 +878,86 @@ explanation for these abundance discrepancies.
 \section{Discussion}
 \label{sec:discussion}
 
-% ARC: Globular clusters
 
-% Model Interpretability?
+We have demonstrated that a data-driven model for stellar spectra can be
+reliably extended to high dimensionality in label space.  The abundance
+labels returned by our model are significantly different for many
+\apogee\ stars, with globular cluster stars demonstrating striking 
+discrepancies.  The spreads in abundance labels are smaller, and we have
+good reasons to believe that our abundance labels are indeed correct.
 
-% Line identification?
+% ARC Overall metallicities we find
 
-% There is room for improvement...
+% ARC Anti-correlations in globular clusters
 
 
+There are a number of important implications that arise from our 
+globular cluster abundances.  First, it is critical to
+note that the training set was \emph{not} constructed to purposefully include
+stars from \emph{any} globular clusters.  We selected stars that met
+strict quality criteria, and stars with questionable label fidelity 
+were removed.  This is significant because \emph{the anti-correlations
+seen in globular clusters here and elsewhere are not dominant in our
+training set}.  For this reason the regularized model is measuring sets
+of labels (e.g., a chemical fingerprint) that are \emph{very different}
+to what it was actually trained on.  And the labels have good astrophysical
+interpretations: although [C/Fe], [N/Fe] and [O/Fe] vary across the giant
+branch due to CNO cycling, the sum of [(C,N,O)/3Fe] should remain roughly
+constant for each globular cluster.  This is not the case in the \aspcap\
+labels, where a huge spread in total CNO abundances is seen.  In contrast,
+\TheCannon\ labels remain roughly constant for each globular cluster.  This
+is a simple example where \TheCannon\ allows for an increased understanding
+of astrophysics, directly through improved precision in abundance labels.
 
-At least one of our model assumptions is provably false. \apogee\ spectra have
+
+In addition to yielding precise abundance labels, the regularized model
+we have presented is interpretable.  Machine learning techniques can be extremely
+useful, but they are frequently limited in their application because they
+usually do not have underlying components that are interpretable.  This is
+not the case for \TheCannon: the spectral coefficients $\vectheta_0$
+represent the baseline spectrum, and the first-order coefficients 
+($\vectheta_{1-17}$ in this model) represent the spectral derivatives with
+respect to each label.  They indicate where specific labels (or elements)
+contribute to the spectrum.  In Figure \ref{fig:line-identification} we
+demonstrate an example of this, where the first-order derivatives of three
+sparsely-acting labels [Al/H], [S/H] and [K/H] are shown for two spectral
+regions.  No information about atomic line lists enters into the spectral
+model, which makes it all the more pleasing to see that the first-order
+coefficients for [Al/H] and [K/H] peak at wavelengths that correspond to
+atomic lines already known to the \apogee\ group \citep{Smith_2013}. 
+
+
+The two black indicators in Figure \ref{fig:line-identification} correspond
+to atomic lines that are seen in \apogee\ spectra, but for which there is
+no atomic data available.  Even the element that
+is responsible for these spectral lines is unknown \citep{apogee_line_list}.
+Figure \ref{fig:line-identification-zoom-in} shows a zoom-in around these
+two regions, where we show \emph{all} first-order spectral derivatives and
+color [S/H] and [Al/H] as per Figure \ref{fig:line-identification}.  While
+there is some background blending near the line at 15235~\AA{}, [S/H] shows
+the dominant first-order spectral coefficient at all pixels that include
+this (previously unknown) atomic line.  The situation is even clearer for
+the [Al/H] spectral derivatives at 16755~\AA{}.  
+
+
+We made no effort to cross-match the list of ``unknown'' spectral lines
+identified by the \apogee\ group.  This example presented itself
+serendipitously whilst examining the relative strengths of different
+first-order derivatives.  Indeed, the list of ``unknown spectral lines''
+was unknown to us when first producing this figure.  While it appears
+very likely that the two unknown lines shown here arise from S and Al,
+we stress that these derivatives should only be used as a guide.  The
+abundances of different elements are strongly covariant in nature (see below).
+For this reason the spectral derivatives are merely indicative as to
+which element label (of the set that we have available) correlates
+most with the fluxes at the given pixels.  We have not performed
+a detailed examination to understand \emph{how interpretable} this
+\emph{Cannon} model is, and what physical insights it can provide.
+
+
+Indeed, there is considerable room for improvement over the work
+we have presented here.  For example, at least one of our model 
+assumptions is provably false. \apogee\ spectra have
 different resolutions.  The line spread function is both wavelength- and 
 fibre-dependent.  Given this information, our current implementation of \tc\ is  
 sub-optimal: we assume nothing about differing line spread functions between 
@@ -901,29 +970,25 @@ label in the model, then the fibre number can be accurately inferred from stars
 in the unlabelled set or through cross-validation!  This is possible because the 
 \apogee\ resolution varies smoothly (to some degree) with fibre number.  For 
 these reasons it is clear that simultaneously solving for additional rotation
-at test time would be an useful extension of this work.  We plan to include 
-this functionality in the future.
+at test time would be an useful extension of this work.  
 
 
-% ARC: There are other fundamental issues by construction..
-
-
-\TheCannon\ is a prediction system: It is designed to predict the labels for 
-stars.  It has a fundamental assumption that the training set is statistically
-identical to the prediction/test set.  If there are covariances in the label 
-space---that is, if stars in the training set are high in label $X$ whenever
+There are other fundamental issues which relate to the underlying construction
+of \TheCannon.  \TheCannon\ is a prediction system: It is designed to predict
+the labels for stars.  It has a fundamental assumption that the training set
+is statistically identical to the prediction/test set.  If there are covariances
+in the label space---that is, if stars in the training set are high in label $X$ whenever
 they are also high in label $Y$---then there will be opportunities for 
 \TheCannon\ to get information about $Y$ from considering data aspects that 
 depend on $X$ (which, according to the training set, is reliably connected to 
-$Y$).  For this reason, we expect that, given a finite training set, there will
+$Y$).  For this reason, we expect that in a finite training set there will
 be situations in which lines from one element are used to predict the abundance
-of another.  A good example is shown in \figurename~\ref{fig:whatever}, where we
-see WHATEVER.
+of another.  Unquestionable examples of this covariant nature will be presented
+in a companion paper (Ness et al., 2016, in preparation).  %This implies that
+%additional information (e.g., label masks) could improve the \emph{reliability}
+%of labels, strictly by limiting the number of pixels providing covariant
+%information.
 
-DWH: Yada Yada...
-
-
-ARC: The fact that we do so badly for [V/H], yet [V/H] is empirically covariant with [Fe/H] in the same way that other Fe-peak abundance labels are, tells us that there is a fundamental limit to how much empirically covariant information is entering into our results!
 
 
 
@@ -944,12 +1009,6 @@ at \url{http://thecannon.io/}.
 % Let's see if this can slip past Hogg...
 %\section{Conclusions}
 
-% We have demonstrated that a data-driven model for stellar spectra can be
-% reliably extended to high dimensionality in label space.  We have further
-% shown that regularization substantially improves the model interpretability:
-% spectral derivatives for abundance labels correspond well with known atomic
-% lines, and we are able to identify spectral lines that were previously
-% unknown.  
 
 
 \acknowledgements
