@@ -710,22 +710,72 @@ observations and examine the (dis-)agreement between our measured labels
 \section{Results}
 \label{sec:results}
 
-% ARC: 	We have a good model. Note that all combined APOGEE spectra are in
-%		the regime where we are dominated by systematics.
 
-% ARC: The differences between us and APOGEE are clear in the high-alpha seq.
+Our experiments have demonstrated that a data-driven model for stellar spectra
+can be reliably extended to high dimensionality in label space.  We have further
+shown that the regularization hyperparameters can be simplified to just two
+numbers that can be heuristically set.  This yields a sparse, interpretable 
+(see below) model that recovers labels with high precision at low S/N.  However,
+for all stacked \apogee\ spectra, the minimum S/N exceeds 50, well into the
+regime where we are advantageously dominated by systematic uncertainties.
 
-% ARC: Some plots showing galactic chemical evolution? e.g. [Fe/H] vs [X/Fe]
 
-% ARC: Globular clusters
+We have used our regularized model to measure (test) labels of 150,677 \apogee\ 
+spectra, normalized and stacked using by the method in Section 
+\ref{sec:training-set}.  In addition to the model being demonstrably effective,
+the test step is very fast: our pure-\texttt{Python} implementation returned 17
+labels for all 150,677 spectra in just 28 minutes of wall-time from a single
+optimization point on a small research cluster in Cambridge.  These were free 
+and otherwise unused resources; no dedicated computing assets were required.  
+This pace is also projected to increase, as the test step did not include 
+analytic derivatives $d\Dvector/dy_j$, which are now implemented in our 
+open-source code.
 
-% ARC: Open clusters??
+
+The test-step optimization is not convex because the vectorizer contains
+quadratic label terms.  For this reason we ran the optimization from nine
+different initialization points, chosen to sparsely cover the range of
+$\Teff$, $\logg$, and abundance labels in the training set.  Of the nine
+optimizations, we adopted the end result with the lowest $\chi^2$ value.
+
+
+The training set only includes giant stars, but the \apogee\ \dr\ includes 
+giants and dwarfs.  Therefore we exclude stars with 
+ARC GIVE FINAL CRITERIA BASED ON ASPCAP LABELS AND/OR CHI-SQUARED VALUE.
+The distilled sample contains XX,XXX giant stars, where we report $\Teff$,
+$\logg$, and 15 abundance labels.  The distribution of $\chi^2$ values for
+all 150,677 combined spectra are show in Figure \ref{fig:chisq-test-set}.  The
+labels in the distilled sample follow expectations from stellar astrophysics,
+and include stars that are marginally outside the training set.  For example,
+the \aspcap\ labels include a strict cut in $\Teff$ at 3600~K, but we reliably
+recover labels beyond this boundary.  Figure \ref{fig:test-set-hrd} presents a
+few different label projections for the distilled sample, indicative of the
+boundaries and distribution of our labels.
+
+
+
+% Galactic chemical evolution.
+
+% High-alpha sequence.
+
+% Globular clusters.
+
+
 
 
 \section{Discussion}
 \label{sec:discussion}
 
-% We have already demonstrated the precision. 
+
+
+There are clear differences between our labels and those from \aspcap\ for
+stars with modest S/N ratios (between 50-120).  These differences are not 
+apparent for stars with $S/N \gtrsim 200$, however many stars in this regime
+are present in our training set.  In Figures \ref{fig:high-alpha-seq} and
+
+% ARC: The differences between us and APOGEE are clear in the high-alpha seq.
+
+% ARC: Globular clusters
 
 % Model Interpretability?
 
@@ -781,6 +831,17 @@ DWH:  Why is this going to change the World nonetheless?
 
 DWH: All of the code for this project is available with documentation
 at \url{http://thecannon.io/}.
+
+% Let's see if this can slip past Hogg...
+%\section{Conclusions}
+
+% We have demonstrated that a data-driven model for stellar spectra can be
+% reliably extended to high dimensionality in label space.  We have further
+% shown that regularization substantially improves the model interpretability:
+% spectral derivatives for abundance labels correspond well with known atomic
+% lines, and we are able to identify spectral lines that were previously
+% unknown.  
+
 
 \acknowledgements
 % Thanks...
