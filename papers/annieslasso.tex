@@ -9,6 +9,7 @@
 % - search for all occurrences of DWH, AC, or MKN in the text and fix them.
 % - audit 'test-set star', 'training-set star', etc. should X-set be hyphenated in these circumstances?
 % - audit: sparsity definition
+% -audit: image filenames, the scripts to produce them, and the ref:tags for them.
 
 % Style Notes
 % -----------
@@ -1028,6 +1029,12 @@ all training set stars on the right.\label{fig:training_hrd}}
   cross-validation as a function of the signal-to-noise of what we
   give in the test subset.\label{fig:snr}}
 \end{figure}
+
+\begin{figure}[p]
+\includegraphics[width=0.8\textwidth]{validation-label-recovery.pdf}
+\caption{\emph{Top left panel}: The distribution of $S/N$ values for spectra of individual observations in the validation set. \emph{All other panels}: The median absolute difference between the measured label for an individual observation, and the measured label from the high $S/N$ combined spectrum for the same star.  All panel have common bins, and all abundance labels have common axis limits.  The dashed line indicates the minimum $S/N$ for any \emph{stacked} \apogee\ spectrum in Table \ref{tab:the-good-stuff}, implying the precision floor achievable for all \apogee\ stars.\label{fig:label-recovery-snr}}
+\end{figure}
+
 
 
 \begin{figure}[p]
