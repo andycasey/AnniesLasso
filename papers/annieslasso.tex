@@ -590,12 +590,67 @@ model sparsity.  In practice these metrics must be balanced if we want a
 sparse, interpretable model that yields precise labels from noisy data.
 
 
+We define the model sparsity as the percent of zero-value spectral derivatives 
+$\vectheta$.  The sparsity could be calculated across just the linear 
+coefficients, only the cross-term coefficients, or some combination thereof.  
+Note that we never include the baseline spectrum coefficients $\theta_0$ when 
+calculating sparsity metrics because this parameter is not regularized (see 
+equation \ref{eq:l1-variant}).  In Figure \ref{fig:sparsity} we show three 
+different sparsity metrics for many permutations of hyperparameters $\Lambda$ 
+and $f$.  Specifically we show the sparsity of the linear model coefficients 
+$\vectheta_{1...17}$, the cross-term coefficients $\vectheta_{18...170}$, and 
+the combination of linear and cross-term coefficients.  It is clear that the 
+total model sparsity does not change significantly (regardless of $f$) until 
+$\Lambda \gtrsim 10^3$.  In this regime the linear and second-order coefficient 
+sparsity metrics exhibit very different responses.  The cross-term sparsity 
+increases faster than the linear terms, with a clear (and expected) dependence 
+on the scale factor $f$.  For any $\Lambda \gtrsim 10^3$, a scale factor 
+$f \approx 20$ produces the sparsest model.
+
+
+While sparser models are preferred, our ultimate goal is to have an 
+interpretable model that predicts spectral fluxes and returns precise stellar
+labels.  In Figure \ref{fig:gridsearch-mad-all-elements} we show the median
+absolute deviation in abundance labels, measured between individual and combined
+spectra for stars in the validation set.  This is an internally-consistent
+check for label recovery at low S/N: we will validate our high- (and low-) S/N
+label determination against \aspcap\ values in the following section.  It is
+clear that a combination of decreasing $f$ with increasing $\Lambda$ recovers
+labels for validation set stars with high precision.  At $\Lambda \approx 10^3$,
+varying $f$ between 0.5 and 50.0 results in a marginal change in the validation
+set precision (0.04~dex to 0.06~dex).  Figure \ref{fig:gridsearch-mad-all-elements}
+suggests that at $\Lambda = 10^3$, $f = 0.5$ has comparable performance in
+label recovery to $f = 50.0$.  While this behaviour was in the recovery of some
+abundance labels, it was not seen in all.  However, lower scale factors were
+favoured for all labels.
+
+
+As a final heuristic to guide our choices on $\Lambda$ and $f$, we examined the
+performance in predicting spectral fluxes for all validation set spectra.  Here 
+we predicted stellar fluxes for all validation set stars (using the \aspcap\ 
+labels) and calculated the total $\chi^2$ difference.  The results are shown in
+Figure \ref{fig:gridsearch-test-scalar}.  At increasing regularization strength
+the models demonstrate better predictive power in spectral fluxes, reflected by
+a lower total $\chi^2$ value.  As expected, the $\chi^2$ minimum is dependent on
+the scale factor.  While regularized models with lower $\chi^2$ values clearly
+predict spectral fluxes more accurately, this heuristic only gives a weak limit
+on our choice of hyperparameters: \emph{any} regularized model with a lower
+$\chi^2$ value than seen in the unregularized case is objectively a better model.
+
+
+Our grid search has revealed that a regularization factor of $\Lambda = 10^3$ is
+required to produce a sufficiently sparse model.  Generally we find that low
+scale factors yield marginally better behaviour in recovering abundance labels
+at low $S/N$.  At $\Lambda = 10^3$, the precision in abundance labels would 
+suggest that a scale factor anywhere between $f = 0.5-5.0$ is reasonable. 
+However the total $\chi^2$ for validation set fluxes shows $f = 2.0$ to be a far
+better model (in terms of predictive power in spectral fluxes) than $f = 0.5$
+or $f = 5.0$.  Thus, on the basis of the available metrics, we adopt $\Lambda 
+= 10^3$ and $f = 2.0$ for the remainder of this work.
+
 
 % ARC:  Setting s^2 heuristically. Maybe not necessary since we note that we
 %   	fixed it as s^2 = 0 for the grid search.
-
-
-
 
 
 \subsection{Label recovery as a function of signal-to-noise}
