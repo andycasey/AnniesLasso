@@ -694,15 +694,25 @@ for \aspcap\ labels as a function of S/N in Figure \ref{fig:label-recovery-snr}
 as \aspcap\ labels are not publicly available for individual visit spectra.
 
 
-\subsection{Duplicate APOGEE/ASPCAP IDs}
-\label{sec:duplicate-ids}
+\subsection{Duplicate observations}
+\label{sec:duplicate-observations}
 
+
+The \apogee\ \texttt{EXTRATARG} bitmask flag indicates that there are 4,667
+repeated observations in \dr\.  These are the same targets, but have different
+\texttt{APOGEE_ID} values.  During our analysis we measured labels for all
+stacked observations using the \texttt{APOGEE_ID} as a unique identifier.  For
+this reason, we can use the \texttt{EXTRATARG} flag to identify repeated
+observations and examine the (dis-)agreement between our measured labels
+
+%% ARC: Do this. Report back. Sanders shows very good agreement for the 
+%%		unregularized labels.
 
 
 \subsection{Label errors \& covariances}
 \label{sec:errors}
 
-
+%% ARC: 
 
 \section{Results}
 \label{sec:results}
