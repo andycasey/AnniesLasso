@@ -542,18 +542,6 @@ self-consistent examination of label determination at low S/N (see later
 section).
 
 
-% ARC: Do we even need this paragraph?
-%One of our model assumptions is knowingly false. The resolution of all \apogee\ 
-%spectra is not identical. The line spread function is both wavelength- and 
-%fibre-dependent.  Given this information, our current implementation of \tc\ is  
-%sub-optimal: we assume nothing about differing line spread functions between 
-%stars in the labelled or unlabelled set.  Similarly, we make no effort to 
-%accommodate fast-rotating stars, where the effect on the spectrum is 
-%approximately represented by convolution with a Gaussian kernel (in the same way
-%a lower resolution would be).  A useful extension of this work would be to 
-%simultaneously solve for any additional rotation at test time.
-
-
 \section{Experiments}
 \label{sec:experiments}
 
@@ -712,33 +700,32 @@ observations and examine the (dis-)agreement between our measured labels
 \subsection{Label errors \& covariances}
 \label{sec:errors}
 
-%% ARC: 
+%% ARC-->DWH: Formal errors from the covariance matrix + a noise model?
+
 
 \section{Results}
 \label{sec:results}
 
-ARC: high s/n values for low and high S/N
+% ARC: 	We have a good model. Note that all combined APOGEE spectra are in
+%		the regime where we are dominated by systematics.
 
-ARC: Globular clusters
+% ARC: The differences between us and APOGEE are clear in the high-alpha seq.
 
-ARC: Open clusters
+% ARC: Some plots showing galactic chemical evolution? e.g. [Fe/H] vs [X/Fe]
 
+% ARC: Globular clusters
 
+% ARC: Open clusters??
 
-
-DWh: What can we say about chemical abundance precision and accuracy?
-
-DWH: What can we say about chemical abundance space?
-
-DWH: What can we say about the promise of chemical tagging?
 
 \section{Discussion}
 \label{sec:discussion}
 
+% We have already demonstrated the precision. 
+
 % Model Interpretability?
 
 % Line identification
-
 
 \TheCannon\ is a prediction system: It is designed to predict the labels for 
 stars.  It has a fundamental assumption that the training set is statistically
@@ -758,8 +745,31 @@ DWH: Yada Yada...
 ARC: The fact that we do so badly for [V/H], yet [V/H] is empirically covariant with [Fe/H] in the same way that other Fe-peak abundance labels are, tells us that there is a fundamental limit to how much empirically covariant information is entering into our results!
 
 
-DWH: No accounting for variable spectroscopic resolution, nor
-microturbulence nor rotation.
+
+DWh: What can we say about chemical abundance precision and accuracy?
+
+DWH: What can we say about chemical abundance space?
+
+DWH: What can we say about the promise of chemical tagging?
+
+
+
+One of our model assumptions is knowingly false. The resolution of all \apogee\ 
+spectra is not identical.  The line spread function is both wavelength- and 
+fibre-dependent.  Given this information, our current implementation of \tc\ is  
+sub-optimal: we assume nothing about differing line spread functions between 
+stars in the labelled or unlabelled set.  Similarly, we make no effort to 
+accommodate fast-rotating stars, where the effect on the spectrum is 
+approximately represented by convolution with a Gaussian kernel (in the same way
+a lower resolution would be).  Tests performed by M.~Ness have revealed that 
+this information is present in the data: if the fibre number is included as a
+label in the model, then the fibre number can be accurately inferred from stars
+in the unlabelled set or through cross-validation!  This is possible because the 
+\apogee\ resolution varies smoothly (to some degree) with fibre number.  For 
+these reasons it is clear that simultaneously solving for additional rotation
+at test time would be an useful extension of this work.  We plan to include 
+this functionality in the future.
+
 
 DWH:  Once again, the differences between measurement and prediction...
 
