@@ -646,7 +646,8 @@ suggest that a scale factor anywhere between $f = 0.5-5.0$ is reasonable.
 However the total $\chi^2$ for validation set fluxes shows $f = 2.0$ to be a far
 better model (in terms of predictive power in spectral fluxes) than $f = 0.5$
 or $f = 5.0$.  Thus, on the basis of the available metrics, we adopt $\Lambda 
-= 10^3$ and $f = 2.0$ for the remainder of this work.
+= 10^3$ and $f = 2.0$ as our \emph{regularized model} hyperparameters for the
+remainder of this work.
 
 
 % ARC:  Setting s^2 heuristically. Maybe not necessary since we note that we
@@ -656,27 +657,30 @@ or $f = 5.0$.  Thus, on the basis of the available metrics, we adopt $\Lambda
 \subsection{Label recovery as a function of signal-to-noise}
 \label{sec:label-recovery-snr}
 
-% Chosing the regularized model.
+
+We re-trained the 17-label model (without requiring $s^2 = 0$) using our adopted
+hyperparameters $\Lambda = 10^3$ and $f = 2.0$.  Here we seek to understand the
+regularized model performance in recovering labels as a function of S/N.  The 
+stars in the validation set include stacked spectra as well as the individual 
+normalized observations.  We applied our regularized model to all stacked and 
+individual spectra, and measured labels for every observation.  This permits us
+to understand how well we can recover labels (to some precision) for a given 
+S/N.  Crucially, this experiment provides a very model-independent metric for
+performance: analysis pipelines that have larger uncertainties at a given S/N
+are demonstrably imprecise (accuracy is not tested here, unless, perhaps, we
+compare to the \aspcap\ labels from the validation set).
 
 
-Recall that the \emph{labelled set} includes both the \emph{training set} and
-a disjoint \emph{validation set}.  Here we seek to understand the model performance
-as a function of S/N after setting the hyper-parameters $\Lambda$ and $f$.
-The stars in the validation set include stacked
-spectra as well as the individual normalized observations.  We apply our model to
-all stacked and individual spectra and recover labels for every observation. 
-This permits us to understand how well we can recover labels (to some precision)
-for a given S/N.  Crucially, this experiment provides a very model-independent
-metric for performance.  Analysis pipelines that have larger uncertainties
-at a given S/N are demonstrably imprecise (accuracy is not tested here, unless,
-perhaps, we compare to the ASPCAP labels from the validation set).
+% ARC: Discuss the figure.
 
-% Discuss the figure.
-
-% At S/N X we get precision of what in what.
+% ARC: At S/N X we get precision of what in what.
+ 
+% ARC:  Comment that we can't say (officially?) how this compares to ASPCAP, 
+% 		since they don't publish their individual results.
 
 \subsection{Duplicate APOGEE/ASPCAP IDs}
 \label{sec:duplicate-ids}
+
 
 
 \subsection{Label errors \& covariances}
