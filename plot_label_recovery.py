@@ -14,8 +14,8 @@ models = {
 
 
 label_names = OrderedDict([
-    ('TEFF', r'$T_{\rm eff}$ $(K)$'),
-    ('LOGG', r'$\log{g}$ $(dex)$'),
+    ('TEFF', r'$T_{\rm eff}$ $(\rm{K})$'),
+    ('LOGG', r'$\log{g}$ $(\rm{dex})$'),
     ('AL_H', r'$[\rm{Al}/\rm{H}]$ $(\rm{dex})$'),
     ('CA_H', r'$[\rm{Ca}/\rm{H}]$ $(\rm{dex})$'),
     ('C_H', r'$[\rm{C}/\rm{H}]$ $(\rm{dex})$'),
@@ -56,7 +56,11 @@ is_repeated_enough = np.array(
 
 
 # Define the metric to show at each bin.
+# MAD
 metric = lambda differences: np.median(np.abs(differences))
+
+# RMS
+#metric = lambda differences: np.sqrt(np.sum((differences**2))/differences.size)
 
 
 for i, (model_name, model_filename) in enumerate(models.items()):
@@ -128,14 +132,20 @@ for i, (model_name, model_filename) in enumerate(models.items()):
 ylim = common_ylim  if common_ylim is not None \
                     else np.max([ax.get_ylim()[1] for ax in axes[3:]])
 
-for ax in axes[3:]:   
-    ax.set_ylim(0, ylim)
-
-
 # Some custom limits:
 # MAGIC
 axes[1].set_ylim(0, 100)
 axes[2].set_ylim(0, 0.2)
+
+axes[0].yaxis.set_major_locator(MaxNLocator(4))
+axes[1].yaxis.set_major_locator(MaxNLocator(4))
+axes[2].set_yticks([0, 0.1, 0.2])
+
+for ax in axes[3:]:   
+    ax.set_ylim(0, ylim)
+    ax.set_yticks([0, 0.2, 0.4])
+
+
 
 for ax in axes:
 
@@ -143,8 +153,7 @@ for ax in axes:
         ax.axvline(minimum_apogee_snr, c="#666666", linestyle="--", zorder=-1)
 
     ax.set_xlim(bin_edges[0], bin_edges[-1])
-    ax.yaxis.set_major_locator(MaxNLocator(4))
-
+    
     if not ax.is_last_row():
         ax.set_xticklabels([])
     else:
