@@ -219,9 +219,8 @@ class CannonModel(model.BaseCannonModel):
         N_spectra = normalized_flux.shape[0]
 
         if initial_labels is None:
-            initial_labels = [None] * N_spectra
-        else:
-            initial_labels = np.atleast_2d(initial_labels)
+            initial_labels = self.vectorizer.fiducials
+        initial_labels = np.atleast_2d(initial_labels)
         
         # Prepare the wrapper function and data.
         message = None if not kwargs.pop("progressbar", True) \
@@ -366,10 +365,6 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
     }
     # Only update the keywords with things that op.leastsq expects.
     kwds.update({ k: v for k, v in kwargs.items() if k in kwds })
-
-    if initial_labels is None:
-        initial_labels = [vectorizer.fiducials]
-    initial_labels = np.atleast_2d(initial_labels)
 
     logger.debug("Optimizing from K = {0} initialization points".format(
         initial_labels.shape[0]))
