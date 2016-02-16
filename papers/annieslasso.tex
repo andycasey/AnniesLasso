@@ -61,7 +61,7 @@
 \begin{abstract}
 % Context
 Data-driven models are demonstrably effective for inferring physical attributes
-of stars ($\Teff$, $\logg$, $mh$) from spectra, even when the signal-to-noise 
+of stars ($\Teff$, $\logg$, $\mh$) from spectra, even when the signal-to-noise 
 is very low \citep{tc}.
 % Aims
 Here we explore whether this is possible when the dimensionality of the label
@@ -385,7 +385,7 @@ and the 2.5th percentile of the training set along each label direction) as
 the scale such that, for example, the $\Teff$ value for star $n$ is rescaled as:
 
 \begin{eqnarray}\label{eq:label-norm}
-  \hat{T}_{\mathrm{eff},n} = \frac{T_{{\rm eff},n} - \langle\Teff\rangle}{f\cdot|p_{\Teff,97.5} - p_{\Teff,2.5}|}
+  \hat{T}_{\mathrm{eff},n} = \frac{T_{{\rm eff},n} - p_{\Teff,50}}{f\cdot|p_{\Teff,97.5} - p_{\Teff,2.5}|}
 \end{eqnarray}
 
 \noindent{}where $p_{\theta,k}$ is the $k$-th percentile value of $\theta$ in
@@ -407,8 +407,8 @@ LASSO (DWH CITE STUFF).  L1 regularization encourages parameters to vanish
 precisely but doesn't break convexity for convex problems.  It is important to
 note that the scale factor $f$ plays into the regularization, because as the 
 scale factor grows, the more penalized the cross (quadratic) terms become 
-relative to the linear terms.  We will heuristically set these hyperparameters
-$\Lambda$, $f$ in Section \ref{sec:hyperparameter-validation}.
+relative to the linear terms.  We will heuristically set the hyperparameters
+$\Lambda$ and $f$ in Section \ref{sec:hyperparameter-validation}.
 
 
 %DWH: Scaling argument that, in general, the best value of $\Lambda_j$
@@ -541,92 +541,68 @@ self-consistent examination of label determination at low S/N (see later
 section).
 
 
-One of our model assumptions is knowingly false. The resolution of all \apogee\ 
-spectra is not identical. The line spread function is both wavelength- and 
-fibre-dependent.  Given this information, our current implementation of \tc\ is  
-sub-optimal: we assume nothing about differing line spread functions between 
-stars in the labelled or unlabelled set.  Similarly, we make no effort to 
-accommodate fast-rotating stars, where the effect on the spectrum is 
-approximately represented by convolution with a Gaussian kernel (in the same way
-a lower resolution would be).  A useful extension of this work would be to 
-simultaneously solve for any additional rotation at test time.
+% ARC: Do we even need this paragraph?
+%One of our model assumptions is knowingly false. The resolution of all \apogee\ 
+%spectra is not identical. The line spread function is both wavelength- and 
+%fibre-dependent.  Given this information, our current implementation of \tc\ is  
+%sub-optimal: we assume nothing about differing line spread functions between 
+%stars in the labelled or unlabelled set.  Similarly, we make no effort to 
+%accommodate fast-rotating stars, where the effect on the spectrum is 
+%approximately represented by convolution with a Gaussian kernel (in the same way
+%a lower resolution would be).  A useful extension of this work would be to 
+%simultaneously solve for any additional rotation at test time.
 
 
 \section{Experiments}
 \label{sec:experiments}
 
-\subsection{Hyper-parameter selection and validation}
+
+\subsection{Hyperparameter selection and validation}
 \label{sec:hyperparameter-validation}
-In the simplest case we have two hyper-parameters that need to be 
-determined: $\Lambda$ and $f$.  The strength of the regularization (at all 
-pixels) is set by $\Lambda$, and the scale factor $f$ controls the scaling on 
-individual labels.  In practice large $\Lambda$ values encourage zero 
-coefficients (unless it is well-fit by the data) and thus enforces sparsity.  
-High scale factor $f$ values act to penalize cross-terms more than linear labels. 
-Because these hyper-parameters act in conjunction with each other, we need to
-explore many combinations of $\Lambda$ and $f$.
+
+In the simplest case we have two hyperparameters that need to be determined: 
+$\Lambda$ and $f$.  The strength of the regularization (at all pixels) is set 
+by $\Lambda$, and the scale factor $f$ controls the scaling on individual 
+labels.  In practice large $\Lambda$ values encourage zero coefficients (unless
+it is well-fit by the data) and thus enforces sparsity.  High scale factor $f$
+values act to penalize cross-terms more than linear labels.  Because these 
+hyper-parameters act in conjunction with each other, we need to explore many 
+combinations of $\Lambda$ and $f$.
 
 
-Here we use a single training set and perform a grid search to evaluate models
-with different values of $\Lambda$ and $f$.  Specifically we vary $\Lambda$ in
-logarithmic steps from $10^0$ to $10^5$, and linearly increase the scale factor
-$f$ from 0.5 to 50.  For each combination of $\Lambda$ and $f$ we trained the full
-17-label model and fitted labels for all (individual and stacked) spectra in
-the validation set.
+Here we use the training set described in the previous section to perform a
+grid search with different values of $\Lambda$ and $f$.  Specifically we vary 
+$\Lambda$ in logarithmic steps from $10^0$ to $10^5$, and linearly increase the 
+scale factor $f$ from 0.5 to 50.  For each combination of $\Lambda$ and $f$ we 
+trained the full 17-label model and measured labels for all spectra in the
+validation set: the combined and individual observations.  Given the model
+complexity, for this experiment we fixed $s^2 = 0$ to leverage convexity
+and ensure we were converged at the global minimum.  This also ensures a fair
+comparison between different hyperparameters, because if $s^2$ is free it
+will inevitably rise at very high $\Lambda$ values.  
 
 
-We must chose heuristic(s) to select the optimal regularization $\Lambda$ and
-scale factor $f$.  Many metrics are available, including: the predictive power
-in spectral fluxes (e.g., the $\chi^2$ value for the validation set), the 
-label precision at low S/N, or opting to maximize the model sparsity.  In practice these metrics must be
-balanced if we want a sparse, interpretable model that yields precise labels
-even at low S/N values.
+We must chose heuristic(s) to select an appropriate regularization and scale
+factor.  Many metrics are available to us: the predictive power in spectral
+fluxes (e.g., the $\chi^2$ or test scalar for the validation set), the 
+recovered precision in labels at low S/N, or simply opting to maximize the 
+model sparsity.  In practice these metrics must be balanced if we want a 
+sparse, interpretable model that yields precise labels from noisy data.
 
 
-We define the model sparsity as the percent of zero-value spectral derivatives $\vectheta$.
-The sparsity could be calculated across just the linear coefficients, only
-the cross-term coefficients, or some combination thereof.  Note that we never
-include the baseline spectrum coefficients $\theta_0$ when calculating 
-sparsity metrics because this parameter is not regularized (see equation 
-\ref{eq:l1-variant}).  In Figure \ref{fig:sparsity} we show three different
-sparsity metrics for many permutations of $\Lambda$ and $f$.  Specifically we
-show the sparsity of the linear model coefficients $\vectheta_{1...17}$, the 
-cross-term coefficients $\vectheta_{18...170}$, and the combination of linear
-and cross-term coefficients.  It is clear that the total model sparsity does
-not change significantly (regardless of $f$) until $\Lambda \gtrsim 10^3$.  
-In this regime
-the linear and second-order coefficient sparsity metrics exhibit very
-different responses.  The cross-term sparsity increases faster than the
-linear terms, with a clear dependence on the scale factor $f$.  Note also
-that there is an `optimal' scale factor $f \approx 20$ which produces the 
-sparsest model for a given regularization factor.
+
+% ARC:  Setting s^2 heuristically. Maybe not necessary since we note that we
+%   	fixed it as s^2 = 0 for the grid search.
 
 
-While sparser models are preferred, our ultimate goal is to have an
-interpretable  model that predicts spectral fluxes and returns precise
-stellar labels.  In Figures \ref{fig:gridsearch-all} and XXXXX we show the
-median absolute difference (MAD) between our estimated label value at low 
-S/N values (from individual spectra) and the corresponding high S/N (stacked)
-spectrum.  This is an internally-consistent check: we will validate our high-
-(and low-) S/N label determination against the \aspcap\ values in the next
-section.  It is clear from these figures that the optimal combination of 
-$(\Lambda, f)$ is dependent on the label of interest.  However for all 
-labels it is clear that a combination of decreasing $f$ with increasing
-$\Lambda$ will yield good results.  
-
-
-Our grid search has revealed that a regularization factor of $\Lambda = 10^3$ and
-a scale factor $f = 2$ yields a relatively sparse (interpretable) model that
-accurately predicts spectral fluxes and provides precise stellar labels at low S/N. 
- We adopt these values for the remainder of this work.
-
-
-% ARC: Setting s^2 heuristically
 
 
 
 \subsection{Label recovery as a function of signal-to-noise}
 \label{sec:label-recovery-snr}
+
+% Chosing the regularized model.
+
 
 Recall that the \emph{labelled set} includes both the \emph{training set} and
 a disjoint \emph{validation set}.  Here we seek to understand the model performance
@@ -646,6 +622,7 @@ perhaps, we compare to the ASPCAP labels from the validation set).
 
 \subsection{Duplicate APOGEE/ASPCAP IDs}
 \label{sec:duplicate-ids}
+
 
 \subsection{Label errors \& covariances}
 \label{sec:errors}
@@ -715,12 +692,15 @@ This project was funded in part by
   the \acronym{NSF} (grants \acronym{IIS-1124794}, \acronym{AST-1517237}),
   \acronym{NASA} (grant \acronym{NNX12AI50G}), and 
   the Moore-Sloan Data Science Environment at \acronym{NYU}.
-This research made use of 
+This research made use of: 
   the \acronym{NASA} \project{Astrophysics Data System},
-  \texttt{TOPCAT} \citep{Taylor_2005}, and 
+  \texttt{TOPCAT} \citep{Taylor_2005},
+  GitHub, 
+  Travis CI, the 
+  \texttt{numpy} \citep{van_der_Walt_2011}, 
+  \texttt{scipy} \citep{Jones_2001}, and
+  \texttt{matplotlib} \citep{Hunter_2007} packages, as well as
   Astropy, a community-developed core Python package for Astronomy \citep{astropy}.
-
-% ARC: GitHub? Travis CI?
 
 This project made use of \sdssiii\ data.
 Funding for \sdssiii\ has been provided by the Alfred P. Sloan
