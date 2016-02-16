@@ -417,6 +417,7 @@ $\Lambda$ and $f$ in Section \ref{sec:hyperparameter-validation}.
 
 
 \section{Training, validation, and test data}
+\label{sec:training-set}
 
 
 We employ the \apogee\ Data Release 12 data to demonstrate the effectiveness of
@@ -660,23 +661,38 @@ remainder of this work.
 
 We re-trained the 17-label model (without requiring $s^2 = 0$) using our adopted
 hyperparameters $\Lambda = 10^3$ and $f = 2.0$.  Here we seek to understand the
-regularized model performance in recovering labels as a function of S/N.  The 
+regularized model capability in recovering labels as a function of S/N.  The 
 stars in the validation set include stacked spectra as well as the individual 
-normalized observations.  We applied our regularized model to all stacked and 
-individual spectra, and measured labels for every observation.  This permits us
+normalized observations.  We measured labels for every spectrum.  This permits us
 to understand how well we can recover labels (to some precision) for a given 
 S/N.  Crucially, this experiment provides a very model-independent metric for
-performance: analysis pipelines that have larger uncertainties at a given S/N
-are demonstrably imprecise (accuracy is not tested here, unless, perhaps, we
-compare to the \aspcap\ labels from the validation set).
+performance.  At low S/N values the label errors will be dominated by random
+uncertainties.  In the high S/N regime, systematic uncertainties are more 
+relevant.  Knowing exactly where this `turnover point' occurs from systematic
+to random uncertainties is a good inter-pipeline comparison metric.
 
 
-% ARC: Discuss the figure.
+The results from our label recovery for validation stars at low S/N are shown
+in Figure \ref{fig:label-recovery-snr}.  At $S/N \gtrsim 50$ the errors in all
+labels are approximately flat, indicating that we are dominated by systematics.
+In this regime we recover labels to within X.XX-Y.YY for all abundance labels.
+The worst performance is evident for [V/H].  This abundance label is also
+problematic in the \aspcap\ pipeline because there are very few lines, most of
+which are blended.  Indeed, we noted very obvious issues in the [V/H] labels
+in the labelled set which we tried to account for (e.g., Section 
+\ref{sec:training-set}). 
 
-% ARC: At S/N X we get precision of what in what.
- 
-% ARC:  Comment that we can't say (officially?) how this compares to ASPCAP, 
-% 		since they don't publish their individual results.
+
+It is clear that the regularized model recovers labels with good precision even
+in the presence of substantial noise.  In our experience the recovered 
+precision is higher than most physics-driven analysis pipelines.  The reason
+for this is unclear, because both approaches (optimizing a data-driven or
+physics-driven model) rely on least-squares (or $\chi^2$) fitting, which will
+typically follow the $1/\sqrt{S/N}$ behaviour we see in Figure 
+\ref{fig:label-recovery-snr}.  Unfortunately we cannot show the same comparison
+for \aspcap\ labels as a function of S/N in Figure \ref{fig:label-recovery-snr}
+as \aspcap\ labels are not publicly available for individual visit spectra.
+
 
 \subsection{Duplicate APOGEE/ASPCAP IDs}
 \label{sec:duplicate-ids}
