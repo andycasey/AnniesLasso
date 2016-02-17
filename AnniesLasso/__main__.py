@@ -52,6 +52,9 @@ def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
     output_filenames = []
     failures = 0
 
+    # MAGIC HACK
+    initial_labels = np.loadtxt("initial_labels.txt")
+
     if from_filename:
         with open(spectrum_filenames[0], "r") as fp:
             _ = map(str.strip, fp.readlines())
@@ -84,7 +87,8 @@ def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
         else:
             if len(output_filenames) >= chunk_size:
                 
-                results, covs, metas = model.fit(fluxes, ivars, full_output=True)
+                results, covs, metas = model.fit(fluxes, ivars,
+                    initial_labels=initial_labels, full_output=True)
 
                 for result, cov, meta, output_filename \
                 in zip(results, covs, metas, output_filenames):
@@ -97,7 +101,8 @@ def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
 
     if len(output_filenames) > 0:
         
-        results, covs, metas = model.fit(fluxes, ivars, full_output=True)
+        results, covs, metas = model.fit(fluxes, ivars, 
+            initial_labels=initial_labels, full_output=True)
 
         for result, cov, meta, output_filename \
         in zip(results, covs, metas, output_filenames):
