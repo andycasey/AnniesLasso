@@ -53,6 +53,7 @@ def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
     failures = 0
 
     # MAGIC HACK
+    delete_meta_keys = ("fjac", ) # To save space...
     initial_labels = loadtxt("initial_labels.txt")
 
     if from_filename:
@@ -92,6 +93,11 @@ def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
 
                 for result, cov, meta, output_filename \
                 in zip(results, covs, metas, output_filenames):
+
+                    for key in delete_meta_keys:
+                        if key in meta:
+                            del meta[key]
+
                     with open(output_filename, "wb") as fp:
                         pickle.dump((result, cov, meta), fp, 2) # For legacy.
                     logger.info("Saved output to {}".format(output_filename))
@@ -106,6 +112,11 @@ def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
 
         for result, cov, meta, output_filename \
         in zip(results, covs, metas, output_filenames):
+
+            for key in delete_meta_keys:
+                if key in meta:
+                    del meta[key]
+
             with open(output_filename, "wb") as fp:
                 pickle.dump((result, cov, meta), fp, 2) # For legacy.
             logger.info("Saved output to {}".format(output_filename))
