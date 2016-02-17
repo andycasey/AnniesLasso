@@ -741,6 +741,7 @@ observations and examine the (dis-)agreement between our measured labels
 %% ARC: Do this. Report back. Sanders shows very good agreement for the 
 %%		unregularized labels.
 
+% \ref{fig:duplicate-observations}
 
 % ARC: Plot (X1 - X2)^2 / sqrt(errX1^2 + errX2^2)  -- with errs from covariance
 %		matrix and compare them to a unit gaussian.
@@ -1022,8 +1023,8 @@ atomic lines already known to the \apogee\ group \citep{Smith_2013}.
 The two black indicators in Figure \ref{fig:line-identification} correspond
 to atomic lines that are seen in \apogee\ spectra, but for which there is
 no atomic data available.  Even the element that
-is responsible for these spectral lines is unknown \citep{apogee_line_list}.
-Figure \ref{fig:line-identification-zoom-in} shows a zoom-in around these
+is responsible for these spectral lines is unknown \citep{Shetrone_2015}.
+Figure \ref{fig:line-identification-2} shows a zoom-in around these
 two regions, where we show \emph{all} first-order spectral derivatives and
 color [S/H] and [Al/H] as per Figure \ref{fig:line-identification}.  While
 there is some background blending near the line at 15235~\AA{}, [S/H] shows
@@ -1103,7 +1104,7 @@ steam ahead on the RMS Titanic.
 
 
 All of the code for this project is available with documentation at \url{http://thecannon.io/}.  Solutions to address the aforementioned issues will be
-included in this code, providing a robust and well-tested code base for 
+included in this code over time, providing a robust and well-tested code base for 
 future spectroscopic surveys to utilize.  We encourage community 
 improvements through GitHub pull requests.
 
@@ -1180,6 +1181,9 @@ M.~M., \& Stetson, P.~B.\ 2005, \aj, 130, 1177
 \bibitem[Ho et al.(2016)]{Ho_2016} Ho, A.~Y.~Q., Ness, M.~K., 
 Hogg, D.~W., et al.\ 2016, arXiv:1602.00303 
 
+\bibitem[Hogg et al.(2016)]{Hogg_2016} Hogg, D.~W., Casey, A.~R., 
+Ness, M., Rix, H.-W., \& Foreman-Mackey, D.\ 2016, arXiv:1601.05413 
+
 \bibitem[Hunter(2007)]{Hunter_2007} Hunter, J.~D.\ 2007, Matplotlib: A 2D Graphics Environment, Computing in Science \& Engineering, 9, 90-95
 
 \bibitem[Jones et al.(2001)]{Jones_2001} Jones, E., Oliphant E., Peterson P., et al.\ 2001, SciPy: Open Source Scientific Tools for Python, http://www.scipy.org/ (Online; accessed 2016-02-16)
@@ -1195,6 +1199,12 @@ Rix, H.-W., Ho, A.~Y.~Q., \& Zasowski, G.\ 2015, \apj, 808, 16
 Rix, H., et al.\ 2015, arXiv:1511.08204 
 
 \bibitem[Perez \& Granger(2007)]{Perez_2007} P\'erez, F., \& Granger, B. E.\ 2007, IPython: A System for Interactive Scientific Computing, Computing in Science \& Engineering, 9, 21-29
+
+\bibitem[Shetrone et al.(2015)]{Shetrone_2015} Shetrone, M., Bizyaev, 
+D., Lawler, J.~E., et al.\ 2015, \apjs, 221, 24 
+
+\bibitem[Smith et al.(2013)]{Smith_2013} Smith, V.~V., Cunha, K., 
+Shetrone, M.~D., et al.\ 2013, \apj, 765, 16 
 
 \bibitem[Taylor(2005)]{Taylor_2005} Taylor, M.~B.\ 2005, Astronomical Data Analysis Software and Systems XIV, 347, 29 
 
@@ -1213,6 +1223,8 @@ all training set stars on the right.\label{fig:training_hrd}}
 \end{figure}
 
 
+
+
 \begin{figure}[p]
 \caption{Choose two wavelengths (one continuum and one interesting)
   and plot some scatter plots of flux vs various parameters, and also
@@ -1220,40 +1232,6 @@ all training set stars on the right.\label{fig:training_hrd}}
   hyper-parameters.\label{fig:onewavelength}}
 \end{figure}
 
-\begin{figure}[p]
-\caption{Something about hyper-parameters and scatter as a function of
-  wavelength.\label{fig:hyperpars}}
-\end{figure}
-
-\begin{figure}[p]
-\caption{Something about first derivatives of the spectral expectation
-  with respect to labels as a function of
-  wavelength.\label{fig:derivatives}}
-\end{figure}
-
-\begin{figure}[p]
-\caption{Show a few sample spectra and demonstrate that the quality of
-  the model prediction is extremely good; better than
-  \aspcap.\label{fig:correctness}}
-\end{figure}
-
-\begin{figure}[p]
-\caption{Something showing that our results on the full unlabeled set
-  make sense and seem correct!\label{fig:fulltest}}
-\end{figure}
-
-
-\begin{figure}[p]
-\caption{Choose two elements that are interesting, and pull apart the
-  differences between what we have and what \aspcap\ has for those
-  elements.  We are better!\label{fig:elements}}
-\end{figure}
-
-\begin{figure}[p]
-\caption{Something about the quality of results in the
-  cross-validation as a function of the signal-to-noise of what we
-  give in the test subset.\label{fig:snr}}
-\end{figure}
 
 
 
@@ -1278,13 +1256,40 @@ dashed one-to-one line is shown.
 
 
 \begin{figure}[p]
+\caption{Distribution of $\chi^2$ values for stars in the test set.\label{fig:chisq-test-set}}
+\end{figure}
+
+
+\begin{figure}[p]
+\caption{Show a few sample spectra and demonstrate that the quality of
+  the model prediction is extremely good; better than
+  \aspcap.\label{fig:correctness}}
+\end{figure}
+
+
+
+
+\begin{figure}[p]
+\caption{[X/Fe] abundance labels (y-axis) with respect to [Fe/H] to demonstrate that we recover galactic chemical evolution.\label{fig:gce}}
+\end{figure}
+
+
+
+\begin{figure}[p]
+\caption{Some label projections showing the extent of the distilled sample of bonafide giants.\label{fig:test-set-hrd}}
+\end{figure}
+
+
+
+
+\begin{figure}[p]
 \includegraphics[width=\textwidth]{sparse-first-order-coefficients.pdf}
-\caption{Normalized (to the maximum derivative value at any $\theta$) first-order derivatives for [Al/H], [S/H], and [K/H] from a regularized Cannon model with $\Lambda = 10^{3.5}$ and $f = 20$. For the sake of clarity, we have only shown $\theta$ values that exceed the shaded region. The top markings for K and Al correspond to the lines used by Smith et al. The black markers indicate 'Missing' or 'Unknown' lines in the APOGEE spectra according to Shetrone et al. Here we identify these elements from our model derivatives.  \label{fig:inferring-lines}}
+\caption{Normalized (to the maximum derivative value at any $\theta$) first-order derivatives for [Al/H], [S/H], and [K/H] from a regularized Cannon model with $\Lambda = 10^{3.5}$ and $f = 20$. For the sake of clarity, we have only shown $\theta$ values that exceed the shaded region. The top markings for K and Al correspond to the lines used by Smith et al. The black markers indicate 'Missing' or 'Unknown' lines in the APOGEE spectra \citep{Shetrone_2015}. Here we identify these elements from our model derivatives.  \label{fig:line-identification}}
 \end{figure}
 
 \begin{figure}[p]
 \includegraphics[width=\textwidth]{sparse-first-order-coefficients-zoom.pdf}
-\caption{Zoom in of previous figure, showing the theta values for all elements. Al and S are highlighted and colored as per Figure \ref{fig:inferring-lines}.\label{fig:inferring-lines2}}
+\caption{Zoom in of previous figure, showing the theta values for all elements. Al and S are highlighted and colored as per Figure \ref{fig:line-identification}.\label{fig:line-identification-2}}
 \end{figure}
 
 
@@ -1304,20 +1309,37 @@ that inferred from the high $S/N$ combined spectrum.
 
 
 
+\begin{figure}[p]
+\caption{The test scalar for the gridsearch at different $\Lambda$ and $f$.
+\label{fig:gridsearch-test-scalar}}
+\end{figure}
 
-% These need rasterizing:
-%\begin{figure}[p]
-%\includegraphics[width=\textwidth]{high-alpha-seq-ASPCAP.pdf}
-%\caption{A high [$\alpha$/Fe] sequence shown with \aspcap\ labels
-%and coloured by the $S/N$ ratio.\label{fig:high-alpha-aspcap}}
-%\end{figure}
 
-%\begin{figure}[p]
-%\includegraphics[width=\textwidth]{high-alpha-seq-TC.pdf}
-%\caption{The same high [$\alpha$/Fe] stars shown in Figure
-%\ref{fig:high-alpha-aspcap}, with abundances from \TheCannon.
-%\label{fig:high-alpha-tc}}
-%\end{figure}
+
+
+\begin{figure}[p]
+\caption{Differences in labels from duplicate observations, compared to a unit normal histogram to test how reasonable our formal errors are.
+\label{fig:duplicate-observations}}
+\end{figure}
+
+
+
+
+
+
+% ARC: These need rasterizing:
+\begin{figure}[p]
+\includegraphics[width=\textwidth]{high-alpha-seq-ASPCAP.pdf}
+\caption{A high [$\alpha$/Fe] sequence shown with \aspcap\ labels
+and coloured by the $S/N$ ratio.\label{fig:high-alpha-aspcap}}
+\end{figure}
+
+\begin{figure}[p]
+\includegraphics[width=\textwidth]{high-alpha-seq-TC.pdf}
+\caption{The same high [$\alpha$/Fe] stars shown in Figure
+\ref{fig:high-alpha-aspcap}, with abundances from \TheCannon.
+\label{fig:high-alpha-tc}}
+\end{figure}
 
 \clearpage
 
@@ -1331,7 +1353,7 @@ shows heliocentric velocity and metallicity, which we use to separate
 bonafide cluster members (blue) from field stars (grey). Panel limits
 are set by the dynamic range of \TheCannon\ labels.  The number of stars
 within those limits (from \aspcap\ and \TheCannon) are shown.\label{fig:m15-comparison}}
-\end{figure}
+\end{figure}are
 
 \clearpage
 
@@ -1369,6 +1391,24 @@ Markings are the same as per Figure \ref{fig:m15-comparison}.
 \label{fig:m92-comparison}}
 \end{figure}
 
+
+% ARC: [C/N] vs [Al/Mg] (or [(Al+Si)/Mg] is even better) for clusters.
+\begin{figure}[p]
+\caption{[C/N] vs [Al/Mg] (or [(Al+Si)/Mg]) for bonafide members in the five globular clusters under consideration.\label{fig:gc-abundances}}
+\end{figure}
+
+
+
+\begin{table*}
+\begin{tabular}{lllccccccccccccccccc}
+\hline
+\texttt{APOGEE\_ID} & $\alpha$ & $\delta$ & $\Teff$ & $\logg$ & [C/H] & [N/H] & [O/H] & [Na/H] & [Mg/H] & [Al/H] & [Si/H] & [S/H] & [K/H] & [Ca/H] & [Ti/H] & [V/H] & [Mn/H] & [Fe/H] & [Ni/H] \\
+\hline
+&&& \\
+\end{tabular}
+\caption{All 17-labels (and associated errors) for XX,XXX \apogee\ giant stars using the regularized model. Positions and ancillary measurements from \aspcap\ are included for convenience.  This table is online-only. A portion is shown to indicate form and content.}
+\label{tab:the-good-stuff}
+\end{table*}
 
 \end{document}
 
