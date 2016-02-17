@@ -8,7 +8,7 @@ A basic command line interface for The Cannon.
 import argparse
 import logging
 import os
-from numpy import ceil, zeros
+from numpy import ceil, loadtxt, zeros
 from subprocess import check_output
 from six.moves import cPickle as pickle
 from tempfile import mkstemp
@@ -53,7 +53,7 @@ def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
     failures = 0
 
     # MAGIC HACK
-    initial_labels = np.loadtxt("initial_labels.txt")
+    initial_labels = loadtxt("initial_labels.txt")
 
     if from_filename:
         with open(spectrum_filenames[0], "r") as fp:
