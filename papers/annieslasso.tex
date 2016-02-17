@@ -142,7 +142,7 @@ few stars.  As a consequence of the limited atmosphere dimensionality, crude
 (knowingly incorrect) approximations for the convection are 
 necessary.  Although grids of three-dimensional hydrodynamic models have been 
 produced and averaged to one-dimensional approximations, these models assume 
-local thermodynamic equalibrium (LTE).  Properly accounting for departures from 
+local thermodynamic equilibrium (LTE).  Properly accounting for departures from 
 LTE is a formidable analytic and computational challenge.  Lastly, while 
 laboratory efforts have thoroughly improved much of the faulty atomic and 
 molecular data, this process is unquestionably incomplete.  For these reasons 
@@ -682,6 +682,12 @@ label precision is worse than other abundance labels, it is limited by the
 training set.
 
 
+We report formal errors in all labels provided by \TheCannon\ at test time.
+Errors (and correlation coefficients) are available from the estimated
+covariance matrix surrounding the optimized solution.  In the following sections
+we will gauge the reliability of the labels (and their formal errors).
+
+
 \subsection{Label recovery as a function of signal-to-noise}
 \label{sec:label-recovery-snr}
 
@@ -736,10 +742,9 @@ observations and examine the (dis-)agreement between our measured labels
 %%		unregularized labels.
 
 
-\subsection{Label errors \& covariances}
-\label{sec:errors}
+% ARC: Plot (X1 - X2)^2 / sqrt(errX1^2 + errX2^2)  -- with errs from covariance
+%		matrix and compare them to a unit gaussian.
 
-%% ARC-->DWH: Formal errors from the covariance matrix + a noise model?
 
 
 \section{Results}
@@ -923,6 +928,41 @@ our precision in abundance labels that we report for these clusters.
 
 % ARC Anti-correlations in globular clusters
 
+% M 15
+The anti-correlation we see between [C/Fe] and [N/Fe] abundances in M~15 is
+expected from the CN-cycling of stellar material.  The labels (and correlation
+strength) are in excellent agreement with high-resolution studies on this cluster
+\citep{Cohen_2005}.  Indeed, while we find an intrinsic spread in these abundance
+labels, we find the spread is much smaller than previously consider.  We also
+corroborate works that find no evidence of bimodality in C and N 
+abundance labels, a signature commonly found amongst metal-rich globular clusters.
+While the \aspcap\ labels show a substantial spread in total C+N+O abundances
+for M~15, our results imply that CNO-cycling has maintained an approximately
+constant sum abundance of these elements, consistent with recent works
+\citep{Meszaros_2015}.
+
+
+The [Mg/Fe]--[Al/Fe] signature we observe in M~13 is striking.  While this
+anti-correlation is observed in most globular clusters, it rarely 
+appears to have such a small intrinsic abundance scatter.  The signature
+can arise in extreme temperatures, where Al is produced by proton-capture
+onto Mg. The larger scatter in Al is expected: Mg is much more abundant 
+than Al, thus after a small quantity of Mg is synthesized into Al, an 
+appreciable scatter can exist in Al abundances, even if Mg remains largely
+unchanged.  Thus, the abundances here reflect detailed conditions about
+stellar interior temperatures and/or the formation environment.  
+
+An example
+is shown in Figure \ref{fig:gc-abundances}, where we show abundance
+ratios [C/N] against [Al/Mg] for all members of the five globular clusters
+discussed here.  M~13 and M~3 (the relatively more metal-rich clusters) 
+show similar enrichment in [Al/Mg], which is distinct to that seen in 
+the metal-poor globular clusters.  M~53, with a mean metallicity of the 
+cluster sample, shows a mild enrichment in [Al/Mg] that links the metal-poor
+and metal-rich globular cluster stars.
+
+
+% ARC: [C/N] vs [Al/Mg] (or [(Al+Si)/Mg] is even better) for clusters.
 
 
 The labelled set described in Section \ref{sec:training-set} was not
@@ -1035,37 +1075,52 @@ they are also high in label $Y$---then there will be opportunities for
 depend on $X$ (which, according to the training set, is reliably connected to 
 $Y$).  For this reason, we expect that in a finite training set there will
 be situations in which lines from one element are used to predict the abundance
-of another.  Unquestionable examples of this covariant nature will be presented
-in a companion paper (Ness et al., 2016, in preparation).  %This implies that
-%additional information (e.g., label masks) could improve the \emph{reliability}
-%of labels, strictly by limiting the number of pixels providing covariant
-%information.
+of another.  In practice \TheCannon\ will be predicting abundances almost
+entirely on information from other elements, highlighting the important
+distinction between measurement and prediction. Convincing examples of this
+covariant behaviour (and methods to address it) will be presented in a 
+companion paper (Ness et al., 2016, in preparation).  
 
 
+Notwithstanding these issues, \TheCannon\ clearly has its place amongst
+the current methods employed to analyse stellar spectra.  Precise labels
+are returned even in the presence of noisy data, and the model internals
+are sufficiently interpretable that they can inform physics-based models.
+Admittedly, our comparisons to the globular cluster literature suggests
+that our [Fe/H] (and other?) labels may be inaccurate in the metal-poor
+regime, an signature arising from incompleteness and inaccuracy of our
+training set labels.  This limiting accuracy does not significantly
+hinder potential inferences from individual chemical abundances: for
+these purposes we care more about chemical abundance precision, not
+accuracy.
 
 
-DWh: What can we say about chemical abundance precision and accuracy?
-
-DWH: What can we say about chemical abundance space?
-
-DWH: What can we say about the promise of chemical tagging?
-
-DWH:  Once again, the differences between measurement and prediction...
-
-DWH:  Why is this going to change the World nonetheless?
-
-DWH: All of the code for this project is available with documentation
-at \url{http://thecannon.io/}.
+Our precise labels have already revealed substructure and that had previously
+been overlooked \citep{Hogg_2016}, and significantly narrowed abundance
+correlations that have been key to understanding the formation of globular
+clusters.  This is only the tip of the iceberg.  And we are moving full
+steam ahead on the RMS Titanic. 
 
 
-% Let's see if this can slip past Hogg...
-%\section{Conclusions}
+All of the code for this project is available with documentation at \url{http://thecannon.io/}.  Solutions to address the aforementioned issues will be
+included in this code, providing a robust and well-tested code base for 
+future spectroscopic surveys to utilize.  We encourage community 
+improvements through GitHub pull requests.
+
+
+%DWh: What can we say about chemical abundance precision and accuracy?
+
+%DWH: What can we say about chemical abundance space?
+
+%DWH: What can we say about the promise of chemical tagging?
+
+%DWH:  Why is this going to change the World nonetheless?
 
 
 
 \acknowledgements
 % Thanks...
-The authors warmly thank Daniel Foreman-Mackey for valuable discussions.
+The authors warmly thank Daniel Foreman-Mackey (University of Washington) for valuable discussions.
 This project was funded in part by
   the European Research Council under the European Union's Seventh Framework 
   Programme (FP~7) \acronym{ERC} Grant Agreement 320360,
@@ -1119,12 +1174,19 @@ al.(2013)]{astropy} Astropy Collaboration, Robitaille, T.~P., Tollerud, E.~J., e
 \bibitem[Cannon 
 \& Pickering(1912)]{Cannon_1912} Cannon, A.~J., \& Pickering, E.~C.\ 1912, Annals of Harvard College Observatory, 56, 115 
 
+\bibitem[Cohen et al.(2005)]{Cohen_2005} Cohen, J.~G., Briley, 
+M.~M., \& Stetson, P.~B.\ 2005, \aj, 130, 1177 
+
 \bibitem[Ho et al.(2016)]{Ho_2016} Ho, A.~Y.~Q., Ness, M.~K., 
 Hogg, D.~W., et al.\ 2016, arXiv:1602.00303 
 
 \bibitem[Hunter(2007)]{Hunter_2007} Hunter, J.~D.\ 2007, Matplotlib: A 2D Graphics Environment, Computing in Science \& Engineering, 9, 90-95
 
 \bibitem[Jones et al.(2001)]{Jones_2001} Jones, E., Oliphant E., Peterson P., et al.\ 2001, SciPy: Open Source Scientific Tools for Python, http://www.scipy.org/ (Online; accessed 2016-02-16)
+
+\bibitem[M{\'e}sz{\'a}ros et al.(2015)]{Meszaros_2015} 
+M{\'e}sz{\'a}ros, S., Martell, S.~L., Shetrone, M., et al.\ 2015, \aj, 149, 
+153 
 
 \bibitem[Ness et al.(2015a)]{tc} Ness, M., Hogg, D.~W., 
 Rix, H.-W., Ho, A.~Y.~Q., \& Zasowski, G.\ 2015, \apj, 808, 16
