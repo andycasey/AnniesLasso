@@ -882,13 +882,41 @@ explanation for these abundance discrepancies.
 We have demonstrated that a data-driven model for stellar spectra can be
 reliably extended to high dimensionality in label space.  The abundance
 labels returned by our model are significantly different for many
-\apogee\ stars, with globular cluster stars demonstrating striking 
-discrepancies.  The spreads in abundance labels are smaller, and we have
-good reasons to believe that our abundance labels are indeed correct.
+\apogee\ stars, particularly those with low S/N ratios.  In this regime
+there are good reasons to believe \TheCannon\ abundance labels are more
+reliable.  This has a prominent impact on abundance labels for globular
+cluster stars, as our results suggest much smaller intrinsic abundance
+spreads.
 
-% ARC Overall metallicities we find
+
+The overall metallicities ([Fe/H] label) we find for the five globular
+clusters examined are in satisfactory agreement with the literature.  In
+general our [Fe/H] label is more metal-rich than existing cluster
+compilations.  The difference seems to be an imprint from
+the \aspcap\ labels at low-metallicity, as the \aspcap\ labels for 
+stars we assign as cluster members are also more metal-rich than
+literature sources. This deviation may itself be linear in the 
+\aspcap\ [Fe/H] scale, as the agreement is very good for two of the
+more metal-rich clusters in our sample.  For example, for M~3 we find a cluster mean and standard
+deviation of $[{\rm Fe/H}] = -1.38 \pm 0.09$, just 0.12~dex more metal-rich
+than the literature mean \citep{Harris}.  Similarly we find M~13 to have
+[Fe/H] $= -1.45 \pm 0.09$ whereas the same source quotes [Fe/H] $= -1.53$.
+However at the metal-poor end the disparity becomes severe, where we find
+a 0.5~dex offset with the literature for M~92 ($[{\rm Fe/H}] = -1.81 \pm 0.04$).
+
+
+While these mismatches are important to examine, our tests suggest they
+are a reflection of two compounding issues: a relevant paucity of metal-poor
+stars in the training set, and a suggestion of a linear-in-[Fe/H] systematic
+trend in \aspcap\ [Fe/H] labels.  A more thorough comparison of metal-poor
+stars in \aspcap\ may help resolve these issues.  Nevertheless, while
+\TheCannon\ abundance scale may be slightly inaccurate (offset from the
+literature consensus) for metal-poor stars, this issue does not impact
+our precision in abundance labels that we report for these clusters.  
+
 
 % ARC Anti-correlations in globular clusters
+
 
 
 The labelled set described in Section \ref{sec:training-set} was not
@@ -898,13 +926,19 @@ discarded stars with questionable label fidelity.  Given the
 abundance (anti-)correlations we confirm from other high-resolution
 studies, our construction of the labelled set has a number of
 implications.  First, \emph{the anti-correlations seen in globular 
-clusters here and elsewhere are not dominant in our training set}.  
-For this reason the regularized model is measuring sets
-of labels (e.g., chemical fingerprints) that are \emph{very different}
-to what the model was actually trained on.  This is pleasing because
-it reflects the interpretable nature of our model: the spectral
+clusters here and elsewhere are not dominant in our training set}.
+Indeed, the lack of globular cluster (metal-poor) stars in our 
+training set actually compounds the [Fe/H] discrepancy we see with
+respect to the literature.  Consequently, the regularized model is 
+measuring sets of labels (e.g., chemical fingerprints) that are 
+\emph{very different} to what the model was actually trained on.  
+Even though these chemical signatures are distinct from the training
+set, an experimental astrophysicist expects to see them.  For this
+reason it is very pleasing to see these signatures because (amongst
+other things) it reflects the interpretable nature of our model: the spectral
 derivatives \emph{do} have physical meaning, allowing for the model
-to measure labels that are very different from the training set.
+to recover label patterns of high astrophysical interest that are 
+substantially different from the training set.
 
 
 It's also important because our measured labels have good astrophysical
