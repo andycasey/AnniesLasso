@@ -8,10 +8,10 @@ import AnniesLasso as tc
 
 
 
-a = tc.load_model("gridsearch-2.0-3.0-s2hh.model", threads=4)
+a = tc.load_model("gridsearch-2.0-3.0.model", threads=8)
 
 # Load the data.
-PATH, CATALOG, FILE_FORMAT = ("/Users/arc/research/apogee/", "apogee-rg.fits",
+PATH, CATALOG, FILE_FORMAT = ("", "apogee-rg.fits",
     "apogee-rg-custom-normalization-{}.memmap")
 
 labelled_set = Table.read(os.path.join(PATH, CATALOG))
@@ -37,9 +37,10 @@ a._labelled_set = labelled_set[train_set]
 a._normalized_flux = normalized_flux[train_set]
 a._normalized_ivar = normalized_ivar[train_set]
 
-#a._set_s2_by_hogg_heuristic()
-#a.train()
-#a.save("gridsearch-2.0-3.0-s2hh.model", overwrite=True)
+
+a._set_s2_by_hogg_heuristic()
+a.train()
+a.save("gridsearch-2.0-3.0-s2-heuristically-set.model", overwrite=True)
 
 raise a
 

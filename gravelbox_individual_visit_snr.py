@@ -26,13 +26,13 @@ output_filename = "apogee-rg-17label-theta_linalg_init-bfgs_factr0.1_pgtol1e-6-f
 
 from glob import glob
 filenames = [(_, "{}.validation".format(_), "{}.individual_visits".format(_)) \
-    for _ in glob("gridsearch*.model")]
+    for _ in glob("gridsearch*s2*.model")]
 
 with open("apogee-rg-individual-visit-normalized.pickle", "rb") as fp:
     individual_visits = pickle.load(fp, encoding="latin-1")
 
 # Data.
-PATH, CATALOG, FILE_FORMAT = ("/Users/arc/research/apogee/", "apogee-rg.fits",
+PATH, CATALOG, FILE_FORMAT = ("", "apogee-rg.fits",
     "apogee-rg-custom-normalization-{}.memmap")
 
 # Load the data.
@@ -56,7 +56,56 @@ q = np.random.randint(0, 10, len(labelled_set))
 
 validate_set = (q == 0)
 train_set = (~validate_set)
-raise a
+
+
+# Generate initialization points.
+label_names = ["TEFF", "LOGG"] + elements
+tsl = labelled_set[train_set]
+initial_labels = np.array([
+    # 1. The fiducial values (mean of all parameters in the training set).
+    [np.median(tsl[label_name]) for label_name in label_names], 
+    # 2. The fiducial Teff and logg, with the 25th percentile of all abundances.
+    np.hstack([
+        [np.median(tsl["TEFF"]), np.median(tsl["LOGG"])],
+        [np.percentile(tsl[element_label], 25) for element_label in elements]
+    ]),
+    # 3. The fiducial Teff and logg, with the 75th percentile of all abundances.
+    np.hstack([
+        [np.median(tsl["TEFF"]), np.median(tsl["LOGG"])],
+        [np.percentile(tsl[element_label], 75) for element_label in elements]
+    ]),
+    # 4. The 25th percentile in Teff and logg, with the training set mean of all abundances.
+    np.hstack([
+        [np.percentile(tsl["TEFF"], 25), np.percentile(tsl["LOGG"], 25)],
+        [np.median(tsl[element_label]) for element_label in elements]
+    ]),
+    # 5. The 25th percentile in Teff and logg, with the 25th percentile of all abundances.
+    np.hstack([
+        [np.percentile(tsl["TEFF"], 25), np.percentile(tsl["LOGG"], 25)],
+        [np.percentile(tsl[element_label], 25) for element_label in elements]
+    ]),
+    # 6. The 25th percentile in Teff and logg, with the 75th percentile of all abundances.
+    np.hstack([
+        [np.percentile(tsl["TEFF"], 25), np.percentile(tsl["LOGG"], 25)],
+        [np.percentile(tsl[element_label], 75) for element_label in elements]
+    ]),
+    # 7. The 75th percentile in Teff and logg, with the training set mean of all abundances.
+    np.hstack([
+        [np.percentile(tsl["TEFF"], 75), np.percentile(tsl["LOGG"], 75)],
+        [np.median(tsl[element_label]) for element_label in elements]
+    ]),
+    # 8. The 75th percentile in Teff and logg, with the 25th percentile of all abundances.
+    np.hstack([
+        [np.percentile(tsl["TEFF"], 75), np.percentile(tsl["LOGG"], 75)],
+        [np.percentile(tsl[element_label], 25) for element_label in elements]
+    ]),
+    # 9. The 75th percentile in Teff and logg, with the 75th percentile of all abundances.
+    np.hstack([
+        [np.percentile(tsl["TEFF"], 75), np.percentile(tsl["LOGG"], 75)],
+        [np.percentile(tsl[element_label], 75) for element_label in elements]
+    ]),
+])
+
 
 for model_filename, validation_filename, output_filename in filenames:
 
@@ -65,7 +114,7 @@ for model_filename, validation_filename, output_filename in filenames:
     print("Output filename {}".format(output_filename))
 
     # Load the model
-    model = tc.load_model(model_filename, threads=32, encoding="latin-1")
+    model = tc.load_model(model_filename, threads=8)
     if not model.is_trained:
         print("Not trained..")
         continue
@@ -77,7 +126,8 @@ for model_filename, validation_filename, output_filename in filenames:
     # Load any high S/N stuff from the validation set.
     if not os.path.exists(validation_filename):
         expected = model.get_labels_array(labelled_set[validate_set])
-        inferred, cov, metadata = model.fit(normalized_flux[validate_set], normalized_ivar[validate_set], full_output=True)
+        inferred, cov, metadata = model.fit(normalized_flux[validate_set], normalized_ivar[validate_set], full_output=True,
+            initial_labels=initial_labels)
 
         with open(validation_filename, "wb") as fp:
             pickle.dump((expected, inferred, cov, metadata), fp, -1)
@@ -105,10 +155,12 @@ for model_filename, validation_filename, output_filename in filenames:
     single_visit_inferred = []
     for i, apogee_id in enumerate(validation_apogee_ids):
 
+        apogee_ids.extend([apogee_id] * len(meta["SNR"]))
+
         flux, ivar, meta = individual_visits[apogee_id]
         N = len(meta)
 
-        iv_inferred = model.fit(flux, ivar)
+        iv_inferred = model.fit(flux, ivar, initial_labels=initial_labels)
 
         # difference with respect to the high S/N case.
         difference_inferred = iv_inferred - inferred[i]

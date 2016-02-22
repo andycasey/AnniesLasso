@@ -5,15 +5,15 @@ showing us compared to ASPCAP for whatever labels in the model.
 
 import numpy as np
 import matplotlib.pyplot as plt
-import cPickle as pickle
 import os
 from astropy.io import fits
 from astropy.table import Table
+from six.moves import cPickle as pickle
 
 import AnniesLasso as tc
 
 # Load the data.
-PATH, CATALOG, FILE_FORMAT = ("/Users/arc/research/apogee/", "apogee-rg.fits",
+PATH, CATALOG, FILE_FORMAT = ("", "apogee-rg.fits",
     "apogee-rg-custom-normalization-{}.memmap")
 
 labelled_set = Table.read(os.path.join(PATH, CATALOG))
@@ -33,6 +33,7 @@ validate_set = (q == 0)
 train_set = (q > 0)
 
 
+"""
 # Fit the validation stuff first (which is high S/N).
 model = tc.L1RegularizedCannonModel(labelled_set[train_set],
     normalized_flux[train_set], normalized_ivar[train_set])
@@ -60,6 +61,7 @@ for i, label_name in enumerate(model.vectorizer.label_names):
 raise a
 
 
+"""
 
 
 
@@ -68,7 +70,7 @@ raise a
 
 # Fit individual spectra using two different models.
 with open("apogee-rg-individual-visit-normalized.pickle", "rb") as fp:
-    individual_visit_spectra = pickle.load(fp)
+    individual_visit_spectra = pickle.load(fp, encoding="latin-1")
 
 latex_labels = {
     "TEFF": "T_{\\rm eff}",
@@ -77,7 +79,8 @@ latex_labels = {
 }
 
 models_to_compare = {
-    "model1": "apogee-rg-custom-10.00-5.00e-01.model"
+    #"model1": "gridsearch-2.0-3.0.model",
+    "model2": "gridsearch-2.0-3.0-s2-heuristically-set.model"
 }
 
 for model_name, saved_filename in models_to_compare.items():
