@@ -86,19 +86,19 @@ Survey.
 We find that we can successfully train and use a model with 17 stellar labels.
 Validation shows that the model does a good job of inferring all 17 labels 
 (typical precision is 0.04~dex), even when we degrade the signal-to-noise by 
-discarding some of the spectroscopic observing time.  The model dependencies 
+discarding $\gtrsim$50\% of the spectroscopic observing time.  The model dependencies 
 make sense: the derivatives of the spectral mean model with respect to 
 abundances correlate well with known atomic lines, and we are able to identify 
 elements belonging to atomic lines that were previously unknown.  We deliver 
-open-source code and 17 labels for a set of 96,514 stars.
+open-source code and 17 labels for a set of 96,514 red giant stars.
 \end{abstract}
 
 
 \section{Introduction}
-The detailed chemical composition of a star's photosphere contains a reflection
-of the formation environment when that star was born, and any supernovae that 
+The detailed chemical composition of a star's photosphere reflects 
+the formation environment when that star was born, and any supernovae that 
 preceded it.  This photospheric \emph{chemical fingerprint} largely remains 
-unchanged throughout a star's lifetime, providing a fossilised record of 
+unchanged throughout a star's lifetime, providing a fossil record of 
 local star-formation history.  Although the differences in detailed chemical
 abundances may be subtle between two formation sites, if stars could be linked
 to their natal gas cloud by their chemical fingerprint, a sufficiently large
@@ -204,7 +204,7 @@ $K$-dimensional label space takes a training set the size of which scales
 exponentially (or worse) with $K$.  Subsequent experiments, however, did not 
 bear this out.  We found that we can transfer many labels from the training set 
 to the test set, with training sets of (just) thousands of stars.  The fundamental 
-reason is that \TheCannon\ is \emph{not} a density estimator!  It is more like 
+reason is that \TheCannon\ is \emph{not} a density estimator.  It is more like 
 an \emph{interpolator}, which effectively finds stars in the training set that
 are close to the test star, and transfers labels, using the smooth polynomial 
 model as a kind of regularizer.
@@ -364,10 +364,10 @@ labels $\ell_m$ that optimizes the likelihood:
   \quad .
 \end{eqnarray}
 If the vectorizing function $\vecv(\ell)$ is non-linear (as it is in our 
-quadratic model), the test-step optimization is not convex.  However, the fact
-that there are many pixels $j$ acting, each of which has a different functional
-dependence on the labels in the label list $\ell$, tends to make the 
-optimization find a good value for the label list $\ell$ in practice.  We call
+quadratic model), the test-step optimization is not convex.  However, because
+there are many pixels $j$ acting, each of which has a different functional
+dependence on the labels in the label list $\ell$, in practice the optimization 
+finds a good value for the label list $\ell$.  We call
 this partial log likelihood---the argument of the argmin in 
 equation~(\ref{eq:test})---the \emph{test scalar}.
 
@@ -434,7 +434,7 @@ $\Lambda$ and $f$ by validation in Section \ref{sec:hyper-parameter-validation}.
 We employ the \apogee\ Data Release 12 data to demonstrate the effectiveness of
 a regularized \emph{Cannon} model in high-dimensional label space.  We 
 constructed the labelled set using sensible criteria for stars analysed with 
-version \texttt{v603} of the \aspcap\ pipeline.  We employed several quality 
+version \texttt{v603} of the \aspcap\ pipeline \citep{Holtzman_16,Garcia_Perez_2016}.  We employed several quality 
 criteria to distill a robust yet representative labelled set: We first removed 
 any stars with problematic flags from the \aspcap\ pipeline, requiring 
 \texttt{ASPCAPFLAG~=~0}.  We excluded stars with S/N ratios outside the range of
@@ -530,7 +530,7 @@ the continuum function demonstrates large wiggles.
 
 
 The approach we have described is \emph{pseudo}-continuum normalization.  While 
-our choice of continuum pixels is well-informed, albeit arbitrary, our 
+our choice of continuum pixels is well-informed, our 
 procedure does not require that the chosen pixels to indeed be ``true'' continuum
 pixels.  This is advantageous.  The continuum pixels could be randomly selected; 
 our approach would be equally effective as long as the same pixels were always
@@ -646,7 +646,7 @@ because it predicts stellar spectra more accurately.
 Our grid search has revealed that a regularization factor of $\Lambda = 10^3$ is
 required to produce a sufficiently sparse model.  Generally we find that low
 scale factors yield marginally better behaviour in recovering abundance labels
-at low $S/N$.  At $\Lambda = 10^3$, the precision in abundance labels would 
+at low S/N.  At $\Lambda = 10^3$, the precision in abundance labels would 
 suggest that a scale factor anywhere between $f = 0.5-5.0$ is reasonable. 
 However the total $\chi^2$ for validation set fluxes shows $f = 2.0$ to be a far
 better model (in terms of predictive power in spectral fluxes) than $f = 0.5$
@@ -893,13 +893,16 @@ explanation for these abundance discrepancies.
 
 
 We have demonstrated that a data-driven model for stellar spectra can be
-reliably extended to high dimensionality in label space.  The abundance
-labels returned by our model are significantly different for many
-\apogee\ stars, particularly those with low S/N ratios.  In this regime
+reliably extended to high dimensionality in label space. We return high
+precision labels for \apogee\ spectra across the giant branch, including
+those with low S/N. For these noisy data, the abundance labels returned
+by our model for show similar behaviour to what is seen in the high
+S/N ($>250$) sample.  However our abundance labels from noisy data are
+significantly different from \aspcap. In this noisy regime
 there are good reasons to believe \TheCannon\ abundance labels are more
 reliable.  This has a prominent impact on abundance labels for globular
-cluster stars, as our results suggest much smaller intrinsic abundance
-spreads.
+cluster stars, as our results suggest much narrower intrinsic abundance
+spreads ($\sim$3-4 times smaller).
 
 
 The overall metallicities ([Fe/H] label) we find for the five globular
@@ -1246,7 +1249,7 @@ dashed one-to-one line is shown.
 \begin{figure}[p]
 \centering
 \includegraphics[width=0.8\textwidth]{validation-label-recovery.pdf}
-\caption{\emph{Top left panel}: The distribution of $S/N$ values for spectra of individual observations in the validation set. \emph{All other panels}: The median absolute difference between the measured label for an individual observation, and the measured label from the high $S/N$ combined spectrum for the same star.  All panel have common bins, and all abundance labels have common axis limits.  The dashed line indicates the minimum $S/N$ for any \emph{stacked} \apogee\ spectrum in Table \ref{tab:the-good-stuff}, implying the precision floor achievable for all \apogee\ stars.\label{fig:label-recovery-snr}}
+\caption{\emph{Top left panel}: The distribution of S/N values for spectra of individual observations in the validation set. \emph{All other panels}: The median absolute difference between the measured label for an individual observation, and the measured label from the high S/N combined spectrum for the same star.  All panel have common bins, and all abundance labels have common axis limits.  The dashed line indicates the minimum S/N for any \emph{stacked} \apogee\ spectrum in Table \ref{tab:the-good-stuff}, implying the precision floor achievable for all \apogee\ stars.\label{fig:label-recovery-snr}}
 \end{figure}
 
 \clearpage
@@ -1311,7 +1314,7 @@ for \aspcap\ and \TheCannon\ are shown. The residuals are plotted in the top pan
 \includegraphics[width=\textwidth]{gs-mad-all-elements.pdf}
 \caption{The median absolute abundance difference (over all abundance labels)
 between that inferred from individual observations in the validation set, and
-that inferred from the high $S/N$ combined spectrum.
+that inferred from the high S/N combined spectrum.
 \label{fig:gridsearch-mad-all-elements}}
 \end{figure}
 
@@ -1340,7 +1343,7 @@ that inferred from the high $S/N$ combined spectrum.
 \begin{figure}[p]
 \centering
 \includegraphics[width=0.8\textwidth]{high-alpha-sequence.pdf}
-\caption{Abundance labels of three element groups (odd-Z, $\alpha$, and Fe-peak) for stars in a high [$\alpha$/Fe] abundance sequence. Labels from \aspcap\ (left) and \TheCannon\ (right) are shown for the same set of stars. Stars are colored by their $S/N$ ratio to highlight that the spread in the \aspcap\ label distribution is strongly impacted by stars with modest $S/N$ ($<120$). The same result is not seen with \TheCannon.\label{fig:high-alpha-sequence}}
+\caption{Abundance labels of three element groups (odd-Z, $\alpha$, and Fe-peak) for stars in a high [$\alpha$/Fe] abundance sequence. Labels from \aspcap\ (left) and \TheCannon\ (right) are shown for the same set of stars. Stars are colored by their S/N ratio to highlight that the spread in the \aspcap\ label distribution is strongly impacted by stars with modest S/N ($<120$). The same result is not seen with \TheCannon.\label{fig:high-alpha-sequence}}
 \end{figure}
 
 \clearpage
