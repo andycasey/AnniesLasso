@@ -77,20 +77,23 @@ space is large ($\Teff$, $\logg$, and 15 abundances: C, N, O, Na, Mg, Al, Si, S,
 K, Ca, Ti, V, Mn, Fe, Ni) and the model is non-linear in its response to 
 abundance and parameter changes.
 % Methods
-We adopt ideas from compressed sensing to limit overall model complexity (number
-of non-zero model parameters) while retaining model freedom.  The training set 
-consists of 12,681 red-giant stars with high signal-to-noise spectroscopic 
+We adopt ideas from compressed sensing to limit overall model complexity
+while retaining model freedom.  The model is trained
+with a set of 12,681 red-giant stars with high signal-to-noise spectroscopic 
 observations and stellar parameters and abundances taken from the \apogee\ 
 Survey.
 % Results
 We find that we can successfully train and use a model with 17 stellar labels.
 Validation shows that the model does a good job of inferring all 17 labels 
 (typical precision is 0.04~dex), even when we degrade the signal-to-noise by 
-discarding $\gtrsim$50\% of the spectroscopic observing time.  The model dependencies 
-make sense: the derivatives of the spectral mean model with respect to 
-abundances correlate well with known atomic lines, and we are able to identify 
-elements belonging to atomic lines that were previously unknown.  We deliver 
-open-source code and 17 labels for a set of 96,514 red giant stars.
+discarding $\gtrsim$50\% of the observing time. The model dependencies 
+make sense: the spectral derivatives with respect to abundances correlate
+with known atomic lines, and we identify elements belonging
+to atomic lines that were previously unknown.  We recover (anti-)correlations
+in abundance labels for globular cluster stars, consistent with the literature.
+We find the intrinsic spread in globular cluster abundances is $\approx$3-4 times smaller than 
+previously reported.  We deliver 17 labels with associated errors for 
+96,514 red giant stars, and open-source code to extend this work to other surveys.
 \end{abstract}
 
 
