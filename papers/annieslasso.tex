@@ -33,6 +33,7 @@
 \newcommand{\sdssiii}{\project{\acronym{SDSS-III}}}
 \newcommand{\apogee}{\project{\acronym{APOGEE}}}
 \newcommand{\aspcap}{\project{\acronym{ASPCAP}}}
+\newcommand{\lasso}{\project{\acronym{LASSO}}}
 \newcommand{\dr}{\acronym{DR12}}
 \newcommand{\logg}{\log g}
 \newcommand{\mh}{\mathrm{[M/H]}}
@@ -411,19 +412,18 @@ of L1 regularization; we set
   \quad,
 \end{eqnarray}
 where the sum is over the $[D-1]$ components of $\vectheta$, excluding the 
-zeroth component because we don't ever expect that component to vanish.
-\footnote{Forgive a notational similarity here: When we subscript $\vectheta$ 
+zeroth component because we don't ever expect that component to vanish.\footnote{Forgive a notational similarity here: When we subscript $\vectheta$ 
 with $j$ we mean ``the $D$-vector of parameters associated with wavelength pixel
 $j$''; when we subscript $\theta$ with $d$ we mean ``the single parameter along 
 coordinate axis $d$ in the $D$-dimensional $\vectheta$ vector space.} There is
 a great deal of theory about this kind of regularization; it is called L1 or the
-LASSO \citep{Tibshirani_1996}.  L1 regularization encourages parameters to vanish 
+\lasso\ \citep{Tibshirani_1996}.  L1 regularization encourages parameters to vanish 
 precisely but doesn't break convexity for convex problems.  It is important to
 note that the scale factor $f$ plays into the regularization, because as the 
-scale factor grows, the more penalized the cross (quadratic) terms become 
+scale factor grows, the more penalized the cross-terms (e.g., $\Teff\cdot$[Al/H], [Mg/H]$\cdot$[Si/H]) become 
 relative to the linear terms.  We will heuristically set the values of the hyper-parameters
 $\Lambda$ and $f$ by validation in Section \ref{sec:hyper-parameter-validation}.
-%% ARC CLARIFY WITH HOGG ON HOGG-8.PNG
+%% ARC CLARIFY BOLD/NOT BOLD WITH HOGG ON HOGG-8.PNG
 
 
 
@@ -573,7 +573,7 @@ In the simplest case we have two hyper-parameters that need to be determined:
 $\Lambda$ and $f$.  The strength of the regularization (at all pixels) is set 
 by $\Lambda$, and the scale factor $f$ controls the scaling on individual 
 labels.  In practice large $\Lambda$ values encourage zero coefficients and thus enforces sparsity.  High scale factor $f$
-values act to penalize cross-terms (e.g., $\Teff\cdot$[Mn/H], [Al/H]$\cdot$[Si/H]) more than linear labels, and produce sparse
+values act to penalize cross-terms more than linear labels, and produce sparse
 models as a consequence.  Because these hyper-parameters act in conjunction 
 with each other, we need to explore many combinations of $\Lambda$ and $f$.
 
