@@ -43,7 +43,7 @@ label_names = OrderedDict([
 
 
 
-fig, axes = plt.subplots(6, 3, figsize=(7, 12.5))
+fig, axes = plt.subplots(6, 3, figsize=(8.5, 12.5))
 axes = np.array(axes).flatten()
 
 
@@ -67,16 +67,6 @@ for i, (ax, label_name) in enumerate(zip(axes, label_names.keys())):
         horizontalalignment="right", verticalalignment="bottom",
         transform=ax.transAxes)
 
-    # Common limits.
-    limits = np.array([ax.get_xlim(), ax.get_ylim()]).flatten()
-    limits = (min(limits), max(limits))
-    ax.plot(limits, limits, c="#666666", ls="--", zorder=-1)
-    ax.set_xlim(limits)
-    ax.set_ylim(limits)
-
-    ax.xaxis.set_major_locator(MaxNLocator(4))
-    ax.yaxis.set_major_locator(MaxNLocator(4))
-
     #ax.set_xlabel(label_names.get(label_name, label_name) + r" $({\rm ASPCAP})$")
     #ax.set_ylabel(label_names.get(label_name, label_name) + r" $({\rm Cannon})$")
     #ax.set_title(label_names.get(label_name, label_name))
@@ -85,8 +75,42 @@ for i, (ax, label_name) in enumerate(zip(axes, label_names.keys())):
         color="k", horizontalalignment="left", verticalalignment="top",
         transform=ax.transAxes)
 
+
+
+# Common limits for all axes.
+limits = np.array([[axes[0].get_xlim(), axes[0].get_ylim()]]).flatten()
+limits = (min(limits), max(limits))
+axes[0].set_xlim(limits)
+axes[0].set_ylim(limits)
+axes[0].plot(limits, limits, c="#666666", ls="--", zorder=-1)
+axes[0].set(adjustable="box-forced", aspect=np.ptp(axes[0].get_xlim())/np.ptp(axes[0].get_ylim()))
+axes[0].xaxis.set_major_locator(MaxNLocator(3))
+axes[0].yaxis.set_major_locator(MaxNLocator(3))
+
+
+
+
+axes[1].set_xlim(limits)
+axes[1].set_ylim(limits)
+axes[1].plot(limits, limits, c="#666666", ls="--", zorder=-1)
+axes[1].set(adjustable="box-forced", aspect=np.ptp(axes[1].get_xlim())/np.ptp(axes[1].get_ylim()))
+axes[1].xaxis.set_major_locator(MaxNLocator(3))
+axes[1].yaxis.set_major_locator(MaxNLocator(3))
+
+
+limits = (-3, 1)
+for ax in axes[2:]:
+    ax.plot(limits, limits, c="#666666", ls="--", zorder=-1)
+    ax.set_xlim(limits)
+    ax.set_ylim(limits)
+
     ax.set(adjustable="box-forced", aspect=np.ptp(ax.get_xlim())/np.ptp(ax.get_ylim()))
 
+    if not ax.is_last_row():
+        ax.set_xticklabels([])
+
+    ax.xaxis.set_major_locator(MaxNLocator(3))
+    ax.yaxis.set_major_locator(MaxNLocator(3))
 
 fig.tight_layout()
 axes[-1].set_visible(False)

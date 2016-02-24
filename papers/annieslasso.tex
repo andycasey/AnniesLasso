@@ -41,6 +41,7 @@
 \newcommand{\vectheta}{\Dvector{\theta}}
 \newcommand{\vecv}{\Dvector{v}}
 \newcommand{\argmin}[1]{\underset{#1}{\operatorname{argmin}}\,}
+\newcommand{\pn}{\hphantom{-}}
 
 \begin{document}
 
@@ -455,7 +456,7 @@ integer $q$ between 0 and 9, inclusive.  We assign stars with $q > 0$ as
 belonging to the training set, and those with $q = 0$ will form the validation 
 set.  We have ensured that the same $q$ integer was assigned to each star 
 between the different experiments described below.  The training set (Figure
-\ref{fig:training_hrd}) comprises 12,681 red giant branch stars, and the 
+\ref{fig:training_set_hrd}) comprises 12,681 red giant branch stars, and the 
 validation set includes 1,460 stars.
 
 
@@ -1121,7 +1122,10 @@ improvements through GitHub pull requests.
 
 \acknowledgements
 % Thanks...
-The authors warmly thank Daniel Foreman-Mackey (University of Washington) for valuable discussions.
+The authors warmly thank Daniel Foreman-Mackey (University of Washington),
+						 Anna Ho (Caltech), and
+						 Angus Williams (Cambridge) for valuable discussions.
+						 
 This project was funded in part by
   the European Research Council under the European Union's Seventh Framework 
   Programme (FP~7) \acronym{ERC} Grant Agreement 320360,
@@ -1216,28 +1220,19 @@ Shetrone, M.~D., et al.\ 2013, \apj, 765, 16
 \clearpage
 
 \begin{figure}[p]
+\centering
 \includegraphics[width=\textwidth]{training_set_hrd.pdf}
 \caption{A temperature-surface gravity diagram for all 12,681 stars in
-the training set (left).  The distributions of abundances are shown for
-all training set stars on the right.\label{fig:training_hrd}}
+the training set (left). A logarithmic density plot for the training set
+is shown in the centre panel. Distributions of abundance labels
+are shown in the right-hand panel.\label{fig:training_set_hrd}}
 \end{figure}
 
-
-
-
-\begin{figure}[p]
-\caption{Choose two wavelengths (one continuum and one interesting)
-  and plot some scatter plots of flux vs various parameters, and also
-  cross-validation results for the
-  hyper-parameters.\label{fig:onewavelength}}
-\end{figure}
-
-
-
-
+\clearpage
 
 \begin{figure}[p]
-\includegraphics[width=0.6\textwidth]{regularized-model-validation.pdf}
+\centering
+\includegraphics[width=0.8\textwidth]{regularized-model-validation.pdf}
 \caption{Comparisons between \aspcap\ (x-axis) and \TheCannon\ (y-axis)
 labels for the 1,460 high S/N stars in the validation set.  For clarity
 purposes the label name is shown within each panel, as is the mean
@@ -1246,61 +1241,73 @@ dashed one-to-one line is shown.
 \label{fig:regularized-model-validation}}
 \end{figure}
 
-
+\clearpage
 
 \begin{figure}[p]
+\centering
 \includegraphics[width=0.8\textwidth]{validation-label-recovery.pdf}
 \caption{\emph{Top left panel}: The distribution of $S/N$ values for spectra of individual observations in the validation set. \emph{All other panels}: The median absolute difference between the measured label for an individual observation, and the measured label from the high $S/N$ combined spectrum for the same star.  All panel have common bins, and all abundance labels have common axis limits.  The dashed line indicates the minimum $S/N$ for any \emph{stacked} \apogee\ spectrum in Table \ref{tab:the-good-stuff}, implying the precision floor achievable for all \apogee\ stars.\label{fig:label-recovery-snr}}
 \end{figure}
 
-
+\clearpage
 
 \begin{figure}[p]
-\caption{Distribution of $\chi^2$ values for stars in the test set.\label{fig:chisq-test-set}}
+\centering
+\includegraphics[width=0.8\textwidth]{test-step-chisq.pdf}
+\caption{Reduced $\chi^2$ values for all \apogee\ \dr\ spectra.\label{fig:chisq-test-set}}
 \end{figure}
 
+\clearpage
 
 \begin{figure}[p]
+\centering
 \includegraphics[width=\textwidth]{spectrum.pdf}
-\caption{A portion of (Cannon-)normalized spectra for 2M18210703-1828134,
+\caption{A portion of the (\emph{Cannon}-)normalized spectrum for 2M18210703-1828134,
 a randomly selected star in the validation set.  The best-fit model spectra
-for \aspcap\ and \TheCannon\ are shown.\label{fig:correctness}}
+for \aspcap\ and \TheCannon\ are shown. The residuals are plotted in the top panel.\label{fig:correctness}}
 \end{figure}
 
-
-
+\clearpage
 
 \begin{figure}[p]
-\caption{[X/Fe] abundance labels (y-axis) with respect to [Fe/H] to demonstrate that we recover galactic chemical evolution.\label{fig:gce}}
+\centering
+\includegraphics[width=0.8\textwidth]{test-step-gce.pdf}
+\caption{Logarithmic density for all abundance labels with respect to iron ([X/Fe]), revealing the Galactic  enrichment with respect to Fe for all elements. Dotted lines indicate Solar abundances.\label{fig:gce}}
 \end{figure}
 
-
+\clearpage
 
 \begin{figure}[p]
-\caption{Some label projections showing the extent of the distilled sample of bonafide giants.\label{fig:test-set-hrd}}
+\includegraphics[width=\textwidth]{test_set_hrd.pdf}
+\caption{A temperature-surface gravity diagram for all 96,514 stars in the test set that pass our quality criteria (left). The centre panel shows a logarithmic density plot for the same stars. Abundance label distributions are shown in the right-hand panel.\label{fig:test-set-hrd}}
 \end{figure}
 
-
-
+\clearpage
 
 \begin{figure}[p]
 \includegraphics[width=\textwidth]{sparse-first-order-coefficients.pdf}
 \caption{Normalized (to the maximum derivative value at any $\theta$) first-order derivatives for [Al/H], [S/H], and [K/H] from a regularized Cannon model with $\Lambda = 10^{3.5}$ and $f = 20$. For the sake of clarity, we have only shown $\theta$ values that exceed the shaded region. The top markings for K and Al correspond to the lines used by Smith et al. The black markers indicate 'Missing' or 'Unknown' lines in the APOGEE spectra \citep{Shetrone_2015}. Here we identify these elements from our model derivatives.  \label{fig:line-identification}}
 \end{figure}
 
+\clearpage
+
 \begin{figure}[p]
+\centering
 \includegraphics[width=\textwidth]{sparse-first-order-coefficients-zoom.pdf}
 \caption{Zoom in of previous figure, showing the theta values for all elements. Al and S are highlighted and colored as per Figure \ref{fig:line-identification}.\label{fig:line-identification-2}}
 \end{figure}
 
+\clearpage
 
 \begin{figure}[p]
+\centering
 \includegraphics[width=\textwidth]{sparsity.pdf}
 \caption{The fraction of non-zero coefficients (sparsity) of 17-label models with different scale factors $f$ and regularization terms $\Lambda$.  The sparsity of the first-order coefficients are shown in the left panel, the second-order coefficients (e.g., $\Teff^2$, $\Teff\cdot\logg$, or $[\rm{Al}/\rm{H}]\cdot[\rm{Mn}/\rm{H}]$) in the middle panel, and total sparsity (excluding the baseline spectrum coefficient $\theta_0$) in the right-hand panel.\label{fig:sparsity}}
 \end{figure}
 
 
 \begin{figure}[p]
+\centering
 \includegraphics[width=\textwidth]{gs-mad-all-elements.pdf}
 \caption{The median absolute abundance difference (over all abundance labels)
 between that inferred from individual observations in the validation set, and
@@ -1311,6 +1318,7 @@ that inferred from the high $S/N$ combined spectrum.
 
 
 \begin{figure}[p]
+\centering
 \caption{The test scalar for the gridsearch at different $\Lambda$ and $f$.
 \label{fig:gridsearch-test-scalar}}
 \end{figure}
@@ -1319,6 +1327,7 @@ that inferred from the high $S/N$ combined spectrum.
 
 
 \begin{figure}[p]
+\centering
 \caption{Differences in labels from duplicate observations, compared to a unit normal histogram to test how reasonable our formal errors are.
 \label{fig:duplicate-observations}}
 \end{figure}
@@ -1327,19 +1336,12 @@ that inferred from the high $S/N$ combined spectrum.
 
 
 
-
-% ARC: These need rasterizing:
 \begin{figure}[p]
-\includegraphics[width=\textwidth]{high-alpha-seq-ASPCAP.pdf}
-\caption{A high [$\alpha$/Fe] sequence shown with \aspcap\ labels
-and coloured by the $S/N$ ratio.\label{fig:high-alpha-aspcap}}
-\end{figure}
-
-\begin{figure}[p]
-\includegraphics[width=\textwidth]{high-alpha-seq-TC.pdf}
+\centering
+\includegraphics[width=0.8\textwidth]{high-alpha-sequence.pdf}
 \caption{The same high [$\alpha$/Fe] stars shown in Figure
 \ref{fig:high-alpha-aspcap}, with abundances from \TheCannon.
-\label{fig:high-alpha-tc}}
+\label{fig:high-alpha-sequence}}
 \end{figure}
 
 \clearpage
@@ -1347,6 +1349,7 @@ and coloured by the $S/N$ ratio.\label{fig:high-alpha-aspcap}}
 
 
 \begin{figure}[p]
+\centering
 \includegraphics[width=0.40\textwidth]{M15_comparison.pdf}
 \caption{Abundance labels from \aspcap\ and \TheCannon\ for candidate
 members of the metal-poor globular cluster M~15 (NGC~7078).  The top panel
@@ -1354,29 +1357,12 @@ shows heliocentric velocity and metallicity, which we use to separate
 bonafide cluster members (blue) from field stars (grey). Panel limits
 are set by the dynamic range of \TheCannon\ labels.  The number of stars
 within those limits (from \aspcap\ and \TheCannon) are shown.\label{fig:m15-comparison}}
-\end{figure}are
-
-\clearpage
-
-\begin{figure}[p]
-\includegraphics[width=0.4\textwidth]{M13_comparison.pdf}
-\caption{Label comparison between \aspcap\ and \TheCannon\ for M~13.
-Markings are the same as per Figure \ref{fig:m15-comparison}.
-\label{fig:m13-comparison}}
 \end{figure}
 
 \clearpage
 
 \begin{figure}[p]
-\includegraphics[width=0.4\textwidth]{M3_comparison.pdf}
-\caption{Label comparison between \aspcap\ and \TheCannon\ for M~3.
-Markings are the same as per Figure \ref{fig:m15-comparison}.
-\label{fig:m3-comparison}}
-\end{figure}
-
-\clearpage
-
-\begin{figure}[p]
+\centering
 \includegraphics[width=0.4\textwidth]{M53_comparison.pdf}
 \caption{Label comparison between \aspcap\ and \TheCannon\ for M~53.
 Markings are the same as per Figure \ref{fig:m15-comparison}.
@@ -1386,6 +1372,7 @@ Markings are the same as per Figure \ref{fig:m15-comparison}.
 \clearpage
 
 \begin{figure}[p]
+\centering
 \includegraphics[width=0.4\textwidth]{M92_comparison.pdf}
 \caption{Label comparison between \aspcap\ and \TheCannon\ for M~92.
 Markings are the same as per Figure \ref{fig:m15-comparison}.
@@ -1393,21 +1380,26 @@ Markings are the same as per Figure \ref{fig:m15-comparison}.
 \end{figure}
 
 
-% ARC: [C/N] vs [Al/Mg] (or [(Al+Si)/Mg] is even better) for clusters.
-\begin{figure}[p]
-\caption{[C/N] vs [Al/Mg] (or [(Al+Si)/Mg]) for bonafide members in the five globular clusters under consideration.\label{fig:gc-abundances}}
-\end{figure}
-
-
-
 \begin{table*}
-\begin{tabular}{lllccccccccccccccccc}
+\centering
+\begin{tabular}{lccccc}
 \hline
-\texttt{APOGEE\_ID} & $\alpha$ & $\delta$ & $\Teff$ & $\logg$ & [C/H] & [N/H] & [O/H] & [Na/H] & [Mg/H] & [Al/H] & [Si/H] & [S/H] & [K/H] & [Ca/H] & [Ti/H] & [V/H] & [Mn/H] & [Fe/H] & [Ni/H] \\
+\texttt{APOGEE\_ID} & $\Teff$ & $\logg$ & [Al/H] & [Ca/H] & $\cdots$ \\
+& (K) & & & \\
 \hline
-&&& \\
+2M18550791+4754062 & $3960 \pm 2$ & $1.154 \pm 0.007$ & $-0.266   \pm 0.011$ & $-0.261   \pm 0.011$ & $\cdots$ \\
+2M18482322+4727598 & $4502 \pm 3$ & $2.279 \pm 0.008$ & $\pn0.275 \pm 0.013$ & $-0.019   \pm 0.012$ & $\cdots$ \\
+2M18495146+4622483 & $4592 \pm 5$ & $2.641 \pm 0.010$ & $\pn0.385 \pm 0.016$ & $\pn0.109 \pm 0.018$ & $\cdots$ \\
+2M18543638+4658349 & $4767 \pm 7$ & $2.550 \pm 0.014$ & $-0.076   \pm 0.019$ & $-0.307   \pm 0.017$ & $\cdots$ \\
+2M18471131+4726561 & $4494 \pm 3$ & $2.158 \pm 0.009$ & $\pn0.040 \pm 0.014$ & $-0.187   \pm 0.013$ & $\cdots$ \\
+2M18493578+4838112 & $4720 \pm 6$ & $2.828 \pm 0.011$ & $\pn0.055 \pm 0.019$ & $-0.074   \pm 0.017$ & $\cdots$ \\
+2M18442845+4651265 & $4659 \pm 5$ & $2.559 \pm 0.010$ & $\pn0.042 \pm 0.014$ & $-0.046   \pm 0.013$ & $\cdots$ \\
+2M18524613+4745349 & $3949 \pm 2$ & $1.483 \pm 0.006$ & $\pn0.216 \pm 0.010$ & $-0.034   \pm 0.010$ & $\cdots$ \\
+2M18464037+4816449 & $4730 \pm 4$ & $2.621 \pm 0.009$ & $\pn0.372 \pm 0.013$ & $\pn0.204 \pm 0.013$ & $\cdots$ \\
+2M18515439+4809330 & $4786 \pm 6$ & $2.601 \pm 0.013$ & $\pn0.009 \pm 0.017$ & $-0.208   \pm 0.016$ & $\cdots$ \\
+\hline
 \end{tabular}
-\caption{All 17-labels (and associated errors) for XX,XXX \apogee\ giant stars using the regularized model. Positions and ancillary measurements from \aspcap\ are included for convenience.  This table is online-only. A portion is shown to indicate form and content.}
+\caption{All 17-labels for 96,514 \apogee\ giant stars using the regularized model. Positions and ancillary measurements from \aspcap\ are included for convenience. Only formal errors are listed here. See text for full details regarding the known error budget.  This table is online-only. A portion is shown here to indicate form and content.}
 \label{tab:the-good-stuff}
 \end{table*}
 

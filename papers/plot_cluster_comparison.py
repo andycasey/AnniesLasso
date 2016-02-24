@@ -59,11 +59,18 @@ def plot_cluster_comparison(data, cluster_name, membership, x_elements,
     suffix = tc_suffix if used_cannon_for_target_selection else aspcap_suffix
     top_ax.scatter(
         data["VHELIO_AVG"][candidates], data["FE_H" + suffix][candidates], 
-        facecolor=candidate_color, label=r"$\texttt{{FIELD = {0}}}$".format(cluster_name),
+        facecolor=candidate_color, rasterized=True,
+        label=r"$\texttt{{FIELD = {0}}}$".format(cluster_name),
         **candidate_kwds)
     top_ax.scatter(
         data["VHELIO_AVG"][membership], data["FE_H" + suffix][membership], 
-        facecolor=membership_color, **membership_kwds)
+        facecolor=membership_color, rasterized=True, **membership_kwds)
+    top_ax.errorbar(
+        data["VHELIO_AVG"][membership], data["FE_H" + suffix][membership],
+        xerr=data["VERR"][membership], yerr=data["E_FE_H" + suffix][membership],
+        rasterized=True, 
+        fmt=None, ecolor="k", zorder=-1)
+
 
     N, M = len(data["VHELIO_AVG"][candidates]), len(data["VHELIO_AVG"][membership])
     top_ax.text(0.05, 0.95, r"${:,}$".format(N), color=candidate_color,
@@ -103,30 +110,65 @@ def plot_cluster_comparison(data, cluster_name, membership, x_elements,
         for i, (mask, color) \
         in enumerate(zip((candidates, membership), (candidate_color, membership_color))):
 
+            xerr, yerr = None, None
             if "," in element_x:
                 x = 0
+                xerr = 0
                 for each in element_x.split(","):
                     x += data["{0}_H{1}".format(each.upper(), tc_suffix)]
+                    xerr += data["E_{0}_H{1}".format(each.upper(), tc_suffix)]**2
+
                     if x_wrt_fe:
                         x = x - data["FE_H{}".format(tc_suffix)]
+
+                if x_wrt_fe:
+                    xerr += data["E_FE_H{0}".format(tc_suffix)]**2
+                xerr = np.sqrt(xerr)
+
             else:
                 x = data["{0}_H{1}".format(element_x.upper(), tc_suffix)]
                 if x_wrt_fe:
                     x = x - data["FE_H{}".format(tc_suffix)]
+                    xerr = (
+                        data["E_{0}_H{1}".format(element_x.upper(), tc_suffix)]**2 + \
+                        data["E_FE_H{0}".format(tc_suffix)]**2)**0.5
+                
+                else:
+                    xerr = data["E_{0}_H{1}".format(element_x.upper(), tc_suffix)]
+                
 
             if "," in element_y:
                 y = 0
+                yerr = 0
                 for each in element_y.split(","):
                     y += data["{0}_H{1}".format(each.upper(), tc_suffix)]
+                    yerr += data["E_{0}_H{1}".format(each.upper(), tc_suffix)]**2
+
                     if y_wrt_fe:
                         y = y - data["FE_H{}".format(tc_suffix)]
+
+                if y_wrt_fe:
+                    yerr += data["E_FE_H{}".format(tc_suffix)]**2
+                yerr = np.sqrt(yerr)
+
             else:
                 y = data["{0}_H{1}".format(element_y.upper(), tc_suffix)]
                 if y_wrt_fe:
                     y = y - data["FE_H{}".format(tc_suffix)]
+                    yerr = (
+                        data["E_{0}_H{1}".format(element_y.upper(), tc_suffix)]**2 + \
+                        data["E_FE_H{0}".format(tc_suffix)]**2
+                        )**0.5
+                else:
+                    yerr = data["E_{0}_H{1}".format(element_y.upper(), tc_suffix)]
+
 
             kwds = candidate_kwds if i == 0 else membership_kwds
-            axes[2*j + 2 + 1].scatter(x[mask], y[mask], facecolor=color, **kwds)
+            axes[2*j + 2 + 1].scatter(x[mask], y[mask], facecolor=color, rasterized=True, **kwds)
+            if xerr is not None and yerr is not None and color == membership_color:
+                axes[2*j + 2 + 1].errorbar(x[mask], y[mask],
+                    xerr=xerr[mask], yerr=yerr[mask], 
+                    fmt=None, ecolor="k", zorder=-1, rasterized=True)
 
             # Quote the number of points.
             axes[2*j + 2 + 1].text(0.05, 0.95 - i * 0.10, r"${:,}$".format(len(x[mask])),
@@ -181,7 +223,7 @@ def plot_cluster_comparison(data, cluster_name, membership, x_elements,
                     y = y - data["FE_H{}".format(aspcap_suffix)]
 
             kwds = candidate_kwds if i == 0 else membership_kwds
-            axes[2*j + 2].scatter(x[mask], y[mask], facecolor=color, **kwds)
+            axes[2*j + 2].scatter(x[mask], y[mask], facecolor=color, rasterized=True, **kwds)
 
             N = sum((tc_xlims[1] > x[mask]) * (x[mask] > tc_xlims[0]) \
                   * (tc_ylims[1] > y[mask]) * (y[mask] > tc_ylims[0]))
@@ -237,11 +279,10 @@ if __name__ == "__main__":
         data
     except:
 
-        data = fits.open(
-            "/Users/arc/research/apogee/results-unregularized/results-unregularized-matched.fits")[1].data
+        catalog = Table.read("../tc-cse-regularized-apogee-catalog.fits.gz")
+        ok = catalog["OK"] * (catalog["R_CHI_SQ"] < 3)
+        data = catalog[ok]
 
-        use = data["physical"]
-        data = data[use]
 
 
     """
@@ -257,6 +298,17 @@ if __name__ == "__main__":
     M54SGRC1 386
     M5PAL5 317
     """
+
+
+    # M 15
+    M15_members = (data["FIELD"] == "M15") \
+                * (data["VHELIO_AVG"] > -130) * (data["VHELIO_AVG"] < 80) \
+                * (data["FE_H"] < -1.7)
+    
+    M15_figure = plot_cluster_comparison(data, "M15", M15_members, 
+        ["C", "O", "Mg", "Ca", "Fe"], ["N", "Na", "Al", "S", "C,N,O"],
+        vel_lim=(-400, 150))
+    M15_figure.savefig("M15_comparison.pdf", dpi=300)
 
 
     # M13
@@ -289,15 +341,6 @@ if __name__ == "__main__":
     M53_figure.savefig("M53_comparison.pdf", dpi=300)
 
 
-    # M 15
-    M15_members = (data["FIELD"] == "M15") \
-                * (data["VHELIO_AVG"] > -130) * (data["VHELIO_AVG"] < 80) \
-                * (data["FE_H"] < -1.7)
-    
-    M15_figure = plot_cluster_comparison(data, "M15", M15_members, 
-        ["C", "O", "Mg", "Ca", "Fe"], ["N", "Na", "Al", "S", "C,N,O"],
-        vel_lim=(-400, 150))
-    M15_figure.savefig("M15_comparison.pdf", dpi=300)
         
 
     # M 3

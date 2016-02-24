@@ -8,7 +8,7 @@ from matplotlib.ticker import MaxNLocator
 from astropy.table import Table
 
 
-catalog = Table.read("/data/arc/research/apogee/regularized-results/catalog.fits")
+catalog = Table.read("../tc-cse-regularized-apogee-catalog.fits.gz")
 
 fill_color = "#CCCCCC"
 
@@ -18,7 +18,7 @@ xlim = (0, 10)
 bins = np.linspace(xlim[0], xlim[1], N_bins)
 
 fig, ax = plt.subplots()
-y, bin_edges, _ = ax.hist(catalog["r_chi_sq"], bins=bins, facecolor="#666666", edgecolor="k",
+y, bin_edges, _ = ax.hist(catalog["R_CHI_SQ"], bins=bins, facecolor="#666666", edgecolor="k",
     histtype="step", lw=2)
 
 x = np.diff(bin_edges)[0]/2. + bin_edges[:-1]
@@ -29,7 +29,7 @@ x2 = np.append(x2, x2.max() + xstep[-1])
 x2 -= xstep /2.
 
 
-y2 = np.repeat(foo[0], 2)
+y2 = np.repeat(y, 2)
 ax.fill_between(x2, np.zeros_like(y2), y2, where=np.ones_like(y2),
     color=fill_color,
     zorder=-1)
