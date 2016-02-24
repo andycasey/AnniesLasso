@@ -64,9 +64,11 @@ def plot_sparsity(models, scale_factor, color="k", percent=True, label=None,
         # Y
         ax.semilogy()
         if ax.is_first_col():
-            ax.set_ylabel(r"$\rm{Sparsity}$ $(\%)$")
+            ax.set_ylabel(r"$\rm{Matrix}$ $\rm{density}$ $(\%)$")
         ax.set_title(S_labels[i])
 
+
+        ax.axhline(100, c="k", lw=1.0, linestyle=":", zorder=-1)
 
     return fig
 
@@ -97,8 +99,8 @@ if __name__ == "__main__":
             color=color, s=50)
             
     # Joint things for prettyness.
-    fig.axes[-1].set_ylim(0.1, 100)
-    fig.axes[-1].set_xlim(fig.axes[-1].get_xlim()[0], 10**5.5)
+    fig.axes[-1].set_ylim(0.1, 150)
+    fig.axes[-1].set_xlim(10**(-0.5), 10**5.5)
     
     fig.tight_layout()
 
@@ -117,6 +119,5 @@ if __name__ == "__main__":
     fig.subplots_adjust(right=0.88)
     
     fig.savefig("papers/sparsity.pdf", dpi=300)
-    fig.savefig("papers/sparsity.png", dpi=300)
-
+    
 
