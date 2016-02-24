@@ -99,52 +99,50 @@ previously reported.  We deliver 17 labels with associated errors for
 
 \section{Introduction}
 The detailed chemical composition of a star's photosphere reflects 
-the formation environment when that star was born, and any supernovae that 
-preceded it.  This photospheric \emph{chemical fingerprint} largely remains 
+the formation environment when that star was born, and the mix of supernovae that 
+preceded it.  This photospheric \emph{chemical fingerprint} remains largely
 unchanged throughout a star's lifetime, providing a fossil record of 
 local star-formation history.  Although the differences in detailed chemical
 abundances may be subtle between two formation sites, if stars could be linked
 to their natal gas cloud by their chemical fingerprint, a sufficiently large
-collection of precise stellar abundances would unambiguously unravel the
+collection of precise stellar abundances would unravel the
 complete chemical evolution of the Milky Way. 
 
 
-This goal has only recently become feasible given the increasing volume and 
+This goal has only recently become feasible with the increasing volume and 
 quality of stellar spectra obtained in the last decade.  Specifically, large 
 surveys are obtaining high-resolution ($\mathcal{R} \gtrsim 20,000$), high 
 signal-to-noise (S/N) ratio spectra for $\sim10^5$---$10^6$ stars across all 
-components of the Galaxy.  This is a sharp relative increase in data volume, 
-which has mandated the automation of spectral analysis, and encouraged dozens of
+components of the Galaxy \citep{GES,GALAH,APOGEE}.  This is a sharp relative increase in data volume; it has mandated the automation of spectral analysis, and encouraged dozens of
 groups to produce bespoke pipelines.
 
 
 Most automated pipelines have grown from classical, manual methods.  There has 
 been relatively little work on unconventional methods to analyse spectra.  
-Spectroscopists have instead sought to hard-code their experience (or subjectivity), 
-with arbitrary heuristics enforced for wavelength masks, convergence criteria, 
-and similar analysis issues.  Most of these decisions are based on optimizing 
-the resultant accuracy for a few stars with good quality data (e.g., solar-like
+Spectroscopists have instead sought to code their experience (or subjectivity), 
+with heuristics enforced for wavelength masks, convergence criteria, 
+and similar analysis issues.  Most of these decisions are based on the optimization of accuracy for particular stars with good quality data (e.g., Solar-like
 stars with high S/N ratios).  As a consequence, these heuristics are frequently 
 incompatible for data with more modest (and representative) S/N ratios.  Indeed, 
 it can be shown from repeat or blind experiments that traditional pipelines 
 routinely yield imprecise abundances for noisy data.  Moreover, individual 
-pipelines vary significantly to each other, with differences an order of 
+pipelines vary significantly from one to another, with differences an order of 
 magnitude larger than what state-of-the-art spectroscopic studies seek to 
 measure (e.g., the effects of atomic diffusion, evolutionary mixing, planetary
 accretion).  Thus, while there has been substantial effort in automating 
 classical analysis techniques, they are generally imprecise at modest S/N 
-ratios, and frequently yield inaccurate results.
+ratios, and frequently yield inaccurate (biased) results.
 
 
-Considerable efforts have also been spent on improving the accuracy of physical
-models.  Indeed it is impossible to measure physical properties of stars (or 
+Considerable efforts have  been spent on improving the accuracy of physical
+models of stars.  Indeed it is impossible to measure physical properties of stars (or 
 their chemical abundances) accurately without accurate physical models of 
 stellar spectra.  However physics-based models of stars have a number of known
-problems.  The atmospheres are one-dimensional approximations.  
+problems:  The atmospheres are one-dimensional approximations.  
 Three-dimensional models remain computationally impractical for more than just a
 few stars.  As a consequence of the limited atmosphere dimensionality, crude 
 (knowingly incorrect) approximations for the convection are 
-necessary.  Although grids of three-dimensional hydrodynamic models have been 
+necessary.  Although some grids of three-dimensional hydrodynamic models have been 
 produced and averaged to one-dimensional approximations, these models assume 
 local thermodynamic equilibrium (LTE).  Properly accounting for departures from 
 LTE is a formidable analytic and computational challenge.  Lastly, while 
@@ -152,31 +150,19 @@ laboratory efforts have thoroughly improved much of the faulty atomic and
 molecular data, this process is unquestionably incomplete.  For these reasons 
 there are some spectral features that are much better understood than others.  
 As a consequence, physics-based methods are restricted to spectral regions and
-parameter spaces that are understood marginally better, which vastly limits 
+parameter spaces that are understood marginally better, which limits 
 their applicability and interpretability \emph{by construction}.
 
 
-In detail, physics-based models do not explain all pixels of stellar 
-spectroscopy at the precision with which we are currently observing.  The data
-quality have outgrown the classical methods used to analyse them.  This led to 
+In detail, physics-based models do not explain all pixels of a stellar 
+spectrum at the precision with which we are currently observing.  The data
+quality have outgrown the classical methods used to analyse them.  This led to the creation of
 \TheCannon\footnote{It is important (to us) to note that \TheCannon\ is named 
 not after a weapon but instead after Annie Jump Cannon, who was the first to 
 correctly order stellar spectra in temperature order \citep[and who did
-so by looking at the data, and without any use of physics-based models, see][]
+so by looking at the data, and without any use of physics-based models, see, e.g.,][]
 {Cannon_1912}.} (\citealt{tc}), a data-driven---as opposed to 
-physics-based---model for stellar spectra.  \TheCannon\ is a data-driven model, 
-but it differs from standard machine-learning approaches because it contains an 
-explicit noise model.  This means that \TheCannon\ can transfer labels from high
-S/N training set stars to low S/N test-set stars; that is, the training set and
-the test set do not need to be statistically identical.  This is related to the
-fact that \TheCannon\ is an interpretable model; the internals of the model are 
-the dependencies of the spectral expectation and variance on wavelength and 
-physical parameters of the star.  Given a representative set of stars with known
-labels of high-fidelity, \TheCannon\ provides a generative model for stellar 
-spectra based on a linear combination of the labels.  
-
-
-%DWH: Cite some relevant literature.
+physics-based---model for stellar spectra. 
 
 
 Before we continue to introduce background on this work, we first need to
@@ -185,10 +171,26 @@ parameters ($\Teff$ and $\logg$) and the full set of 15 chemical abundances
 collectively ``labels''.  This unifies and collapses the phrase ``stellar
 parameters and chemical abundances'' to a word, and connects to relevant 
 terminology for supervised methods in the machine-learning and statistics 
-literatures.  
+literatures.  \TheCannon\ uses spectra from stars that have labels known
+with high fidelity to train a model for stellar spectra.  The trained model can
+then be used to tested on new data, and precisely estimate labels.
 
 
-\TheCannon\ offers opportunities to reconcile known problems with physics-based 
+  \TheCannon\ is a data-driven model, 
+but it differs from standard machine-learning approaches because it contains an 
+explicit noise model.  This means that \TheCannon\ can transfer labels from high
+S/N training-set stars to low S/N test-set stars; that is, the training set and
+the test set do not need to be statistically identical.  This is related to the
+fact that \TheCannon\ is an interpretable causal model; the internals of the model are 
+the dependencies of the spectral expectation and variance on wavelength and 
+physical parameters of the star, plus an explicit noise model.  Given a representative set of stars with known
+labels of high-fidelity, \TheCannon\ provides a generative model for stellar 
+spectra based on a non-linear combination of the labels.  
+
+
+
+While a physical model is required to construct an acceptable training set for
+\TheCannon\ to use, \TheCannon\ also offers opportunities to reconcile known problems with physics-based 
 models.  It provides labels for training set data at wavelengths where there is
 limited or missing atomic information, allowing for every pixel to contribute in 
 measuring labels from noisy stars.  If there is a sufficient
@@ -200,9 +202,8 @@ a first step towards using \TheCannon\ to improve physics-based models.
 
 
 Only a small number of labels were used in the first work with \TheCannon: 
-three in the original work, and four or five in later work \citep{tc, age}. 
-Here we were guided by thoughts related to density estimation. As the length of 
-the label list $K$ grows, so too does the model complexity.  Sampling well a 
+three in the original work, and four or five in later work \citep{tc, age, Ho_2016}. 
+Here we were guided by thoughts related to density estimation. Sampling well a 
 $K$-dimensional label space takes a training set the size of which scales 
 exponentially (or worse) with $K$.  Subsequent experiments, however, did not 
 bear this out.  We found that we can transfer many labels from the training set 
@@ -210,29 +211,25 @@ to the test set, with training sets of (just) thousands of stars.  The fundament
 reason is that \TheCannon\ is \emph{not} a density estimator.  It is more like 
 an \emph{interpolator}, which effectively finds stars in the training set that
 are close to the test star, and transfers labels, using the smooth polynomial 
-model as a kind of regularizer.
+model as a smooth interpolation function.
 
 
-% DWH: Should we be saying things about the fact that the model is probabilistic?
-% It takes as input stellar labels and gives as output a pdf for stellar spectra?
-
-
-The capacity to extend to a larger set of $K$ labels without significant
+The capacity to extend to a larger set of labels without significant
 computational detriment offers tantalizing opportunities.  The most 
-straightforward would be to include abundances of individual elements as labels.
+straightforward is that it provides a measurement of many elemental abundances.
 However in doing so, it can be shown that a standard \emph{Cannon} model yields
-coefficients (spectral derivatives; see next section) that are incompatible with 
-expectations from physics: there may be an abundance label with non-zero 
-contributions at all pixels, however physically we know that spectral lines of a
-single element do not contribute at all wavelengths. 
+noisy coefficients (spectral derivatives; see next Section) that are incompatible with 
+expectations from physics: the training step may imply that there is an abundance label with non-zero 
+contributions at all pixels, however physically we know that spectral lines of most
+elements do not contribute at all wavelengths. 
 
 
-For this reason alone we know that the problem is sparse.  Here we exploit this 
-information to the fullest, using standard regularization methods to discover
+For this reason alone we know that the problem ought to be sparse.  Here we exploit this 
+knowledge to the fullest, using standard regularization methods to discover
 and enforce sparsity.  We consider the \emph{entire} 17-dimensional label space 
 produced by the \apogee\ \aspcap\ pipeline.  We accept the \aspcap\ labels for 
-a subset of the highest S/N stars, and adopt these stars and their labels as the
-labelled set.  We show by validation that we can transfer these labels to much 
+a subset of the highest S/N stars, and adopt these stars and their labels as a
+reliable training set.  We show by validation that we can transfer these labels to much 
 lower S/N stars, with reduced precision but no strong biases.  We then use the
 system to label all of the stars in the \apogee\ \dr\ data set.  After
 validating our model, we confirm our abundance precision using tests of globular
