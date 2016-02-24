@@ -241,8 +241,7 @@ clusters.
 
 Before we outline our assumptions, we need to define the different data sets we
 will use, and terminology related to our method. Consider a stellar spectroscopic
-survey.  Within the survey data is a set of stars observed in high S/N and it 
-can be reliably asserted that the labels for those stars with are known with high
+survey.  Consider that within the survey data is a set of stars observed in high S/N, where the labels for those stars are known with high
 fidelity.  We call this sample the \emph{labelled set}, and all other stars
 are set aside into the \emph{unlabelled set}.  Note that there may be labels
 reported for stars in the \emph{unlabelled set}, but the implicit assumption is
@@ -250,7 +249,7 @@ that those labels are not known with high fidelity.  We are going to construct
 (train) \TheCannon\ using a subset of the labelled set, allowing us to 
 \emph{predict} stellar fluxes and \emph{measure} (test) labels for stars in the 
 unlabelled set.  It is important to note that we do not use every star in the
-labelled set for training: here we wil define the \emph{training set} as a random
+labelled set for training: here we will define the \emph{training set} as a random
 subset of the labelled set.  All stars in the labelled set that are not part of 
 the training set will form the \emph{validation set}, which we will use to 
 \emph{validate} the predictive power of our model.
@@ -265,6 +264,8 @@ The expectation of the spectrum of a star is a smooth function of the values of
 the labels for that star.  Further than this, we assume that the function is so 
 smooth it is reasonably approximated with a quadratic form in label space.
 \item
+The \apogee\ reported noise variances are (nearly) correct.
+\item
 The resolution of all \apogee\ spectra are identical, all spectra are calibrated
 to the same rest wavelength grid, the noise is Gaussian and independent from 
 pixel to pixel (with correctly known variances at the pixel level).  
@@ -275,6 +276,8 @@ We have a training set of stars with accurate labels, where ``accurate'' is
 defined by the accuracy requirements of the output labels.  It might be more 
 appropriate to say that we are assuming that the training set stars have 
 \emph{consistent} labels (consistent with the assumptions of smoothness, above).
+%% DWH CLARIFICATION ON HOGG-7.png image
+
 \item
 The training set is representative, in the sense that the training set stars 
 span the label space similarly to how any test or prediction set spans the label
@@ -284,7 +287,7 @@ We assume our continuum normalization procedure (described below) is consistent.
 We do not require ``true'' continuum-normalization in the classical sense 
 because any offset (even a label-dependent residual due to a strong absorption
 line) can be captured by the model.  Instead we require that our normalization
-procedure is invariant with respect to S/N ratios.
+procedure is invariant as S/N decreases.
 \end{itemize}
 
 
@@ -414,12 +417,14 @@ with $j$ we mean ``the $D$-vector of parameters associated with wavelength pixel
 $j$''; when we subscript $\theta$ with $d$ we mean ``the single parameter along 
 coordinate axis $d$ in the $D$-dimensional $\vectheta$ vector space.} There is
 a great deal of theory about this kind of regularization; it is called L1 or the
-LASSO (DWH CITE STUFF).  L1 regularization encourages parameters to vanish 
+LASSO \citep{Tibshirani_1996}.  L1 regularization encourages parameters to vanish 
 precisely but doesn't break convexity for convex problems.  It is important to
 note that the scale factor $f$ plays into the regularization, because as the 
 scale factor grows, the more penalized the cross (quadratic) terms become 
-relative to the linear terms.  We will heuristically set the hyper-parameters
+relative to the linear terms.  We will heuristically set the values of the hyper-parameters
 $\Lambda$ and $f$ by validation in Section \ref{sec:hyper-parameter-validation}.
+%% ARC CLARIFY WITH HOGG ON HOGG-8.PNG
+
 
 
 %DWH: Scaling argument that, in general, the best value of $\Lambda_j$
@@ -431,12 +436,11 @@ $\Lambda$ and $f$ by validation in Section \ref{sec:hyper-parameter-validation}.
 \label{sec:training-set}
 
 
-We employ the \apogee\ Data Release 12 data to demonstrate the effectiveness of
+We employ the \apogee\ Data Release 12 data \citep{SDSS_DR12} to demonstrate the effectiveness of
 a regularized \emph{Cannon} model in high-dimensional label space.  We 
 constructed the labelled set using sensible criteria for stars analysed with 
-version \texttt{v603} of the \aspcap\ pipeline \citep{Holtzman_16,Garcia_Perez_2016}.  We employed several quality 
-criteria to distill a robust yet representative labelled set: We first removed 
-any stars with problematic flags from the \aspcap\ pipeline, requiring 
+version \texttt{v603} of the \aspcap\ pipeline \citep{Holtzman_16,Garcia_Perez_2016}.  We first removed 
+any stars with problematic flags from the \aspcap\ pipeline, i.e., we required 
 \texttt{ASPCAPFLAG~=~0}.  We excluded stars with S/N ratios outside the range of
 200-300, and stars with a radial velocity scatter larger than 1~km~s$^{-1}$.  We
 further demanded that our training set include reported abundances in all 15 
@@ -452,28 +456,28 @@ labelled set, with [Fe/H] labels ranging from $\mathrm{[Fe/H]} = -2.10$ to
 
 
 We randomly assigned each star in the labelled set a uniformly-distributed 
-integer $q$ between 0 and 9, inclusive.  We assign stars with $q > 0$ as 
-belonging to the training set, and those with $q = 0$ will form the validation 
-set.  We have ensured that the same $q$ integer was assigned to each star 
-between the different experiments described below.  The training set (Figure
+integer $q$ between 0 and 9, inclusive.  We assign stars with $q > 0$
+ to the \emph{training set}, and those with $q = 0$ to the \emph{validation set}
+ We have ensured that the same $q$ integer was assigned to each star 
+between the different experiments described below.  The training set (see Figure
 \ref{fig:training_set_hrd}) comprises 12,681 red giant branch stars, and the 
 validation set includes 1,460 stars.
 
 
 Here we describe the requisite data processing steps before we can train the 
 spectral model.  The \apogee\ \texttt{apStar} files contain rest-wavelength, 
-resampled fluxes from individual visits for a given star, and an error array for
+resampled fluxes from individual visits for a given star, and an uncertainty array for
 those fluxes.  Although the \texttt{aspcapStar} files contain stacked, 
 pseudo-continuum normalized spectra for a given star, we chose to only use the 
 fluxes from the \texttt{apStar} data files throughout this work.  Our reasoning 
-is as follows: The \aspcap\ pipeline uses a running filter window to determine 
-the continuum.  For this reason it is provably variant with the S/N ratio: at 
+is as follows: The \aspcap\ pipeline uses a running quartile filter window to determine 
+the continuum.  For this reason it is provably variant with the S/N ratio (biased at low S/N): at 
 low S/N ratios the inferred continuum will be systematically shifted with 
 respect to the same star observed in high S/N.  Although our labelled set only 
 includes high S/N spectra, our results would suffer if we employed the \aspcap\ 
 normalization procedure for low S/N spectra in the \emph{test set}.  Thus, we 
 opted to normalize and stack the fluxes from individual visits provided in the 
-\texttt{apStar} files.
+\texttt{apStar} files. Our normalization procedure is described below.
 
 
 Individual spectra in the \texttt{apStar} files contain associated error arrays
@@ -483,8 +487,10 @@ in a single observation also contains a bitmask flag that documents potential
 issues.  Although pixels are flagged, these issues are not reflected in the
 error arrays of individual observations.  For this reason we chose to construct
 an (adjusted) inverse variance array that encapsulates the implied additional 
-uncertainty in flagged pixels.  Specifically for flagged pixels we set the error
+uncertainty in flagged pixels.  Specifically for pixel with index $j$, if it is flagged, we set the error
 array such that:
+
+%% ARC SAY MORE ABOUT THE LIMITS HERE AS PER HOGG-9
 
 
 \begin{equation}
@@ -513,7 +519,7 @@ wavelength regions 15090--15822~\AA, 15823--16451~\AA, and 16452--16971~\AA.
 We distilled a list of continuum pixels \citep[following the initial 
 identification in][]{tc}, and for each region in all observations we fit
 the continuum-pixel fluxes as a sum of sine and cosines with $L = 1400$ and 
-$W = 3$:
+$W = 3$, solving for amplitudes $A$ in:
 
 \begin{equation}
 y_j = \sum_{w=0}^{W} A_{2w}\sin{\left(\frac{2w\pi\lambda_{j}}{L}\right)} + A_{(2w+1)}\cos{\left(\frac{2w\pi\lambda_{j}}{L}\right)}.
@@ -530,7 +536,7 @@ the continuum function demonstrates large wiggles.
 
 
 The approach we have described is \emph{pseudo}-continuum normalization.  While 
-our choice of continuum pixels is well-informed, our 
+our choice of continuum pixels is well-informed \citep{tc}, our 
 procedure does not require that the chosen pixels to indeed be ``true'' continuum
 pixels.  This is advantageous.  The continuum pixels could be randomly selected; 
 our approach would be equally effective as long as the same pixels were always
@@ -546,12 +552,12 @@ continuum effects.
 For all of the aforementioned reasons (invariance with respect to S/N, bounded
 functions, linear operations, and repeatability between spectra), we emphasize
 that if traditional continuum methods are employed, \TheCannon\ will (likely) 
-give \emph{very bad results}.  Adopting a robust continuum normalization 
+give \emph{very bad results}.  Adopting a linear continuum normalization 
 procedure is paramount.  After normalizing all individual spectra in the
 \texttt{apStar} files, we re-stacked the spectra using the (adjusted) inverse
 variance of each pixel as weights.  Therefore for all stars observed by \apogee,
 we have normalized individual and combined spectra, allowing for a 
-self-consistent examination of label determination at low S/N (e.g., Section
+self-consistent examination of label determination at low S/N (see Section
 \ref{sec:label-recovery-snr}).
 
 
@@ -566,16 +572,15 @@ self-consistent examination of label determination at low S/N (e.g., Section
 In the simplest case we have two hyper-parameters that need to be determined: 
 $\Lambda$ and $f$.  The strength of the regularization (at all pixels) is set 
 by $\Lambda$, and the scale factor $f$ controls the scaling on individual 
-labels.  In practice large $\Lambda$ values encourage zero coefficients (unless
-it is well-fit by the data) and thus enforces sparsity.  High scale factor $f$
-values act to penalize cross-terms more than linear labels, and produce sparse
+labels.  In practice large $\Lambda$ values encourage zero coefficients and thus enforces sparsity.  High scale factor $f$
+values act to penalize cross-terms (e.g., $\Teff\cdot$[Mn/H], [Al/H]$\cdot$[Si/H]) more than linear labels, and produce sparse
 models as a consequence.  Because these hyper-parameters act in conjunction 
 with each other, we need to explore many combinations of $\Lambda$ and $f$.
 
 
 Here we use the labelled set described in the previous section to perform a
 grid search with different values of $\Lambda$ and $f$.  Specifically we vary 
-$\Lambda$ in logarithmic steps from $10^0$ to $10^5$, and linearly increase the 
+$\Lambda$ in logarithmic steps from $10^0$ to $10^5$, and increase the 
 scale factor $f$ from 0.5 to 50.  For each combination of $\Lambda$ and $f$ we 
 trained the full 17-label model using the training set (the $\sim$90\% random
 subset of the labelled set) and measured labels for all spectra in the
@@ -589,9 +594,7 @@ will inevitably rise at very high $\Lambda$ values.
 We must chose heuristic(s) to select an appropriate regularization and scale
 factor.  Many metrics are available to us: the predictive power in spectral
 fluxes (e.g., the $\chi^2$ or test scalar for the validation set), the 
-recovered precision in labels at low S/N, or simply opting to maximize the 
-model sparsity.  In practice these metrics must be balanced if we want a 
-sparse, interpretable model that yields precise labels from noisy data.
+recovered precision in labels at low S/N, or something that balances goodness of fit and sparsity.
 
 
 We define the model sparsity as the percent of zero-value spectral derivatives 
@@ -1214,6 +1217,8 @@ D., Lawler, J.~E., et al.\ 2015, \apjs, 221, 24
 Shetrone, M.~D., et al.\ 2013, \apj, 765, 16 
 
 \bibitem[Taylor(2005)]{Taylor_2005} Taylor, M.~B.\ 2005, Astronomical Data Analysis Software and Systems XIV, 347, 29 
+
+\bibitem[Tibshirani(1996)]{Tibshirani_1996} Tibshirani, R.\ 1996, Journal of the Royal Statistical Society. Series B (Methodological), 58, 267-288
 
 \bibitem[van der Walt et al.(2011)]{van_der_Walt_2011} van der Walt, S., Colbert S.~C., Varoquaux, G.\ 2011, The NumPy Array: A Structure for Efficient Numerical Computation, Computing in Science \& Engineering, 13, 22-30
 
