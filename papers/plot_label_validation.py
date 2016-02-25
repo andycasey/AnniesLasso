@@ -89,7 +89,8 @@ axes[0].yaxis.set_major_locator(MaxNLocator(3))
 
 
 
-
+limits = np.array([[axes[1].get_xlim(), axes[1].get_ylim()]]).flatten()
+limits = (min(limits), max(limits))
 axes[1].set_xlim(limits)
 axes[1].set_ylim(limits)
 axes[1].plot(limits, limits, c="#666666", ls="--", zorder=-1)
