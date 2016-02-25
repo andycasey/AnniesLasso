@@ -1,27 +1,12 @@
 %% This file is part of the Annie's Lasso project.
-%% Copyright 2015 the authors.  All rights reserved.
-
-% To-Do
-% -----
-% - make full outline
-% - get to zeroth draft
-% - audit for usage of vector and list
-% - search for all occurrences of DWH, AC, or MKN in the text and fix them.
-% - audit 'test-set star', 'training-set star', etc. should X-set be hyphenated in these circumstances?
-% - audit: sparsity definition
-% -audit: image filenames, the scripts to produce them, and the ref:tags for them.
-
-% Style Notes
-% -----------
-% - Use \acronym{NASA} for acronyms like NASA.
-% - The label list \ell is a *list*; the vectorization v(ell) is a *vector*.
-
+%% Copyright 2015-2016 the authors.  All rights reserved.
 
 % Showcase: a globular cluster,
 %			our label recovery w.r.t S/N,
 %			sparsity w.r.t. Lambda, and
 %			our (interpret)ability to identify missing lines
-%@arxiver{M15_comparison.pdf,validation-label-recovery.pdf,sparsity.pdf,sparse-first-order-coefficients.pdf}
+%@arxiver{M15_comparison.pdf,validation-label-recovery.pdf,sparsity.pdf,line-identification.pdf}
+
 \documentclass[12pt,preprint]{aastex}
 \usepackage{amsmath,amssymb}
 
@@ -1049,13 +1034,11 @@ exhibit significantly narrower intrinsic spreads in abundances (and their anti-c
 than previously considered.  Crucially, because the detailed chemical
 abundances reflect the star forming conditions and subsequent evolution of
 the cluster, this work is a necessary and fundamental step forward in
-understanding the formation of stars, clusters, and ultimately, the Milky Way.
-
+understanding the evolution of stars, clusters, and ultimately, the Milky Way.
 
 
 All of the code for this project is available with documentation at \url{http://thecannon.io/}.  
 We encourage open community discussion by way of GitHub issues, and code contributions through pull requests.
-This manuscript was compiled using \texttt{git} hash ARC TODO on the \texttt{master} branch.
 
 
 \acknowledgements
@@ -1261,6 +1244,7 @@ for \aspcap\ and \TheCannon\ are shown. The residuals are plotted in the top pan
 \caption{The fraction of non-zero coefficients (i.e., a measure of matrix density) for 17-label models with different hyper-parameters $\Lambda$ and $f$.  The density of the first-order coefficients are shown in the left panel, the second-order coefficients (e.g., $\Teff^2$, $\Teff\cdot\logg$, or $[\rm{Al}/\rm{H}]\cdot[\rm{Mn}/\rm{H}]$) in the middle panel, and total density (excluding the baseline spectrum coefficient $\theta_0$) in the right-hand panel.\label{fig:sparsity}}
 \end{figure}
 
+\clearpage
 
 \begin{figure}[p]
 \centering
@@ -1271,7 +1255,7 @@ that inferred from the high S/N combined spectrum.
 \label{fig:gridsearch-mad-all-elements}}
 \end{figure}
 
-
+\clearpage
 
 \begin{figure}[p]
 \centering
@@ -1280,18 +1264,7 @@ that inferred from the high S/N combined spectrum.
  \label{fig:gridsearch-test-scalar}}
 \end{figure}
 
-
-
-
-\begin{figure}[p]
-\centering
-\caption{Differences in labels from duplicate observations, compared to a unit normal histogram to test how reasonable our formal errors are.
-\label{fig:duplicate-observations}}
-\end{figure}
-
-
-
-
+\clearpage
 
 \begin{figure}[p]
 \centering
@@ -1300,8 +1273,6 @@ that inferred from the high S/N combined spectrum.
 \end{figure}
 
 \clearpage
-
-
 
 \begin{figure}[p]
 \centering
@@ -1334,6 +1305,7 @@ Markings are the same as per Figure \ref{fig:m15-comparison}.
 \label{fig:m92-comparison}}
 \end{figure}
 
+\clearpage
 
 \begin{table*}
 \centering
