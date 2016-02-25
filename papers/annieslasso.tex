@@ -742,6 +742,7 @@ stacked observations using the \texttt{APOGEE\_ID} as a unique identifier.  For
 this reason, we can use the \texttt{EXTRATARG} flag to identify repeated
 observations and examine the (dis-)agreement between our measured labels
 
+ARC: To do. This may not be feasible unless existing APOGEE QC heuristics are relaxed, but this is TBC.
 %% ARC: Do this. Report back. Sanders shows very good agreement for the 
 %%		unregularized labels.
 
@@ -759,21 +760,21 @@ observations and examine the (dis-)agreement between our measured labels
 Our experiments have demonstrated that a data-driven model for stellar spectra
 can be reliably extended to high dimensionality in label space.  We have further
 shown that the regularization hyper-parameters can be simplified to just two
-parameters that can be set heuristically.  This yields a sparse, interpretable 
+hyper-parameters that can be set heuristically.  This yields a sparse, interpretable 
 model that recovers labels with high precision at low S/N.  While this is 
-reassuring it is less relevant for our results, as all stacked \apogee\
+reassuring, it is less relevant for our results as all stacked \apogee\
 spectra for bonafide giants (see below) have $S/N \gtrsim 50$, well into the 
 regime where we are advantageously dominated by systematic uncertainties.
 
 
 We have used our regularized model to measure (test) labels of 150,677 \apogee\ 
 spectra, all normalized and stacked using by the method in Section 
-\ref{sec:training-set}.  In addition to the model being demonstrably effective,
+\ref{sec:training-set}.  In addition to the model being effective,
 the test step is very fast: our pure-\texttt{Python} implementation returned 
 \emph{17 labels for all 150,677 spectra in just 28 minutes} of wall-time 
 on a small research cluster in Cambridge.  These were free 
 and otherwise unused resources; no dedicated computing assets were required.  
-This pace is also projected to increase, as this test step did not include 
+This pace is also projected to increase, as the test step did not include 
 analytic derivatives $\delta\vectheta/\delta{}y_j$, which are now implemented
 in our open-source code for any polynomial vectorizer.  The test-step 
 optimization is not convex because the vectorizer contains
@@ -784,9 +785,8 @@ optimizations, we adopted the end result with the lowest $\chi^2$ value.
 
 
 The training set only includes giant stars, but the \apogee\ \dr\ includes 
-giants and dwarfs.  Therefore we exclude stars with 
-ARC GIVE FINAL CRITERIA BASED ON ASPCAP LABELS AND/OR CHI-SQUARED VALUE.
-The distilled sample contains XX,XXX giant stars, where we report $\Teff$,
+giants and dwarfs.  Therefore we exclude stars with $\chi_r^2 > 3$, stars without \aspcap\ labels, or stars with \aspcap\ labels outside of the bounds $5300 > \Teff > 3700$ or $\logg < 3.9$.
+The distilled sample contains 96,514 giant stars, where we report $\Teff$,
 $\logg$, and 15 abundance labels.  The distribution of $\chi^2$ values for
 all 150,677 combined spectra are show in Figure \ref{fig:chisq-test-set}.  The
 labels in the distilled sample follow expectations from stellar astrophysics,
@@ -795,7 +795,7 @@ the \aspcap\ labels include a strict cut in $\Teff$ at 3600~K, but we reliably
 recover labels beyond this boundary.  Figure \ref{fig:test-set-hrd} presents a
 few different label projections for the distilled sample, indicative of the
 boundaries and distribution of our labels.  The full complement of 17-labels
-for XX,XXX stars is provided in Table \ref{tab:the-good-stuff}, in addition
+for 96,514 stars is provided in Table \ref{tab:the-good-stuff}, in addition
 to quality metrics.  Additional data (the normalized spectra, best-fit model
 spectra, and all available optimization metrics) for every star in Table 
 \ref{tab:the-good-stuff} can be found online \citet{Zenodo}.
@@ -819,20 +819,16 @@ our labels agree excellently with \aspcap\ for stars with high S/N ratios.
 This is not the case for stars with S/N ratios below 200.  Here we present
 abundance label projections for some astrophysically interesting subsets of
 the \apogee\ sample, and show comparisons between \TheCannon\ and \aspcap.
-Our first comparison is shown in Figures \ref{fig:high-alpha-aspcap} and
-\ref{fig:high-alpha-tc}, where we have selected a sequence of stars with
+Our first comparison is shown in Figure \ref{fig:high-alpha-sequence}, where we have selected a sequence of stars with
 high [$\alpha$/Fe] abundance ratios and shown six well-behaved (precise)
 abundance labels that trace different nucleosynthetic pathways.  Points are
 coloured by their S/N ratio, and the black lines indicate density contours.
-Labels from \TheCannon\ are shown in Figure \ref{fig:high-alpha-tc}, where
-substantial structure is present, illustrative of chemical enrichment on a
-galactic (non-local) scale.
+
 
 
 Abundance projections using \aspcap\ labels of the same stars are shown
-in Figure \ref{fig:high-alpha-aspcap}.  The differences between \TheCannon\
-and \aspcap\ projections are striking, particularly in [Al/Fe], [Ni/Fe],
-and the commonly-used $\alpha$ element ratios [O/Fe] and [Mg/Fe].  Labels
+in Figure \ref{fig:high-alpha-sequence}.  The differences between \TheCannon\
+and \aspcap\ projections are striking.  Labels
 from \aspcap\ have a much larger range than those from \TheCannon,
 however nearly all stars that fill this difference in label range are those
 with low S/N ratios.  This implies that either those stars with lower S/N
@@ -842,7 +838,7 @@ Our validation tests have demonstrated that our label precision remains
 approximately constant (systematic-dominated) at $S/N \gtrsim 50$ (i.e.,
 for all combined spectra in \apogee\ \dr).  For these reasons we argue
 that the difference in abundance projections between \TheCannon\ and
-\aspcap\ for the high [$\alpha$/Fe] set are likely because \aspcap\
+\aspcap\ for low S/N stars in the [$\alpha$/Fe] set are likely because \aspcap\
 yields imprecise results for spectra with S/N below $\sim$200.  Although
 the imprecise \aspcap\ results can presumably be discarded with some 
 quality cuts, a substantial fraction of the \apogee\ sample would have
@@ -856,8 +852,8 @@ globular cluster abundance labels that would warrant its own publication.
 We encourage others to pursue this; here we comment on how our results 
 compare to \aspcap, and in the next section we will discuss how our
 results compare to existing studies on globular clusters, and our
-expectations from stellar evolution.  Here we discuss five globular
-clusters that have a considerable of bonafide members in \dr: M~3, M~13,
+expectations from stellar evolution.  Here we discuss three globular
+clusters that have a considerable of bonafide members in \dr:
 M~15, M~53, and M~92.  
 
 
@@ -908,7 +904,7 @@ cluster stars, as our results suggest much narrower intrinsic abundance
 spreads ($\sim$3-4 times smaller).
 
 
-The overall metallicities ([Fe/H] label) we find for the five globular
+The overall metallicities ([Fe/H] label) we find for the globular
 clusters examined are in satisfactory agreement with the literature.  In
 general our [Fe/H] label is more metal-rich than existing cluster
 compilations.  The difference seems to be an imprint from
@@ -950,24 +946,24 @@ constant sum abundance of these elements, consistent with recent works
 \citep{Meszaros_2015}.
 
 
-The [Mg/Fe]--[Al/Fe] signature we observe in M~13 is striking.  While this
-anti-correlation is observed in most globular clusters, it rarely 
-appears to have such a small intrinsic abundance scatter.  The signature
-can arise in extreme temperatures, where Al is produced by proton-capture
-onto Mg. The larger scatter in Al is expected: Mg is much more abundant 
-than Al, thus after a small quantity of Mg is synthesized into Al, an 
-appreciable scatter can exist in Al abundances, even if Mg remains largely
-unchanged.  Thus, the abundances here reflect detailed conditions about
-stellar interior temperatures and/or the formation environment.  
+%The [Mg/Fe]--[Al/Fe] signature we observe in M~13 is striking.  While this
+%anti-correlation is observed in most globular clusters, it rarely 
+%appears to have such a small intrinsic abundance scatter.  The signature
+%can arise in extreme temperatures, where Al is produced by proton-capture
+%onto Mg. The larger scatter in Al is expected: Mg is much more abundant 
+%than Al, thus after a small quantity of Mg is synthesized into Al, an 
+%appreciable scatter can exist in Al abundances, even if Mg remains largely
+%unchanged.  Thus, the abundances here reflect detailed conditions about
+%stellar interior temperatures and/or the formation environment.  
 
-An example
-is shown in Figure \ref{fig:gc-abundances}, where we show abundance
-ratios [C/N] against [Al/Mg] for all members of the five globular clusters
-discussed here.  M~13 and M~3 (the relatively more metal-rich clusters) 
-show similar enrichment in [Al/Mg], which is distinct to that seen in 
-the metal-poor globular clusters.  M~53, with a mean metallicity of the 
-cluster sample, shows a mild enrichment in [Al/Mg] that links the metal-poor
-and metal-rich globular cluster stars.
+%An example
+%is shown in Figure \ref{fig:gc-abundances}, where we show abundance
+%ratios [C/N] against [Al/Mg] for all members of the five globular clusters
+%discussed here.  M~13 and M~3 (the relatively more metal-rich clusters) 
+%show similar enrichment in [Al/Mg], which is distinct to that seen in 
+%the metal-poor globular clusters.  M~53, with a mean metallicity of the 
+%cluster sample, shows a mild enrichment in [Al/Mg] that links the metal-poor
+%and metal-rich globular cluster stars.
 
 
 % ARC: [C/N] vs [Al/Mg] (or [(Al+Si)/Mg] is even better) for clusters.
@@ -975,7 +971,7 @@ and metal-rich globular cluster stars.
 
 The labelled set described in Section \ref{sec:training-set} was not
 purposefully constructed to include stars in \emph{any} globular
-clusters.  We selected stars that met strict quality criteria, and
+cluster.  We selected stars that met strict quality criteria, and
 discarded stars with questionable label fidelity.  Given the
 abundance (anti-)correlations we confirm from other high-resolution
 studies, our construction of the labelled set has a number of
@@ -998,7 +994,7 @@ substantially different from the training set.
 It's also important because our measured labels have good astrophysical
 interpretations that are consistent with expectations from stellar
 evolution.  The photospheric abundances of [C/H], [N/H] and [O/Fe] 
-will change as a giant experiences CNO cycling.  This pattern is
+are expected to change as a giant star experiences CNO cycling.  This pattern is
 present in our data, and to a lesser extent it is visible in the
 \aspcap\ labels.  Whilst these abundances vary, the sum of these
 elemental abundances is expected to remain roughly constant for a
@@ -1013,7 +1009,7 @@ labels remain roughly constant for each globular cluster.
 In addition to yielding precise abundance labels, the regularized model
 we have presented is interpretable.  Machine learning techniques can be extremely
 useful, but they are frequently limited in their application because they
-usually do not have underlying components that are interpretable.  This is
+usually do not have internal components that are interpretable.  This is
 not the case for \TheCannon: the spectral coefficients $\vectheta_0$
 represent the baseline spectrum, and the first-order coefficients 
 ($\vectheta_{1-17}$ in this model) represent the spectral derivatives with
@@ -1027,10 +1023,10 @@ coefficients for [Al/H] and [K/H] peak at wavelengths that correspond to
 atomic lines already known to the \apogee\ group \citep{Smith_2013}. 
 
 
-The two black indicators in Figure \ref{fig:line-identification} correspond
+The two unmarked spectral lines in Figure \ref{fig:line-identification} correspond
 to atomic lines that are seen in \apogee\ spectra, but for which there is
 no atomic data available.  Even the element that
-is responsible for these spectral lines is unknown \citep{Shetrone_2015}.
+is responsible for these spectral lines is currently unknown \citep{Shetrone_2015}.
 Figure \ref{fig:line-identification-2} shows a zoom-in around these
 two regions, where we show \emph{all} first-order spectral derivatives and
 color [S/H] and [Al/H] as per Figure \ref{fig:line-identification}.  While
@@ -1040,7 +1036,7 @@ this (previously unknown) atomic line.  The situation is even clearer for
 the [Al/H] spectral derivatives at 16755~\AA{}.  
 
 
-We made no effort to cross-match the list of ``unknown'' spectral lines
+We made no effort to cross-match our model with the list of ``unknown'' spectral lines
 identified by the \apogee\ group.  This example presented itself
 serendipitously whilst examining the relative strengths of different
 first-order derivatives.  Indeed, the list of ``unknown spectral lines''
@@ -1073,27 +1069,19 @@ these reasons it is clear that simultaneously solving for additional rotation
 at test time would be an useful extension of this work.  
 
 
-There are other fundamental issues which relate to the underlying construction
-of \TheCannon.  \TheCannon\ is a prediction system: It is designed to predict
-the labels for stars.  It has a fundamental assumption that the training set
-is statistically identical to the prediction/test set.  If there are covariances
-in the label space---that is, if stars in the training set are high in label $X$ whenever
-they are also high in label $Y$---then there will be opportunities for 
-\TheCannon\ to get information about $Y$ from considering data aspects that 
-depend on $X$ (which, according to the training set, is reliably connected to 
-$Y$).  For this reason, we expect that in a finite training set there will
-be situations in which lines from one element are used to predict the abundance
-of another.  In practice \TheCannon\ will be predicting abundances almost
-entirely on information from other elements, highlighting the important
-distinction between measurement and prediction. Convincing examples of this
-covariant behaviour (and methods to address it) will be presented in a 
-companion paper (Ness et al., 2016, in preparation).  
+%There are other fundamental issues which relate to the underlying construction
+%of \TheCannon.  \TheCannon\ is a prediction system: It is designed to predict
+%the labels for stars.  It has a fundamental assumption that the training set
+%s statistically identical to the prediction/test set.
+% Convincing examples of this
+%covariant behaviour (and methods to address it) will be presented in a 
+%companion paper (Ness et al., 2016, in preparation).  
 
 
 Notwithstanding these issues, \TheCannon\ clearly has its place amongst
 the current methods employed to analyse stellar spectra.  Precise labels
 are returned even in the presence of noisy data, and the model internals
-are sufficiently interpretable that they can inform physics-based models.
+are sufficiently i nterpretable that they can inform physics-based models.
 Admittedly, our comparisons to the globular cluster literature suggests
 that our [Fe/H] (and other?) labels may be inaccurate in the metal-poor
 regime, an signature arising from incompleteness and inaccuracy of our
@@ -1103,11 +1091,10 @@ these purposes we care more about chemical abundance precision, not
 accuracy.
 
 
-Our precise labels have already revealed substructure and that had previously
-been overlooked \citep{Hogg_2016}, and significantly narrowed abundance
-correlations that have been key to understanding the formation of globular
-clusters.  This is only the tip of the iceberg.  And we are moving full
-steam ahead on the RMS Titanic. 
+%Our precise labels have       and significantly narrowed abundance
+%correlations that have been key to understanding the formation of globular
+%clusters.  This is only the tip of the iceberg.  And we are moving full
+%steam ahead on the RMS Titanic. 
 
 
 All of the code for this project is available with documentation at \url{http://thecannon.io/}.  Solutions to address the aforementioned issues will be
