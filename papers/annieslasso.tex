@@ -340,7 +340,9 @@ regularization, discussed below.  Although the training-step optimization
 problem will not in general be convex, we can make choices for $Q(\vectheta)$ 
 (and we will) to make the problem such that it would be convex at any fixed 
 value of $s^2$; for this reason it will tend to optimize well in most cases of 
-interest.
+interest. Convexity is extremely advantageous: it ensures that only a single
+global minima exists, implying that any reasonable optimization routine is
+guaranteed to optimize to the correct global minima (i.e., no local minima).
 
 
 The regularization parameter $\Lambda_j$ sets the strength of the 
