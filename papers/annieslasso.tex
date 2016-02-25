@@ -705,9 +705,10 @@ At $S/N \gtrsim 50$ the discrepancies in all
 labels are either flat or taper towards zero, indicating that we are dominated
 by systematics.  This is an important transition point, because \emph{stacked} spectra for all bonafide giant
 stars (Section \ref{sec:results}) have $S/N \geq 50$.  In this regime we 
-recover labels from within 0.014~dex ([Fe/H]) to 0.16~dex ([V/H]) for all 
+recover labels from within 0.01~dex ([Fe/H]) to 0.16~dex ([V/H]) for all 
 abundance labels.  The worst performance is again found for [V/H], by a factor of
-two: the second-worst label at $S/N \geq 50$ is [Na/H] with 0.08~dex. 
+two: the second-worst label at $S/N \geq 50$ is [Na/H] with 0.08~dex.  These
+values are listed for all labels in Table \ref{tab:error-floor}, where we advocate their use as a representative error floor that should be added in quadrature with the formal errors.
 
 
 It is clear that the regularized model recovers labels with good precision even
@@ -720,10 +721,6 @@ fitting, which will usually follow the $1/\sqrt{S/N}$ behaviour we see in Figure
 Unfortunately we cannot show the same comparison for \aspcap\ labels as a 
 function of S/N in Figure \ref{fig:label-recovery-snr} as \aspcap\ labels are not
 publicly available for individual visit spectra.
-
-
-% ESTIMATE BASELINE UNCERTAINTIES.
-% TODO:
 
 
 
@@ -1043,7 +1040,8 @@ We encourage open community discussion by way of GitHub issues, and code contrib
 
 \acknowledgements
 The authors warmly thank Daniel Foreman-Mackey (University of Washington),
-						 Anna Ho (Caltech), and
+						 Anna Ho (Caltech),
+						 Jason Sanders (Cambridge), and
 						 Angus Williams (Cambridge) for valuable discussions.
 						 
 This project was funded in part by
@@ -1193,7 +1191,7 @@ dashed one-to-one line is shown.
 \begin{figure}[p]
 \centering
 \includegraphics[width=0.8\textwidth]{test-step-chisq.pdf}
-\caption{Reduced $\chi^2$ values for all \apogee\ \dr\ spectra.\label{fig:chisq-test-set}}
+\caption{Reduced $\chi^2$ values for all stars (stacked spectra) in \apogee\ \dr.\label{fig:chisq-test-set}}
 \end{figure}
 
 \clearpage
@@ -1225,7 +1223,7 @@ for \aspcap\ and \TheCannon\ are shown. The residuals are plotted in the top pan
 
 \begin{figure}[p]
 \includegraphics[width=\textwidth]{line-identification.pdf}
-\caption{The normalized (to the maximum derivative value at any $\theta$) first-order spectral derivatives for [Al/H], [S/H], and [K/H] from our regularized \emph{Cannon} model. Vertical markings (and their colors) correspond to strong spectral lines used by \citet{Smith}. For the sake of clarity we only show $\theta$ values above a background threshold.\label{fig:line-identification}}
+\caption{The normalized (to the maximum derivative value at any $\theta$) first-order spectral derivatives for [Al/H], [S/H], and [K/H] from our regularized \emph{Cannon} model. Vertical markings (and their colors) correspond to strong spectral lines used by \citet{Smith_2013}. For the sake of clarity we only show $\theta$ values above a background threshold.\label{fig:line-identification}}
 \end{figure}
 
 \clearpage
@@ -1233,7 +1231,7 @@ for \aspcap\ and \TheCannon\ are shown. The residuals are plotted in the top pan
 \begin{figure}[p]
 \centering
 \includegraphics[width=\textwidth]{line-identification-zoom.pdf}
-\caption{First-order spectral derivatives (normalized to the standard deviation for that derivative) for all abundance labels centered at the \apogee\ `unknown' lines at 15235.8~\AA and 16755.6~\AA. Derivatives are shown in grey, or colored as per Figure \ref{fig:line-identification}.\label{fig:line-identification-2}}
+\caption{First-order spectral derivatives (normalized to the standard deviation for that derivative) for all abundance labels centered at the \apogee\ `unknown' lines at 15235.8~\AA\ and 16755.6~\AA. Abundance derivatives are shown in grey, or colored as per Figure \ref{fig:line-identification}.\label{fig:line-identification-2}}
 \end{figure}
 
 \clearpage
@@ -1241,7 +1239,7 @@ for \aspcap\ and \TheCannon\ are shown. The residuals are plotted in the top pan
 \begin{figure}[p]
 \centering
 \includegraphics[width=\textwidth]{sparsity.pdf}
-\caption{The fraction of non-zero coefficients (i.e., a measure of matrix density) for 17-label models with different hyper-parameters $\Lambda$ and $f$.  The density of the first-order coefficients are shown in the left panel, the second-order coefficients (e.g., $\Teff^2$, $\Teff\cdot\logg$, or $[\rm{Al}/\rm{H}]\cdot[\rm{Mn}/\rm{H}]$) in the middle panel, and total density (excluding the baseline spectrum coefficient $\theta_0$) in the right-hand panel.\label{fig:sparsity}}
+\caption{The fraction of non-zero coefficients (i.e., a measure of matrix density) for 17-label models with different hyper-parameters $\Lambda$ and $f$.  The density of the first-order coefficients are shown in the left panel, the second-order coefficients (e.g., $\Teff^2$, $\Teff\cdot\logg$, or $[\rm{Al}/\rm{H}]\cdot[\rm{Mn}/\rm{H}]$) in the middle panel, and total density (excluding the baseline spectrum coefficient $\vectheta_0$) in the right-hand panel.\label{fig:sparsity}}
 \end{figure}
 
 \clearpage
@@ -1260,7 +1258,7 @@ that inferred from the high S/N combined spectrum.
 \begin{figure}[p]
 \centering
 \includegraphics[width=\textwidth]{validation-scalar.pdf}
-\caption{The total $\chi^2$ (i.e., the \emph{test scalar}) for all validation set stars for different combinations of the hyper-parameters $\Lambda$ and $f$.
+\caption{The total $\chi^2$ (i.e., the \emph{test scalar}) relative to the $\Lambda = 10^0$ model for all validation set stars for different combinations of the hyper-parameters $\Lambda$ and $f$.
  \label{fig:gridsearch-test-scalar}}
 \end{figure}
 
@@ -1304,6 +1302,37 @@ Markings are the same as per Figure \ref{fig:m15-comparison}.
 Markings are the same as per Figure \ref{fig:m15-comparison}.
 \label{fig:m92-comparison}}
 \end{figure}
+
+\clearpage
+
+\begin{table*}
+\centering
+\begin{tabular}{lr}
+\hline
+Label & Error floor \\
+\hline
+$\Teff$ 		& 22~K \\
+$\logg$ 		& 0.03~dex \\
+$[\rm{C/H}]$ 	& 0.03~dex \\
+$[\rm{N/H}]$  	& 0.04~dex \\
+$[\rm{O/H}]$  	& 0.03~dex \\
+$[\rm{Na/H}]$ 	& 0.08~dex \\
+$[\rm{Mg/H}]$ 	& 0.03~dex \\
+$[\rm{Al/H}]$ 	& 0.06~dex \\
+$[\rm{Si/H}]$ 	& 0.03~dex \\
+$[\rm{S/H}]$	& 0.05~dex \\
+$[\rm{K/H}]$ 	& 0.07~dex \\
+$[\rm{Ca/H}]$ 	& 0.05~dex \\
+$[\rm{Ti/H}]$ 	& 0.07~dex \\
+$[\rm{V/H}]$ 	& 0.16~dex \\
+$[\rm{Mn/H}]$ 	& 0.04~dex \\
+$[\rm{Fe/H}]$ 	& 0.01~dex \\
+$[\rm{Ni/H}]$ 	& 0.03~dex \\
+\hline
+\end{tabular}
+\caption{Minimum error floor in labels, taken as the error in estimating labels for validation set stars at S/N $= 50$ (Figure \ref{fig:label-recovery-snr}).\label{tab:error-floors}}
+\end{table*}
+
 
 \clearpage
 

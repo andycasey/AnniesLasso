@@ -102,6 +102,7 @@ for i, (model_name, model_filename) in enumerate(models.items()):
 
         y = []
         for k in range(len(bin_edges) - 1):
+
             mask = (bin_edges[k + 1] > iv_snr) * (iv_snr >= bin_edges[k]) \
                  * is_repeated_enough
             if not any(mask):
