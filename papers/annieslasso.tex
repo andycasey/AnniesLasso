@@ -86,13 +86,13 @@ Survey.
 % Results
 We find that we can successfully train and use a model with 17 stellar labels.
 Validation shows that the model does a good job of inferring all 17 labels 
-(typical precision is 0.04~dex), even when we degrade the signal-to-noise by 
+(typical abundance precision is 0.04~dex), even when we degrade the signal-to-noise by 
 discarding $\gtrsim$50\% of the observing time. The model dependencies 
 make sense: the spectral derivatives with respect to abundances correlate
 with known atomic lines, and we identify elements belonging
 to atomic lines that were previously unknown.  We recover (anti-)correlations
 in abundance labels for globular cluster stars, consistent with the literature.
-We find the intrinsic spread in globular cluster abundances is 3--4 times smaller than 
+However we find the intrinsic spread in globular cluster abundances is 3--4 times smaller than 
 previously reported.  We deliver 17 labels with associated errors for 
 96,514 red giant stars, as well as open-source code to extend this work to other spectroscopic surveys.
 \end{abstract}
@@ -114,8 +114,9 @@ This goal has only recently become feasible with the increasing volume and
 quality of stellar spectra obtained in the last decade.  Specifically, large 
 surveys are obtaining high-resolution ($\mathcal{R} \gtrsim 20,000$), high 
 signal-to-noise (S/N) ratio spectra for $\sim10^5$---$10^6$ stars across all 
-components of the Galaxy \citep{GES,GALAH,APOGEE}.  This is a sharp relative increase in data volume; it has mandated the automation of spectral analysis, and encouraged dozens of
+components of the Galaxy \citep{Gilmore_2012,Zasowski_2013,De_Silva_2015}.  This is a sharp relative increase in data volume; it has mandated the automation of spectral analysis, and encouraged dozens of
 groups to produce bespoke pipelines.
+
 
 
 Most automated pipelines have grown from classical, manual methods.  There has 
@@ -211,7 +212,7 @@ bear this out.  We found that we can transfer many labels from the training set
 to the test set, with training sets of (just) thousands of stars.  The fundamental 
 reason is that \TheCannon\ is \emph{not} a density estimator.  It is more like 
 an \emph{interpolator}, which effectively finds stars in the training set that
-are close to the test star, and transfers labels, using the smooth polynomial 
+are close to the test star, and transfers labels, using a polynomial 
 model as a smooth interpolation function.
 
 
@@ -220,8 +221,9 @@ computational detriment offers tantalizing opportunities.  The most
 straightforward is that it provides a measurement of many elemental abundances.
 However in doing so, it can be shown that a standard \emph{Cannon} model yields
 noisy coefficients (spectral derivatives; see next Section) that are incompatible with 
-expectations from physics: the training step may imply that there is an abundance label with non-zero 
-contributions at all pixels, however physically we know that spectral lines of most
+expectations from physics: the training coefficients may optimize to produce 
+coefficients of abundance labels with non-zero 
+contributions at \emph{all pixels}, however physically we know that spectral lines of most
 elements do not contribute at all wavelengths. 
 
 
@@ -242,7 +244,7 @@ clusters.
 
 Before we outline our assumptions, we need to define the different data sets we
 will use, and terminology related to our method. Consider a stellar spectroscopic
-survey.  Consider that within the survey data is a set of stars observed in high S/N, where the labels for those stars are known with high
+survey.  Within the survey data is a set of stars observed in high S/N, where the labels for those stars are known with high
 fidelity.  We call this sample the \emph{labelled set}, and all other stars
 are set aside into the \emph{unlabelled set}.  Note that there may be labels
 reported for stars in the \emph{unlabelled set}, but the implicit assumption is
@@ -1175,6 +1177,12 @@ al.(2013)]{astropy} Astropy Collaboration, Robitaille, T.~P., Tollerud, E.~J., e
 \bibitem[Cohen et al.(2005)]{Cohen_2005} Cohen, J.~G., Briley, 
 M.~M., \& Stetson, P.~B.\ 2005, \aj, 130, 1177 
 
+\bibitem[De Silva et al.(2015)]{De_Silva_2015} De Silva, G.~M., 
+Freeman, K.~C., Bland-Hawthorn, J., et al.\ 2015, \mnras, 449, 2604 
+
+\bibitem[Gilmore et al.(2012)]{Gilmore_2012} Gilmore, G., Randich, 
+S., Asplund, M., et al.\ 2012, The Messenger, 147, 25 
+
 \bibitem[Ho et al.(2016)]{Ho_2016} Ho, A.~Y.~Q., Ness, M.~K., 
 Hogg, D.~W., et al.\ 2016, arXiv:1602.00303 
 
@@ -1208,6 +1216,9 @@ Shetrone, M.~D., et al.\ 2013, \apj, 765, 16
 \bibitem[Tibshirani(1996)]{Tibshirani_1996} Tibshirani, R.\ 1996, Journal of the Royal Statistical Society. Series B (Methodological), 58, 267-288
 
 \bibitem[van der Walt et al.(2011)]{van_der_Walt_2011} van der Walt, S., Colbert S.~C., Varoquaux, G.\ 2011, The NumPy Array: A Structure for Efficient Numerical Computation, Computing in Science \& Engineering, 13, 22-30
+
+\bibitem[Zasowski et al.(2013)]{Zasowski_2013} Zasowski, G., Johnson, 
+J.~A., Frinchaboy, P.~M., et al.\ 2013, \aj, 146, 81 
 
 
 \end{thebibliography}
