@@ -245,15 +245,15 @@ clusters.
 Before we outline our assumptions, we need to define the different data sets we
 will use, and terminology related to our method. Consider a stellar spectroscopic
 survey.  Within the survey data is a set of stars observed in high S/N, where the labels for those stars are known with high
-fidelity.  We call this sample the \emph{labelled set}, and all other stars
-are set aside into the \emph{unlabelled set}.  Note that there may be labels
-reported for stars in the \emph{unlabelled set}, but the implicit assumption is
+fidelity.  We call this sample the \emph{reference set}, and all other stars
+are set aside into the \emph{test set}.  Note that there may be labels
+reported for stars in the \emph{test set}, but the implicit assumption is
 that those labels are not known with high fidelity.  We are going to construct
-(train) \TheCannon\ using a subset of the labelled set, allowing us to 
+(train) \TheCannon\ using a subset of the reference set, allowing us to 
 \emph{predict} stellar fluxes and \emph{measure} (test) labels for stars in the 
-unlabelled set.  It is important to note that we do not use every star in the
-labelled set for training: here we will define the \emph{training set} as a random
-subset of the labelled set.  All stars in the labelled set that are not part of 
+test set.  It is important to note that we do not use every star in the
+reference set for training: here we will define the \emph{training set} as a random
+subset of the reference set.  All stars in the reference set that are not part of 
 the training set will form the \emph{validation set}, which we will use to 
 \emph{validate} the predictive power of our model.
 
@@ -273,7 +273,7 @@ The resolution of all \apogee\ spectra are identical, all spectra are calibrated
 to the same rest wavelength grid, the noise is Gaussian and independent from 
 pixel to pixel (with correctly known variances at the pixel level).  
 Importantly, we are \emph{not} assuming that different stars have similar noise
-variances, nor that the labelled and unlabelled sets have the same noise model.
+variances, nor that the reference and test sets have the same noise model.
 \item
 We have a training set of stars with accurate labels, where ``accurate'' is 
 defined by the accuracy requirements of the output labels.  It might be more 
@@ -440,7 +440,7 @@ $\Lambda$ and $f$ by validation in Section \ref{sec:hyper-parameter-validation}.
 
 We employ the \apogee\ Data Release 12 data \citep{SDSS_DR12} to demonstrate the effectiveness of
 a regularized \emph{Cannon} model in high-dimensional label space.  We 
-constructed the labelled set using sensible criteria for stars analysed with 
+constructed the reference set using sensible criteria for stars analysed with 
 version \texttt{v603} of the \aspcap\ pipeline \citep{Holtzman_16,Garcia_Perez_2016}.  We first removed 
 any stars with problematic flags from the \aspcap\ pipeline, i.e., we required 
 \texttt{ASPCAPFLAG~=~0}.  We excluded stars with S/N ratios outside the range of
@@ -450,14 +450,14 @@ elements (C, N, O, Na, Mg, Al, Si, S, K, Ca, Ti, V, Mn, Fe, and Ni), and
 restricted the abundance range such that $2 > \mathrm{[X/Fe]} > -2$, 
 $\mathrm{[Fe/H]} > -3$, and $[\alpha/\mathrm{Fe}] > -0.1$.  A visual comparison 
 of the [V/H] labels with other (Fe-peak) abundance labels showed that many stars
-in the labelled set had spurious measurements of [V/H].  For this reason we 
-required that stars in the labelled set have $\mathrm{[V/Fe]} > -0.6$.  The 
+in the reference set had spurious measurements of [V/H].  For this reason we 
+required that stars in the reference set have $\mathrm{[V/Fe]} > -0.6$.  The 
 distilled sample includes 14,141 red giant branch stars that will form our 
-labelled set, with [Fe/H] labels ranging from $\mathrm{[Fe/H]} = -2.10$ to 
+reference set, with [Fe/H] labels ranging from $\mathrm{[Fe/H]} = -2.10$ to 
 +0.30~dex.
 
 
-We randomly assigned each star in the labelled set a uniformly-distributed 
+We randomly assigned each star in the reference set a uniformly-distributed 
 integer $q$ between 0 and 9, inclusive.  We assign stars with $q > 0$
  to the \emph{training set}, and those with $q = 0$ to the \emph{validation set}
  We have ensured that the same $q$ integer was assigned to each star 
@@ -475,7 +475,7 @@ fluxes from the \texttt{apStar} data files throughout this work.  Our reasoning
 is as follows: The \aspcap\ pipeline uses a running quartile filter window to determine 
 the continuum.  For this reason it is provably variant with the S/N ratio (biased at low S/N): at 
 low S/N ratios the inferred continuum will be systematically shifted with 
-respect to the same star observed in high S/N.  Although our labelled set only 
+respect to the same star observed in high S/N.  Although our reference set only 
 includes high S/N spectra, our results would suffer if we employed the \aspcap\ 
 normalization procedure for low S/N spectra in the \emph{test set}.  Thus, we 
 opted to normalize and stack the fluxes from individual visits provided in the 
@@ -580,12 +580,12 @@ models as a consequence.  Because these hyper-parameters act in conjunction
 with each other, we need to explore many combinations of $\Lambda$ and $f$.
 
 
-Here we use the labelled set described in the previous section to perform a
+Here we use the reference set described in the previous section to perform a
 grid search with different values of $\Lambda$ and $f$.  Specifically we vary 
 $\Lambda$ in logarithmic steps from $10^0$ to $10^5$, and increase the 
 scale factor $f$ from 0.5 to 50.  For each combination of $\Lambda$ and $f$ we 
 trained the full 17-label model using the training set (the $\sim$90\% random
-subset of the labelled set) and measured labels for all spectra in the
+subset of the reference set) and measured labels for all spectra in the
 validation set: both the combined and individual observations.  Given the model
 complexity, for this experiment we fixed $s^2 = 0$ to leverage convexity
 and ensure we were converged at the global minimum.  This also ensures a fair
@@ -668,7 +668,7 @@ We re-trained the 17-label model (without requiring $s^2 = 0$) using our adopted
 hyper-parameters.  In this and subsequent sections we validate our model through
 various experiments.  Our first test is to examine how well we can recover
 labels for the validation set stars.  Recall these stars are a random 10\%
-subset of the labelled set and were not used for training.  Comparisons between
+subset of the reference set and were not used for training.  Comparisons between
 the \aspcap\ validation set labels and our own are shown in Figure
 \ref{fig:regularized-model-validation}, where we find the model shows good
 agreement with the \aspcap\ labels.  No strong biases are seen, and the standard
@@ -682,7 +682,7 @@ near [V/H] $\approx 0$.
 The [V/H] abundance labels are problematic in the \aspcap\ pipeline 
 because the signature is subtle even at high S/N ratios: there are very few
 spectral lines, most of which are blended with stronger lines.  Indeed, we noted
-very obvious issues in the [V/H] labels in the labelled set which we tried to
+very obvious issues in the [V/H] labels in the reference set which we tried to
 account for (e.g., Section \ref{sec:training-set}).  Hence although our [V/H]
 label precision is worse than other abundance labels, it is limited by the
 training set.
@@ -971,12 +971,12 @@ constant sum abundance of these elements, consistent with recent works
 % ARC: [C/N] vs [Al/Mg] (or [(Al+Si)/Mg] is even better) for clusters.
 
 
-The labelled set described in Section \ref{sec:training-set} was not
+The reference set described in Section \ref{sec:training-set} was not
 purposefully constructed to include stars in \emph{any} globular
 cluster.  We selected stars that met strict quality criteria, and
 discarded stars with questionable label fidelity.  Given the
 abundance (anti-)correlations we confirm from other high-resolution
-studies, our construction of the labelled set has a number of
+studies, our construction of the reference set has a number of
 implications.  First, \emph{the anti-correlations seen in globular 
 clusters here and elsewhere are not dominant in our training set}.
 Indeed, the lack of globular cluster (metal-poor) stars in our 
@@ -1059,13 +1059,13 @@ assumptions is provably false. \apogee\ spectra have
 different resolutions.  The line spread function is both wavelength- and 
 fibre-dependent.  Given this information, our current implementation of \tc\ is  
 sub-optimal: we assume nothing about differing line spread functions between 
-stars in the labelled or unlabelled set.  Similarly, we make no effort to 
+stars in the reference or test set.  Similarly, we make no effort to 
 accommodate fast-rotating stars, where the effect on the spectrum is 
 approximately represented by convolution with a Gaussian kernel (in the same way
 a lower resolution would be).  Tests performed by M.~Ness have revealed that 
 this information is present in the data: if the fibre number is included as a
 label in the model, then the fibre number can be accurately inferred from stars
-in the unlabelled set or through cross-validation!  This is possible because the 
+in the test set or through cross-validation!  This is possible because the 
 \apogee\ resolution varies smoothly (to some degree) with fibre number.  For 
 these reasons it is clear that simultaneously solving for additional rotation
 at test time would be an useful extension of this work.  
