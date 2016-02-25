@@ -275,22 +275,20 @@ and independent from pixel to pixel.
 Importantly, we are \emph{not} assuming that different stars have similar noise
 variances, nor that the reference and test sets have the same noise model.
 \item
-We have a training set of stars with accurate labels, where ``accurate'' is 
+We have a training set of stars with \emph{mean} accurate labels, where ``accurate'' is 
 defined by the accuracy requirements of the output labels.  It might be more 
 appropriate to say that we are assuming that the training set stars have 
 \emph{consistent} labels (consistent with the assumptions of smoothness, above).
-%% DWH CLARIFICATION ON HOGG-7.png image
-
 \item
 The training set is representative, in the sense that the training set stars 
-span the label space similarly to how any test or prediction set spans the label
+span the label space similarly to how the test set spans the label
 space.
 \item
 We assume our continuum normalization procedure (described below) is consistent.
 We do not require ``true'' continuum-normalization in the classical sense 
 because any offset (even a label-dependent residual due to a strong absorption
 line) can be captured by the model.  Instead we require that our normalization
-procedure is invariant as S/N decreases.
+procedure is invariant with respect to S/N.
 \end{itemize}
 
 
@@ -438,10 +436,10 @@ $\Lambda$ and $f$ by validation in Section \ref{sec:hyper-parameter-validation}.
 \label{sec:training-set}
 
 
-We employ the \apogee\ Data Release 12 data \citep{SDSS_DR12} to demonstrate the effectiveness of
+We employ the \apogee\ Data Release 12 data \citep{Alam_2015} to demonstrate the effectiveness of
 a regularized \emph{Cannon} model in high-dimensional label space.  We 
 constructed the reference set using sensible criteria for stars analysed with 
-version \texttt{v603} of the \aspcap\ pipeline \citep{Holtzman_16,Garcia_Perez_2016}.  We first removed 
+version \texttt{v603} of the \aspcap\ pipeline \citep{Holtzman_2015,Garcia_Perez_2015}.  We first removed 
 any stars with problematic flags from the \aspcap\ pipeline, i.e., we required 
 \texttt{ASPCAPFLAG~=~0}.  We excluded stars with S/N ratios outside the range of
 200-300, and stars with a radial velocity scatter larger than 1~km~s$^{-1}$.  We
@@ -459,8 +457,7 @@ reference set, with [Fe/H] labels ranging from $\mathrm{[Fe/H]} = -2.10$ to
 
 We randomly assigned each star in the reference set a uniformly-distributed 
 integer $q$ between 0 and 9, inclusive.  We assign stars with $q > 0$
- to the \emph{training set}, and those with $q = 0$ to the \emph{validation set}
- We have ensured that the same $q$ integer was assigned to each star 
+ to the \emph{training set}, and those with $q = 0$ to the \emph{validation set}. We have ensured that the same $q$ integer was assigned to each star 
 between the different experiments described below.  The training set (see Figure
 \ref{fig:training_set_hrd}) comprises 12,681 red giant branch stars, and the 
 validation set includes 1,460 stars.
@@ -482,18 +479,15 @@ opted to normalize and stack the fluxes from individual visits provided in the
 \texttt{apStar} files. Our normalization procedure is described below.
 
 
-Individual spectra in the \texttt{apStar} files contain associated error arrays
-for each observation.  However the error arrays do not encapsulate all knowledge
+Individual spectra in the \texttt{apStar} files contain associated uncertainty arrays
+for each observation.  However the uncertainty arrays do not encapsulate all knowledge
 about any technical, observational, or reduction issues.  Instead, every pixel
 in a single observation also contains a bitmask flag that documents potential
 issues.  Although pixels are flagged, these issues are not reflected in the
-error arrays of individual observations.  For this reason we chose to construct
+uncertainty arrays of individual observations.  For this reason we chose to construct
 an (adjusted) inverse variance array that encapsulates the implied additional 
-uncertainty in flagged pixels.  Specifically for pixel with index $j$, if it is flagged, we set the error
+uncertainty in flagged pixels.  Specifically for pixel $j$, if it is flagged, we set the error
 array such that:
-
-%% ARC SAY MORE ABOUT THE LIMITS HERE AS PER HOGG-9
-
 
 \begin{equation}
 \sigma_{j,adjusted}^2 = \sigma_{j}^2 + \Delta_{j}^2
@@ -503,6 +497,7 @@ array such that:
 
 \begin{equation}
 \Delta_{j} = \max{\left(C_{0}|y_{j} - \widetilde{y}|,C_{1}\widetilde{y}N_\mathrm{flagged}\right)} .
+\label{eq:pixel_flag}
 \end{equation}
 
 Here $N_\mathrm{flagged}$ is the number of flagged pixels in the spectrum, and (what
@@ -511,7 +506,16 @@ $\{2.0,0.1\}$, which produces sensible inverse variance values for flagged
 pixels.  We chose to ignore bitmask values associated with persistence 
 (specifically values 9, 10, and 11) as frequently every pixel in the blue CCD
 would be flagged with these values, thereby producing unrealistically large 
-uncertainties at every pixel in the blue CCD.
+uncertainties at every pixel in the blue CCD.  Consider the two limits of (\ref{eq:pixel_flag}):
+pixel $A$ is flagged and has a flux value that is very far (say 5$\sigma$) 
+away from the mean flux. Pixel $B$ is also flagged but has flux values very
+similar to the mean spectrum -- a visual inspection suggests it is not anomalous.
+For flagged pixels of the $A$ kind, the added variance is proportional to how
+discrepant the flux is to the mean spectrum flux. On the other hand, there may be many 
+$B$-like pixels that represent a subtle systematic problem. These pixels are
+accounted for by considering the number of flagged pixels $N_\mathrm{flagged}$. In both
+cases, our conservative approach accounts for underestimated variance in flagged pixels 
+due to local ($A$-type) and global ($B$) problems.
 
 
 After updating the inverse variance arrays to account for flagged pixels, we
@@ -1168,6 +1172,10 @@ on the \texttt{master} branch.
 
 
 \begin{thebibliography}{dummy}\raggedright
+
+\bibitem[Alam et al.(2015)]{Alam_2015} Alam, S., Albareti, F.~D., 
+Allende Prieto, C., et al.\ 2015, \apjs, 219, 12 
+
 \bibitem[Astropy Collaboration et 
 al.(2013)]{astropy} Astropy Collaboration, Robitaille, T.~P., Tollerud, E.~J., et al.\ 2013, Astronomy \& Astrophysics, 558, AA33 
 
@@ -1180,6 +1188,10 @@ M.~M., \& Stetson, P.~B.\ 2005, \aj, 130, 1177
 \bibitem[De Silva et al.(2015)]{De_Silva_2015} De Silva, G.~M., 
 Freeman, K.~C., Bland-Hawthorn, J., et al.\ 2015, \mnras, 449, 2604 
 
+\bibitem[Garc{\'{\i}}a P{\'e}rez et al.(2015)]{Garcia_Perez_2015} 
+Garc{\'{\i}}a P{\'e}rez, A.~E., Allende Prieto, C., Holtzman, J.~A., et 
+al.\ 2015, arXiv:1510.07635 
+
 \bibitem[Gilmore et al.(2012)]{Gilmore_2012} Gilmore, G., Randich, 
 S., Asplund, M., et al.\ 2012, The Messenger, 147, 25 
 
@@ -1189,6 +1201,9 @@ Hogg, D.~W., et al.\ 2016, arXiv:1602.00303
 \bibitem[Hogg et al.(2016)]{Hogg_2016} Hogg, D.~W., Casey, A.~R., 
 Ness, M., Rix, H.-W., \& Foreman-Mackey, D.\ 2016, arXiv:1601.05413 
 
+\bibitem[Holtzman et al.(2015)]{Holtzman_2015} Holtzman, J.~A., 
+Shetrone, M., Johnson, J.~A., et al.\ 2015, \aj, 150, 148 
+
 \bibitem[Hunter(2007)]{Hunter_2007} Hunter, J.~D.\ 2007, Matplotlib: A 2D Graphics Environment, Computing in Science \& Engineering, 9, 90-95
 
 \bibitem[Jones et al.(2001)]{Jones_2001} Jones, E., Oliphant E., Peterson P., et al.\ 2001, SciPy: Open Source Scientific Tools for Python, http://www.scipy.org/ (Online; accessed 2016-02-16)
@@ -1196,7 +1211,6 @@ Ness, M., Rix, H.-W., \& Foreman-Mackey, D.\ 2016, arXiv:1601.05413
 \bibitem[M{\'e}sz{\'a}ros et al.(2015)]{Meszaros_2015} 
 M{\'e}sz{\'a}ros, S., Martell, S.~L., Shetrone, M., et al.\ 2015, \aj, 149, 
 153 
-
 \bibitem[Ness et al.(2015a)]{tc} Ness, M., Hogg, D.~W., 
 Rix, H.-W., Ho, A.~Y.~Q., \& Zasowski, G.\ 2015, \apj, 808, 16
 
