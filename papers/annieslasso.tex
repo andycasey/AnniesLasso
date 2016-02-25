@@ -606,7 +606,7 @@ recovered precision in labels at low S/N, or something that balances goodness of
 
 
 We define the model sparsity as the percent of zero-value spectral derivatives 
-$\vectheta$.  The sparsity could be calculated across just the linear 
+$\vectheta$.  The sparsity could be calculated across the linear 
 coefficients, only the cross-term coefficients, or some combination thereof.  
 Note that we never include the baseline spectrum coefficients $\vectheta_0$ when 
 calculating sparsity metrics because this parameter is not regularized (see 
@@ -629,22 +629,22 @@ labels.  In Figure \ref{fig:gridsearch-mad-all-elements} we show the median
 absolute deviation in abundance labels, measured between individual and combined
 spectra for stars in the validation set.  This is an internally-consistent
 check for label recovery at low S/N: we will validate our high- (and low-) S/N
-label determination against \aspcap\ values in the next section.  It is
+label determination against \aspcap\ values in Section \ref{sec:model-validation}.  It is
 clear that a combination of decreasing $f$ with increasing $\Lambda$ recovers
 labels for validation set stars with high precision.  At $\Lambda \approx 10^3$,
 varying $f$ between 0.5 and 50.0 results in a marginal change in the validation
 set precision (0.04~dex to 0.06~dex).  Figure \ref{fig:gridsearch-mad-all-elements}
 suggests that at $\Lambda = 10^3$, $f = 0.5$ has comparable performance in
 label recovery as a model with the same $\Lambda$ and $f = 50.0$.  While this
-behaviour was in the recovery of some abundance labels, it was not seen in all.
-However, lower scale factors were favoured by all labels.
+behaviour was observed in the recovery of some abundance labels, it was not seen in all. 
+The behaviour differed for each label.  However, lower scale factors were favoured by all labels.
 
 
 As a final heuristic to guide our choice of $\Lambda$ and $f$, we examined the
 performance in predicting spectral fluxes for all validation set spectra.  Here 
 we predicted stellar fluxes for all validation set stars (using the \aspcap\ 
 labels) and calculated the total $\chi^2$ difference.  The results are shown in
-Figure \ref{fig:gridsearch-test-scalar}.  At increasing regularization strength
+Figure \ref{fig:gridsearch-test-scalar} compared to the $\chi^2$ for the least-regularized case ($\Lambda = 10^0$).  At increasing regularization strength
 the models demonstrate better predictive power in spectral fluxes, reflected by
 a lower total $\chi^2$ value.  As expected, the $\chi^2$ minimum is dependent on
 the scale factor.  While regularized models with lower $\chi^2$ values clearly
@@ -654,7 +654,7 @@ $\chi^2$ value than seen in the unregularized case is objectively a better model
 because it predicts stellar spectra more accurately.
 
 
-Our grid search has revealed that a regularization factor of $\Lambda = 10^3$ is
+Our grid search has revealed that a regularization factor of at least $\Lambda = 10^3$ is
 required to produce a sufficiently sparse model.  Generally we find that low
 scale factors yield marginally better behaviour in recovering abundance labels
 at low S/N.  At $\Lambda = 10^3$, the precision in abundance labels would 
@@ -689,23 +689,28 @@ The [V/H] abundance labels are problematic in the \aspcap\ pipeline
 because the signature is subtle even at high S/N ratios: there are very few
 spectral lines, most of which are blended with stronger lines.  Indeed, we noted
 very obvious issues in the [V/H] labels in the reference set which we tried to
-account for (e.g., Section \ref{sec:training-set}).  Hence although our [V/H]
+account for (e.g., Section \ref{sec:training-set}).  Although our [V/H]
 label precision is worse than other abundance labels, it is limited by the
 training set.
 
 
-We report formal errors in all labels provided by \TheCannon\ at test time.
-Errors (and correlation coefficients) are available from the estimated
-covariance matrix surrounding the optimized solution.  In the following sections
-we will gauge the reliability of the labels (and their formal errors).
+We report formal errors in all labels provided by \TheCannon. At test time the
+Jacobian matrix of partial derivatives is estimated at the optimized solution,
+which we multiply by the residual variance to obtain a formal covariance matrix.
+Errors in each label are taken as the square-root of the diagonal entries along
+the covariance matrix. We stress that the errors listed in Table \ref{tab:the-good-stuff}
+are formal errors only: they do not encapsulate all aspects of the error budget
+that are known (or unknown) to us. An uncertainty floor in each label is estimated
+in the following Section, which ought to be added in quadrature with the formal
+errors.
 
 
 \subsection{Label recovery as a function of signal-to-noise}
 \label{sec:label-recovery-snr}
 
 
-Here we seek to understand the
-regularized model capability in recovering labels as a function of S/N.  The 
+Here we seek to understand the capability of our 
+regularized model in recovering labels as a function of S/N.  The 
 stars in the validation set include stacked spectra as well as the individual 
 normalized observations.  We measured labels for every spectrum.  This permits us
 to understand how well we can recover labels (to some precision) for a given 
