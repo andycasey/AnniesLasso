@@ -65,7 +65,7 @@ abundance and parameter changes.
 % Methods
 We adopt ideas from compressed sensing to limit overall model complexity
 while retaining model freedom.  The model is trained
-with a set of 12,681 red-giant stars with high signal-to-noise spectroscopic 
+with a set of 12,681 red giant stars with high signal-to-noise spectroscopic 
 observations and stellar parameters and abundances taken from the \apogee\ 
 Survey.
 % Results
@@ -77,15 +77,15 @@ make sense: the spectral derivatives with respect to abundances correlate
 with known atomic lines, and we identify elements belonging
 to atomic lines that were previously unknown.  We recover (anti-)correlations
 in abundance labels for globular cluster stars, consistent with the literature.
-However we find the intrinsic spread in globular cluster abundances is 3--4 times smaller than 
+However we find that the intrinsic spread in globular cluster abundances is 3--4 times smaller than 
 previously reported.  We deliver 17 labels with associated errors for 
 96,514 red giant stars, as well as open-source code to extend this work to other spectroscopic surveys.
 \end{abstract}
 
 
 \section{Introduction}
-The detailed chemical composition of a star's photosphere reflects 
-the formation environment when that star was born, and the mix of supernovae that 
+The detailed chemical composition of a star's photosphere reflects its
+ formation environment, and the mix of supernovae that 
 preceded it.  This photospheric \emph{chemical fingerprint} remains largely
 unchanged throughout a star's lifetime, providing a fossil record of 
 local star-formation history.  Although the differences in detailed chemical
@@ -112,27 +112,27 @@ and similar analysis issues.  Most of these decisions are based on the optimizat
 stars with high S/N ratios).  As a consequence, these heuristics are frequently 
 incompatible for data with more modest (and representative) S/N ratios.  Indeed, 
 it can be shown from repeat or blind experiments that traditional pipelines 
-routinely yield imprecise abundances for noisy data.  Moreover, individual 
-pipelines vary significantly from one to another, with differences an order of 
+routinely yield imprecise abundances for noisy data.  Moreover, the results from individual 
+pipelines are inconsistent, with differences an order of 
 magnitude larger than what state-of-the-art spectroscopic studies seek to 
 measure (e.g., the effects of atomic diffusion, evolutionary mixing, planetary
-accretion).  Thus, while there has been substantial effort in automating 
+accretion).  Thus, while there has been substantial effort to automate
 classical analysis techniques, they are generally imprecise at modest S/N 
 ratios, and frequently yield inaccurate (biased) results.
 
 
-Considerable efforts have  been spent on improving the accuracy of physical
+Considerable effort has  been spent on improving the accuracy of physical
 models of stars.  Indeed it is impossible to measure physical properties of stars (or 
 their chemical abundances) accurately without accurate physical models of 
 stellar spectra.  However physics-based models of stars have a number of known
-problems:  The atmospheres are one-dimensional approximations.  
+problems: they rely on incorrect approximations (e.g. one-dimensional atmospheres) and incomplete laboratory data.
 Three-dimensional models remain computationally impractical for more than just a
 few stars.  As a consequence of the limited atmosphere dimensionality, crude 
 (knowingly incorrect) approximations for the convection are 
 necessary.  Although some grids of three-dimensional hydrodynamic models have been 
 produced and averaged to one-dimensional approximations, these models assume 
 local thermodynamic equilibrium (LTE).  Properly accounting for departures from 
-LTE is a formidable analytic and computational challenge.  Lastly, while 
+LTE is a formidable analytic and computational challenge.  Additionally, while 
 laboratory efforts have thoroughly improved much of the faulty atomic and 
 molecular data, this process is unquestionably incomplete.  For these reasons 
 there are some spectral features that are much better understood than others.  
@@ -157,16 +157,16 @@ introduce some relevant terminology.  Throughout this work we will call stellar
 parameters ($\Teff$ and $\logg$) and the full set of 15 chemical abundances 
 collectively ``labels''.  This unifies and collapses the phrase ``stellar
 parameters and chemical abundances'' to a word, and connects to relevant 
-terminology for supervised methods in the machine-learning and statistics 
+terminology for supervised methods in the machine learning and statistics 
 literatures.  \TheCannon\ uses spectra from stars that have labels known
 with high fidelity to train a model for stellar spectra.  The trained model can
-then be used to tested on new data, and precisely estimate labels.
+then be used on new data, and precisely estimate labels.
 
 
   \TheCannon\ is a data-driven model, 
-but it differs from standard machine-learning approaches because it contains an 
+but it differs from standard machine learning approaches because it contains an 
 explicit noise model.  This means that \TheCannon\ can transfer labels from high
-S/N training-set stars to low S/N test-set stars; that is, the training set and
+S/N training set stars to low S/N test set stars; that is, the training set and
 the test set do not need to be statistically identical.  This is related to the
 fact that \TheCannon\ is an interpretable causal model; the internals of the model are 
 the dependencies of the spectral expectation and variance on wavelength and 
@@ -180,8 +180,8 @@ While a physical model is required to construct an acceptable training set for
 \TheCannon\ to use, \TheCannon\ also offers opportunities to reconcile known problems with physics-based 
 models.  It provides labels for training set data at wavelengths where there is
 limited or missing atomic information, allowing for every pixel to contribute in 
-measuring labels from noisy stars.  If there is a sufficient
-number of stars observed by two surveys, \TheCannon\ also facilitates labels that
+measuring labels from noisy spectra.  If there are a sufficient
+number of stars observed by two surveys, \TheCannon\ can also be used to determine labels that
 are consistent across surveys and wavelengths \citep{Ho_2016}.  Moreover, as we
 will show in this work, the model internals have physical interpretations, 
 allowing for the identification of previously unknown spectral lines.  This is
@@ -190,8 +190,8 @@ a first step towards using \TheCannon\ to improve physics-based models.
 
 Only a small number of labels were used in the first work with \TheCannon: 
 three in the original work, and four or five in later work \citep{tc, age, Ho_2016}. 
-Here we were guided by thoughts related to density estimation. Sampling well a 
-$K$-dimensional label space takes a training set the size of which scales 
+Here we were guided by thoughts related to density estimation. To sample a 
+$K$-dimensional label space well, the size of the training set should scale
 exponentially (or worse) with $K$.  Subsequent experiments, however, did not 
 bear this out.  We found that we can transfer many labels from the training set 
 to the test set, with training sets of (just) thousands of stars.  The fundamental 
@@ -204,7 +204,7 @@ model as a smooth interpolation function.
 The capacity to extend to a larger set of labels without significant
 computational detriment offers tantalizing opportunities.  The most 
 straightforward is that it provides a measurement of many elemental abundances.
-However in doing so, it can be shown that a standard \emph{Cannon} model yields
+In doing so, however, it can be shown that a standard \emph{Cannon} model yields
 noisy coefficients (spectral derivatives; see next Section) that are incompatible with 
 expectations from physics: the training coefficients may optimize to produce 
 coefficients of abundance labels with non-zero 
@@ -215,9 +215,8 @@ elements do not contribute at all wavelengths.
 For this reason alone we know that the problem ought to be sparse.  Here we exploit this 
 knowledge to the fullest, using standard regularization methods to discover
 and enforce sparsity.  We consider the \emph{entire} 17-dimensional label space 
-produced by the \apogee\ \aspcap\ pipeline.  We accept the \aspcap\ labels for 
-a subset of the highest S/N stars, and adopt these stars and their labels as a
-reliable training set.  We show by validation that we can transfer these labels to much 
+produced by the \apogee\ \aspcap\ pipeline.  For our training set, we adopt the \aspcap\ labels of the stars with 
+the highest S/N spectra.  We show by validation that we can transfer these labels to much 
 lower S/N stars, with reduced precision but no strong biases.  We then use the
 system to label all of the stars in the \apogee\ \dr\ data set.  After
 validating our model, we confirm our abundance precision using tests of globular
@@ -228,8 +227,8 @@ clusters.
 
 
 Before we outline our assumptions, we need to define the different data sets we
-will use, and terminology related to our method. Consider a stellar spectroscopic
-survey.  Within the survey data is a set of stars observed in high S/N, where the labels for those stars are known with high
+will use, as well as terminology related to our method. Consider a stellar spectroscopic
+survey.  Within the survey data is a set of stars observed at high S/N, where the labels for those stars are known with high
 fidelity.  We call this sample the \emph{reference set}, and all other stars
 are set aside into the \emph{test set}.  Note that there may be labels
 reported for stars in the \emph{test set}, but the implicit assumption is
@@ -248,9 +247,9 @@ the training set will form the \emph{validation set}, which we will use to
 \item
 Stars with similar labels ($\Teff$, $\logg$, and abundances) have similar spectra.
 \item
-The expectation of the spectrum of a star is a smooth function of the values of 
+The expectation that the spectrum of a star is a smooth function of the values of 
 the labels for that star.  Further than this, we assume that the function is so 
-smooth it is reasonably approximated with a quadratic form in label space.
+smooth it can be reasonably approximated with a quadratic form in label space.
 \item
 The resolution of all \apogee\ spectra are identical and all spectra are calibrated
 to the same rest wavelength grid.
@@ -269,7 +268,7 @@ The training set is representative, in the sense that the training set stars
 span the label space similarly to how the test set spans the label
 space.
 \item
-We assume our continuum normalization procedure (described below) is consistent.
+We assume that our continuum normalization procedure (described below) is consistent.
 We do not require ``true'' continuum-normalization in the classical sense 
 because any offset (even a label-dependent residual due to a strong absorption
 line) can be captured by the model.  Instead we require that our normalization
@@ -346,7 +345,7 @@ all $j$ pixels) by validation.
 
 
 In the \emph{test step}, we fix the parameters $\vectheta_j,s^2_j$ at all
-wavelength pixels $j$.  We seek, for each test-set star $m$, the $K$-list of 
+wavelength pixels $j$.  We seek, for each test set star $m$, the $K$-list of 
 labels $\ell_m$ that optimizes the likelihood:
 \begin{eqnarray}\label{eq:test}
   \ell_m &\leftarrow& \argmin{\ell}\left[
@@ -402,7 +401,7 @@ where the sum is over the $[D-1]$ components of $\vectheta$, excluding the
 zeroth component because we don't ever expect that component to vanish.\footnote{Forgive a notational similarity here: When we subscript (bold) $\vectheta$ 
 with $j$ we mean ``the $D$-vector of parameters associated with wavelength pixel
 $j$''; when we subscript (non-bold) $\theta$ with $d$ we mean ``the single parameter along 
-coordinate axis $d$ in the $D$-dimensional $\vectheta$ vector space.} There is
+coordinate axis $d$ in the $D$-dimensional $\vectheta$ vector space.''} There is
 a great deal of theory about this kind of regularization; it is called L1 or the
 \lasso\ \citep{Tibshirani_1996}.  L1 regularization encourages parameters to vanish 
 precisely but doesn't break convexity for convex problems.  It is important to
@@ -413,7 +412,7 @@ $\Lambda$ and $f$ by validation in Section \ref{sec:hyper-parameter-validation}.
 
 
 \section{Training, validation, and test data}
-\label{sec:training-set}
+\label{sec:training set}
 
 
 We employ the \apogee\ Data Release 12 data \citep{Alam_2015} to demonstrate the effectiveness of
@@ -431,7 +430,7 @@ of the [V/H] labels with other (Fe-peak) abundance labels showed that many stars
 in the reference set had spurious measurements of [V/H].  For this reason we 
 required that stars in the reference set have $\mathrm{[V/Fe]} > -0.6$.  The 
 distilled sample includes 14,141 red giant branch stars that will form our 
-reference set, with [Fe/H] labels ranging from $\mathrm{[Fe/H]} = -2.10$ to 
+reference set, with [Fe/H] ranging from $\mathrm{[Fe/H]} = -2.10$ to 
 +0.30~dex.
 
 
@@ -523,13 +522,13 @@ the continuum function demonstrates large wiggles.
 
 The approach we have described is \emph{pseudo}-continuum normalization.  While 
 our choice of continuum pixels is well-informed \citep{tc}, our 
-procedure does not require that the chosen pixels to indeed be ``true'' continuum
+procedure does not require that the chosen pixels to are indeed ``true'' continuum
 pixels.  This is advantageous.  The continuum pixels could be randomly selected; 
 our approach would be equally effective as long as the same pixels were always
 used for normalization.  All spectra would be ``normalized'' in the same way, and
 the residual flux behaviour from a ``true''-normalized spectrum would be captured 
-by the spectral model.  We have only attempted to select well-informed continuum
-pixels in order to maximize model interpretability: by using reasonable 
+by the spectral model.  We have attempted to select well-informed continuum
+pixels only in order to maximize model interpretability: by using reasonable 
 continuum pixels we can be sure that the spectral model derivatives can be 
 interpreted as being astrophysically motivated, rather than capturing residual 
 continuum effects.
@@ -558,7 +557,7 @@ self-consistent examination of label determination at low S/N (see Section
 In the simplest case we have two hyper-parameters that need to be determined: 
 $\Lambda$ and $f$.  The strength of the regularization (at all pixels) is set 
 by $\Lambda$, and the scale factor $f$ controls the scaling on individual 
-labels.  In practice large $\Lambda$ values encourage zero coefficients and thus enforces sparsity.  High scale factor $f$
+labels.  In practice large $\Lambda$ values encourage zero coefficients and thus enforce sparsity.  High scale factor $f$
 values act to penalize cross-terms more than linear labels, and produce sparse
 models as a consequence.  Because these hyper-parameters act in conjunction 
 with each other, we need to explore many combinations of $\Lambda$ and $f$.
@@ -572,7 +571,7 @@ trained the full 17-label model using the training set (the $\sim$90\% random
 subset of the reference set) and measured labels for all spectra in the
 validation set: both the combined and individual observations.  Given the model
 complexity, for this experiment we fixed $s^2 = 0$ to leverage convexity
-and ensure we were converged at the global minimum.  This also ensures a fair
+and to ensure convergence at the global minimum.  This also ensures a fair
 comparison between different hyper-parameters, because if $s^2$ is free it
 will inevitably rise at very high $\Lambda$ values.  
 
@@ -651,10 +650,10 @@ remainder of this work.
 We re-trained the 17-label model (without requiring $s^2 = 0$) using our adopted
 hyper-parameters.  In this and subsequent sections we validate our model through
 various experiments.  Our first test is to examine how well we can recover
-labels for the validation set stars.  Recall these stars are a random 10\%
+labels for the validation set stars.  Recall that these stars are a random 10\%
 subset of the reference set and were not used for training.  Comparisons between
 the \aspcap\ validation set labels and our own are shown in Figure
-\ref{fig:regularized-model-validation}, where we find the model shows good
+\ref{fig:regularized-model-validation}, where we find that the model shows good
 agreement with the \aspcap\ labels.  No strong biases are seen, and the standard
 deviation of the residuals is low for most abundance labels.  The largest
 disagreement is seen in [V/H] and [Na/H], in different regimes of label space.
@@ -667,7 +666,7 @@ The [V/H] abundance labels are problematic in the \aspcap\ pipeline
 because the signature is subtle even at high S/N ratios: there are very few
 spectral lines, most of which are blended with stronger lines.  Indeed, we noted
 very obvious issues in the [V/H] labels in the reference set which we tried to
-account for (e.g., Section \ref{sec:training-set}).  Although our [V/H]
+account for (e.g., Section \ref{sec:training set}).  Although our [V/H]
 label precision is worse than other abundance labels, it is limited by the
 training set.
 
@@ -682,15 +681,13 @@ that are known (or unknown) to us. An uncertainty floor in each label is estimat
 in the following Section, which ought to be added in quadrature with the formal
 errors.
 
-
 \subsection{Label recovery as a function of signal-to-noise}
 \label{sec:label-recovery-snr}
 
 
 Here we seek to understand the capability of our 
-regularized model in recovering labels as a function of S/N.  The 
-stars in the validation set include stacked spectra as well as the individual 
-normalized observations.  We measured labels for every spectrum.  This permits us
+regularized model to recover labels as a function of S/N.  The validation set includes stacked spectra for each star
+ as well as the individual normalized observations.  We measured labels for every spectrum.  This permits us
 to understand how well we can recover labels (to some precision) for a given 
 S/N.  Crucially, this experiment provides a very model-independent metric for
 performance.  At low S/N ratios the label errors will be dominated by random
@@ -740,8 +737,8 @@ regime where we are advantageously dominated by systematic uncertainties.
 
 
 We have used our regularized model to measure (test) labels of 150,677 \apogee\ 
-spectra, all normalized and stacked using by the method in Section 
-\ref{sec:training-set}.  In addition to the model being effective,
+spectra, all normalized and stacked using the method in Section 
+\ref{sec:training set}.  In addition to the model being effective,
 the test step is very fast: our pure-\texttt{Python} implementation returned 
 \emph{17 labels for all 150,677 spectra in just 28 minutes} of wall-time 
 on a small research cluster in Cambridge.  These were free 
@@ -760,11 +757,11 @@ The training set only includes giant stars, but the \apogee\ \dr\ includes
 giants and dwarfs.  Therefore we exclude results with $\chi_r^2 > 3$, stars without a $\Teff$ label from \aspcap, or stars with \aspcap\ labels outside of the bounds $5300 > \Teff > 3700$ or $\logg < 3.9$.
 The distilled sample contains 96,514 giant stars, where we report $\Teff$,
 $\logg$, and 15 abundance labels.  The distribution of $\chi^2$ values for
-all 150,677 combined spectra are show in Figure \ref{fig:chisq-test-set}.  The
+all 150,677 combined spectra are show in Figure \ref{fig:chisq-test set}.  The
 labels in the distilled sample follow expectations from stellar astrophysics,
 and include stars that are marginally outside the training set.  For example,
 the \aspcap\ labels include a strict cut in $\Teff$ at 3600~K, but we reliably
-recover labels beyond this boundary.  Figure \ref{fig:test-set-hrd} presents a
+recover labels beyond this boundary.  Figure \ref{fig:test set-hrd} presents a
 few different label projections for the distilled sample, indicative of the
 boundaries and distribution of our labels.  The full complement of 17-labels
 for 96,514 stars is provided in Table \ref{tab:the-good-stuff}, in addition
@@ -772,7 +769,7 @@ to quality metrics.
 
 
 
-The abundance labels that we find are consistent with detailed studies
+Our abundance labels are consistent with detailed studies
 of galactic chemical evolution.  In Figure \ref{fig:gce} we show our abundance
 labels (with respect to iron) of $\alpha$-capture (e.g., O, Mg, Ca, Si), odd-Z
 (Al, Na), light (C, N), and Fe-peak (Ti, Mn, Ni) elements for all bonafide
@@ -849,7 +846,7 @@ We have demonstrated that a data-driven model for stellar spectra can be
 reliably extended to high dimensionality in label space. We return high
 precision labels for \apogee\ spectra across the giant branch, including
 those with low S/N ratios. For these noisy data, the abundance labels returned
-by our model for low S/N ratios show similar behaviour to what is seen in the high
+by our model for low S/N ratios show similar behavour to what is seen in the high
 S/N ($>250$) sample.  However our abundance labels from noisy data are
 significantly different from \aspcap. In this noisy regime
 there are good reasons to believe \TheCannon\ abundance labels are more
@@ -887,7 +884,7 @@ a 0.5~dex offset with the literature for M~92 ($[{\rm Fe/H}] = -1.81 \pm 0.04$).
 
 
 While these mismatches are important to examine, our tests suggest they
-are a reflection of two compounding issues: a relevant paucity of metal-poor
+are a reflection of two compounding issues: a relative paucity of metal-poor
 stars in the training set, and a suggestion of a linear-in-[Fe/H] systematic
 trend in \aspcap\ [Fe/H] labels.  A more thorough comparison of metal-poor
 stars in \aspcap\ may help resolve these issues.  Nevertheless, while
@@ -900,16 +897,16 @@ The anti-correlation we see between [C/Fe] and [N/Fe] abundances in M~15 is
 expected from the CN-cycling of stellar material.  The labels (and correlation
 strength) are in excellent agreement with high-resolution studies on this cluster
 \citep{Cohen_2005}.  Indeed, while we find an intrinsic spread in these abundance
-labels, we find the spread is much smaller than previously consider.  We also
+labels, we find that the spread is much smaller than considered previously.  We also
 corroborate works that find no evidence of bi-modality in C and N 
-abundance labels, a signature commonly found amongst metal-rich globular clusters.
+abundance labels, a signature commonly found in metal-rich globular clusters.
 While the \aspcap\ labels show a substantial spread in total C+N+O abundances
 for M~15, our results imply that CNO-cycling has maintained an approximately
 constant sum abundance of these elements, consistent with recent works
 \citep{Meszaros_2015}.
 
 
-The reference set described in Section \ref{sec:training-set} was not
+The reference set described in Section \ref{sec:training set} was not
 purposefully constructed to include stars in \emph{any} globular
 cluster.  We selected stars that met strict quality criteria, and
 discarded stars with questionable label fidelity.  Given the
@@ -931,8 +928,7 @@ derivatives \emph{do} have physical meaning, allowing for the model
 to recover label patterns of high astrophysical interest that are 
 substantially different from the training set.
 
-
-It's also important because our measured labels have good astrophysical
+Our measured labels have good astrophysical
 interpretations that are consistent with expectations from stellar
 evolution.  The photospheric abundances of [C/H], [N/H] and [O/Fe] 
 are expected to change as a giant star experiences CNO cycling.  This pattern is
@@ -958,7 +954,7 @@ respect to each label.  They indicate where specific labels (or elements)
 contribute to the spectrum.  In Figure \ref{fig:line-identification} we
 demonstrate an example of this, where the first-order derivatives of three
 sparsely-acting labels [Al/H], [S/H] and [K/H] are shown for two spectral
-regions.  The location of known strong atomic lines are indicated by vertical
+regions.  The locations of known strong atomic lines are indicated by vertical
 markers \citep{Smith_2013}. Although no information about atomic line lists
 enter into our spectral model, the spectral derivatives for [Al/H] and [K/H] 
 show strong contributions at wavelengths of known atomic lines.
@@ -1191,7 +1187,7 @@ dashed one-to-one line is shown.
 \begin{figure}[p]
 \centering
 \includegraphics[width=0.8\textwidth]{test-step-chisq.pdf}
-\caption{Reduced $\chi^2$ values for all stars (stacked spectra) in \apogee\ \dr.\label{fig:chisq-test-set}}
+\caption{Reduced $\chi^2$ values for all stars (stacked spectra) in \apogee\ \dr.\label{fig:chisq-test set}}
 \end{figure}
 
 \clearpage
@@ -1216,7 +1212,7 @@ for \aspcap\ and \TheCannon\ are shown. The residuals are plotted in the top pan
 
 \begin{figure}[p]
 \includegraphics[width=\textwidth]{test_set_hrd.pdf}
-\caption{A temperature-surface gravity diagram for all 96,514 stars in the test set that pass our quality criteria (left). The centre panel shows a logarithmic density plot for the same stars. Abundance label distributions are shown in the right-hand panel.\label{fig:test-set-hrd}}
+\caption{A temperature-surface gravity diagram for all 96,514 stars in the test set that pass our quality criteria (left). The centre panel shows a logarithmic density plot for the same stars. Abundance label distributions are shown in the right-hand panel.\label{fig:test set-hrd}}
 \end{figure}
 
 \clearpage
@@ -1266,7 +1262,7 @@ that inferred from the high S/N combined spectrum.
 
 \begin{figure}[p]
 \centering
-\includegraphics[width=0.8\textwidth]{high-alpha-sequence.pdf}
+\includegraphics[width=0.7\textwidth]{high-alpha-sequence.pdf}
 \caption{Abundance labels of three element groups (odd-Z, $\alpha$, and Fe-peak) for stars in a high [$\alpha$/Fe] abundance sequence. Labels from \aspcap\ (left) and \TheCannon\ (right) are shown for the same set of stars. Stars are colored by their S/N ratio to highlight that the spread in the \aspcap\ label distribution is strongly impacted by stars with modest S/N ($<120$). The same result is not seen with \TheCannon.\label{fig:high-alpha-sequence}}
 \end{figure}
 
@@ -1274,7 +1270,7 @@ that inferred from the high S/N combined spectrum.
 
 \begin{figure}[p]
 \centering
-\includegraphics[width=0.40\textwidth]{M15_comparison.pdf}
+\includegraphics[width=0.35\textwidth]{M15_comparison.pdf}
 \caption{Abundance labels from \aspcap\ and \TheCannon\ for candidate
 members of the metal-poor globular cluster M~15 (NGC~7078).  The top panel
 shows heliocentric velocity and metallicity, which we use to separate
@@ -1287,7 +1283,7 @@ within those limits (from \aspcap\ and \TheCannon) are shown.\label{fig:m15-comp
 
 \begin{figure}[p]
 \centering
-\includegraphics[width=0.4\textwidth]{M53_comparison.pdf}
+\includegraphics[width=0.35\textwidth]{M53_comparison.pdf}
 \caption{Label comparison between \aspcap\ and \TheCannon\ for M~53.
 Markings are the same as per Figure \ref{fig:m15-comparison}.
 \label{fig:m53-comparison}}
@@ -1297,7 +1293,7 @@ Markings are the same as per Figure \ref{fig:m15-comparison}.
 
 \begin{figure}[p]
 \centering
-\includegraphics[width=0.4\textwidth]{M92_comparison.pdf}
+\includegraphics[width=0.35\textwidth]{M92_comparison.pdf}
 \caption{Label comparison between \aspcap\ and \TheCannon\ for M~92.
 Markings are the same as per Figure \ref{fig:m15-comparison}.
 \label{fig:m92-comparison}}
@@ -1331,6 +1327,7 @@ $[\rm{Ni/H}]$ 	& 0.03~dex \\
 \hline
 \end{tabular}
 \caption{Minimum error floor in labels, taken as the error in estimating labels for validation set stars at S/N $= 50$ (Figure \ref{fig:label-recovery-snr}).\label{tab:error-floors}}
+\label{tab:error-floors}
 \end{table*}
 
 
