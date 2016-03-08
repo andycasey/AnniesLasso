@@ -266,6 +266,8 @@ We have a training set of stars with \emph{mean} accurate labels, where ``accura
 defined by the accuracy requirements of the output labels.  It might be more 
 appropriate to say that we are assuming that the training set stars have 
 \emph{consistent} labels (consistent with the assumptions of smoothness, above).
+Indeed, because \TheCannon\ is a data-driven model we stress that it cannot
+create ``ground truth'': we are propagating labels from the training set.
 \item
 The training set is representative, in the sense that the training set stars 
 span the label space similarly to how the test set spans the label
@@ -1329,7 +1331,7 @@ $[\rm{Fe/H}]$ 	& 0.01~dex \\
 $[\rm{Ni/H}]$ 	& 0.03~dex \\
 \hline
 \end{tabular}
-\caption{Minimum error floor in labels, taken as the error in estimating labels for validation set stars at S/N $= 50$ (Figure \ref{fig:label-recovery-snr}).\label{tab:error-floors}}
+\caption{Minimum error floor in labels, taken as the error in estimating labels for validation set stars at S/N $= 50$ (Figure \ref{fig:label-recovery-snr}).}
 \label{tab:error-floors}
 \end{table*}
 
