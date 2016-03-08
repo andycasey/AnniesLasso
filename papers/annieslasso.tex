@@ -628,10 +628,11 @@ Figure \ref{fig:gridsearch-test-scalar} compared to the $\chi^2$ for the least-r
 the models demonstrate better predictive power in spectral fluxes, reflected by
 a lower total $\chi^2$ value.  As expected, the $\chi^2$ minimum is dependent on
 the scale factor.  While regularized models with lower $\chi^2$ values clearly
-predict spectral fluxes more accurately, this heuristic only gives a weak limit
-on our choice of hyper-parameters: \emph{any} regularized model with a lower
-$\chi^2$ value than seen in the unregularized case is objectively a better model 
-because it predicts stellar spectra more accurately.
+predict spectral fluxes more accurately (a comparison with \aspcap\ predicted
+fluxes is shown in Figure \ref{fig:correctness}), this heuristic only gives a 
+weak limit on our choice of hyper-parameters: \emph{any} regularized model with
+a lower $\chi^2$ value than seen in the unregularized case is objectively a 
+better model because it predicts stellar spectra more accurately.
 
 
 Our grid search has revealed that a regularization factor of at least $\Lambda = 10^3$ is
@@ -1167,6 +1168,44 @@ are shown in the right-hand panel.\label{fig:training_set_hrd}}
 
 \begin{figure}[p]
 \centering
+\includegraphics[width=\textwidth]{sparsity.pdf}
+\caption{The fraction of non-zero coefficients (i.e., a measure of matrix density) for 17-label models with different hyper-parameters $\Lambda$ and $f$.  The density of the first-order coefficients are shown in the left panel, the second-order coefficients (e.g., $\Teff^2$, $\Teff\cdot\logg$, or $[\rm{Al}/\rm{H}]\cdot[\rm{Mn}/\rm{H}]$) in the middle panel, and total density (excluding the baseline spectrum coefficient $\vectheta_0$) in the right-hand panel.\label{fig:sparsity}}
+\end{figure}
+
+\clearpage
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=\textwidth]{gs-mad-all-elements.pdf}
+\caption{The median absolute abundance difference (over all abundance labels)
+between that inferred from individual observations in the validation set, and
+that inferred from the high S/N combined spectrum.
+\label{fig:gridsearch-mad-all-elements}}
+\end{figure}
+
+\clearpage
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=\textwidth]{validation-scalar.pdf}
+\caption{The total $\chi^2$ (i.e., the \emph{test scalar}) relative to the $\Lambda = 10^0$ model for all validation set stars for different combinations of the hyper-parameters $\Lambda$ and $f$.
+ \label{fig:gridsearch-test-scalar}}
+\end{figure}
+
+\clearpage
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=\textwidth]{spectrum.pdf}
+\caption{A portion of the (\emph{Cannon}-)normalized spectrum for 2M18210703-1828134,
+a randomly selected star in the validation set.  The best-fit model spectra
+for \aspcap\ and \TheCannon\ are shown. The residuals are plotted in the top panel.\label{fig:correctness}}
+\end{figure}
+
+\clearpage
+
+\begin{figure}[p]
+\centering
 \includegraphics[width=0.8\textwidth]{regularized-model-validation.pdf}
 \caption{Comparisons between \aspcap\ (x-axis) and \TheCannon\ (y-axis)
 labels for the 1,460 high S/N stars in the validation set.  For clarity
@@ -1195,11 +1234,8 @@ dashed one-to-one line is shown.
 \clearpage
 
 \begin{figure}[p]
-\centering
-\includegraphics[width=\textwidth]{spectrum.pdf}
-\caption{A portion of the (\emph{Cannon}-)normalized spectrum for 2M18210703-1828134,
-a randomly selected star in the validation set.  The best-fit model spectra
-for \aspcap\ and \TheCannon\ are shown. The residuals are plotted in the top panel.\label{fig:correctness}}
+\includegraphics[width=\textwidth]{test_set_hrd.pdf}
+\caption{A temperature-surface gravity diagram for all 96,514 stars in the test set that pass our quality criteria (left). The centre panel shows a logarithmic density plot for the same stars. Abundance label distributions are shown in the right-hand panel.\label{fig:test set-hrd}}
 \end{figure}
 
 \clearpage
@@ -1208,56 +1244,6 @@ for \aspcap\ and \TheCannon\ are shown. The residuals are plotted in the top pan
 \centering
 \includegraphics[width=0.8\textwidth]{test-step-gce.pdf}
 \caption{Logarithmic density for all abundance labels with respect to iron ([X/Fe]), revealing the Galactic  enrichment with respect to Fe for all elements. Dotted lines indicate Solar abundances.\label{fig:gce}}
-\end{figure}
-
-\clearpage
-
-\begin{figure}[p]
-\includegraphics[width=\textwidth]{test_set_hrd.pdf}
-\caption{A temperature-surface gravity diagram for all 96,514 stars in the test set that pass our quality criteria (left). The centre panel shows a logarithmic density plot for the same stars. Abundance label distributions are shown in the right-hand panel.\label{fig:test set-hrd}}
-\end{figure}
-
-\clearpage
-
-\begin{figure}[p]
-\includegraphics[width=\textwidth]{line-identification.pdf}
-\caption{The normalized (to the maximum derivative value at any $\theta$) first-order spectral derivatives for [Al/H], [S/H], and [K/H] from our regularized \emph{Cannon} model. Vertical markings (and their colors) correspond to strong spectral lines used by \citet{Smith_2013}. For the sake of clarity we only show $\theta$ values above a background threshold.\label{fig:line-identification}}
-\end{figure}
-
-\clearpage
-
-\begin{figure}[p]
-\centering
-\includegraphics[width=\textwidth]{line-identification-zoom.pdf}
-\caption{First-order spectral derivatives (normalized to the standard deviation for that derivative) for all abundance labels centered at the \apogee\ `unknown' lines at 15235.8~\AA\ and 16755.6~\AA. Abundance derivatives are shown in grey, or colored as per Figure \ref{fig:line-identification}.\label{fig:line-identification-2}}
-\end{figure}
-
-\clearpage
-
-\begin{figure}[p]
-\centering
-\includegraphics[width=\textwidth]{sparsity.pdf}
-\caption{The fraction of non-zero coefficients (i.e., a measure of matrix density) for 17-label models with different hyper-parameters $\Lambda$ and $f$.  The density of the first-order coefficients are shown in the left panel, the second-order coefficients (e.g., $\Teff^2$, $\Teff\cdot\logg$, or $[\rm{Al}/\rm{H}]\cdot[\rm{Mn}/\rm{H}]$) in the middle panel, and total density (excluding the baseline spectrum coefficient $\vectheta_0$) in the right-hand panel.\label{fig:sparsity}}
-\end{figure}
-
-\clearpage
-
-\begin{figure}[p]
-\centering
-\includegraphics[width=\textwidth]{gs-mad-all-elements.pdf}
-\caption{The median absolute abundance difference (over all abundance labels)
-between that inferred from individual observations in the validation set, and
-that inferred from the high S/N combined spectrum.
-\label{fig:gridsearch-mad-all-elements}}
-\end{figure}
-
-\clearpage
-
-\begin{figure}[p]
-\centering
-\includegraphics[width=\textwidth]{validation-scalar.pdf}
-\caption{The total $\chi^2$ (i.e., the \emph{test scalar}) relative to the $\Lambda = 10^0$ model for all validation set stars for different combinations of the hyper-parameters $\Lambda$ and $f$.
- \label{fig:gridsearch-test-scalar}}
 \end{figure}
 
 \clearpage
@@ -1299,6 +1285,21 @@ Markings are the same as per Figure \ref{fig:m15-comparison}.
 \caption{Label comparison between \aspcap\ and \TheCannon\ for M~92.
 Markings are the same as per Figure \ref{fig:m15-comparison}.
 \label{fig:m92-comparison}}
+\end{figure}
+
+\clearpage
+
+\begin{figure}[p]
+\includegraphics[width=\textwidth]{line-identification.pdf}
+\caption{The normalized (to the maximum derivative value at any $\theta$) first-order spectral derivatives for [Al/H], [S/H], and [K/H] from our regularized \emph{Cannon} model. Vertical markings (and their colors) correspond to strong spectral lines used by \citet{Smith_2013}. For the sake of clarity we only show $\theta$ values above a background threshold.\label{fig:line-identification}}
+\end{figure}
+
+\clearpage
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=\textwidth]{line-identification-zoom.pdf}
+\caption{First-order spectral derivatives (normalized to the standard deviation for that derivative) for all abundance labels centered at the \apogee\ `unknown' lines at 15235.8~\AA\ and 16755.6~\AA. Abundance derivatives are shown in grey, or colored as per Figure \ref{fig:line-identification}.\label{fig:line-identification-2}}
 \end{figure}
 
 \clearpage
