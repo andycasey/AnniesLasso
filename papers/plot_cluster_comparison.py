@@ -280,7 +280,7 @@ if __name__ == "__main__":
     except:
 
         catalog = Table.read("../tc-cse-regularized-apogee-catalog.fits.gz")
-        ok = catalog["OK"] * (catalog["R_CHI_SQ"] < 3)
+        ok = catalog["OK"] * (catalog["R_CHI_SQ"] < 3) * (catalog["TEFF"] > 4000) * (catalog["TEFF"] < 5500)
         data = catalog[ok]
 
 
