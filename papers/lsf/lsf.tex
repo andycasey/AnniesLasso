@@ -1,0 +1,47 @@
+\documentclass[12pt, preprint]{aastex}
+
+\newcommand{\acronym}[1]{{\small{#1}}}
+\newcommand{\project}[1]{\textsl{#1}}
+\newcommand{\tc}{\project{The~Cannon}}
+
+\begin{document}
+
+\title{How to train and use \tc\ when the line spread function, rotation, or microturbulence is varying from star to star}
+\authors{DWH}
+
+\section{Introduction}
+
+\tc\ has amazing successes, which could be listed and cited here.
+
+\tc\ makes the fundamental assumption that stars with the same labels
+(atmospheric parameters and chemical abundances) labels will have the
+same spectra (up to Gaussian noise).
+This isn't always true:
+There can be important parameters (for example, rotational velocity
+amplitude $v\,\sin i$) that are not among the label set used for
+training.
+There can also be instrumental issues that make different stars with
+identical properties appear different.
+For example, in the \apogee\ spectrographs, different fibers have
+slightly different line spread functions (\acronym{LSF}s), which lead
+to different line widths for the absorption lines.
+
+The nice thing is that a subset of instrumental and stellar-physical
+effects are expected to only (to first order) affect the line shapes,
+and not their locations or relative equivalent widths.
+From here on, we are going to treat all of these effects as
+contributing to a single ``effective \acronym{LSF}'' (usually we will
+just call this the ``\acronym{LSF}''), which is different (in
+principle) for every star.
+Here we propose a method for training \tc\ with a training set of
+stars that are subject to different effective LSFs, and using \tc\ on
+new unlabeled stars that also all have different effective LSFs.
+
+\section{Method}
+
+First some reminders about linear algebra and convolutions and
+correlations:
+
+...
+
+\end{document}
