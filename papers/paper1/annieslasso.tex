@@ -82,7 +82,7 @@ to atomic lines that were previously unknown.  We recover (anti-)correlations
 in abundance labels for globular cluster stars, consistent with the literature.
 However we find that the intrinsic spread in globular cluster abundances is 3--4 times smaller than 
 previously reported.  We deliver 17 labels with associated errors for 
-96,514 red giant stars, as well as open-source code to extend this work to other spectroscopic surveys.
+87,563 red giant stars, as well as open-source code to extend this work to other spectroscopic surveys.
 \end{abstract}
 
 
@@ -760,8 +760,8 @@ optimizations, we adopted the end result with the lowest $\chi^2$ value.
 
 
 The training set only includes giant stars, but the \apogee\ \dr\ includes 
-giants and dwarfs.  Therefore we exclude results with $\chi_r^2 > 3$, stars without a $\Teff$ label from \aspcap, or stars with \aspcap\ labels outside of the bounds $5300 > \Teff > 3700$ or $\logg < 3.9$.
-The distilled sample contains 96,514 giant stars, where we report $\Teff$,
+giants and dwarfs.  Therefore we exclude results with $\chi_r^2 > 3$, stars without a $\Teff$ label from \aspcap, or stars with \aspcap\ labels outside of the bounds $5500 > \Teff > 4000$ or $\logg < 3.9$.
+The distilled sample contains 87,563 giant stars, where we report $\Teff$,
 $\logg$, and 15 abundance labels.  The distribution of $\chi^2$ values for
 all 150,677 combined spectra are show in Figure \ref{fig:chisq-test set}.  The
 labels in the distilled sample follow expectations from stellar astrophysics,
@@ -770,7 +770,7 @@ the \aspcap\ labels include a strict cut in $\Teff$ at 3600~K, but we reliably
 recover labels beyond this boundary.  Figure \ref{fig:test set-hrd} presents a
 few different label projections for the distilled sample, indicative of the
 boundaries and distribution of our labels.  The full complement of 17-labels
-for 96,514 stars is provided in Table \ref{tab:the-good-stuff}, in addition
+for 87,563 stars is provided in Table \ref{tab:the-good-stuff}, in addition
 to quality metrics. 
 
 
@@ -1237,7 +1237,7 @@ dashed one-to-one line is shown.
 
 \begin{figure}[p]
 \includegraphics[width=\textwidth]{test_set_hrd.pdf}
-\caption{A temperature-surface gravity diagram for all 96,514 stars in the test set that pass our quality criteria (left). The centre panel shows a logarithmic density plot for the same stars. Abundance label distributions are shown in the right-hand panel.\label{fig:test set-hrd}}
+\caption{A temperature-surface gravity diagram for all 87,563 stars in the test set that pass our quality criteria (left). The centre panel shows a logarithmic density plot for the same stars. Abundance label distributions are shown in the right-hand panel.\label{fig:test set-hrd}}
 \end{figure}
 
 \clearpage
@@ -1345,19 +1345,17 @@ $[\rm{Ni/H}]$ 	& 0.03~dex \\
 \texttt{APOGEE\_ID} & $\Teff$ & $\logg$ & [Al/H] & [Ca/H] & $\cdots$ \\
 & (K) & & & \\
 \hline
-2M18550791+4754062 & $3960 \pm 2$ & $1.154 \pm 0.007$ & $-0.266   \pm 0.011$ & $-0.261   \pm 0.011$ & $\cdots$ \\
 2M18482322+4727598 & $4502 \pm 3$ & $2.279 \pm 0.008$ & $\pn0.275 \pm 0.013$ & $-0.019   \pm 0.012$ & $\cdots$ \\
 2M18495146+4622483 & $4592 \pm 5$ & $2.641 \pm 0.010$ & $\pn0.385 \pm 0.016$ & $\pn0.109 \pm 0.018$ & $\cdots$ \\
 2M18543638+4658349 & $4767 \pm 7$ & $2.550 \pm 0.014$ & $-0.076   \pm 0.019$ & $-0.307   \pm 0.017$ & $\cdots$ \\
 2M18471131+4726561 & $4494 \pm 3$ & $2.158 \pm 0.009$ & $\pn0.040 \pm 0.014$ & $-0.187   \pm 0.013$ & $\cdots$ \\
 2M18493578+4838112 & $4720 \pm 6$ & $2.828 \pm 0.011$ & $\pn0.055 \pm 0.019$ & $-0.074   \pm 0.017$ & $\cdots$ \\
 2M18442845+4651265 & $4659 \pm 5$ & $2.559 \pm 0.010$ & $\pn0.042 \pm 0.014$ & $-0.046   \pm 0.013$ & $\cdots$ \\
-2M18524613+4745349 & $3949 \pm 2$ & $1.483 \pm 0.006$ & $\pn0.216 \pm 0.010$ & $-0.034   \pm 0.010$ & $\cdots$ \\
 2M18464037+4816449 & $4730 \pm 4$ & $2.621 \pm 0.009$ & $\pn0.372 \pm 0.013$ & $\pn0.204 \pm 0.013$ & $\cdots$ \\
 2M18515439+4809330 & $4786 \pm 6$ & $2.601 \pm 0.013$ & $\pn0.009 \pm 0.017$ & $-0.208   \pm 0.016$ & $\cdots$ \\
 \hline
 \end{tabular}
-\caption{All 17-labels for 96,514 \apogee\ giant stars using the regularized model. Positions and ancillary measurements from \aspcap\ are included for convenience. Only formal errors are listed here. See text for full details regarding the known error budget.  This table is online-only. A portion is shown here to indicate form and content.}
+\caption{All 17-labels for 87,563 \apogee\ giant stars using the regularized model. Positions and ancillary measurements from \aspcap\ are included for convenience. Only formal errors are listed here. See text for full details regarding the known error budget.  This table is online-only. A portion is shown here to indicate form and content.}
 \label{tab:the-good-stuff}
 \end{table*}
 
