@@ -102,7 +102,7 @@ class BaseCannonModel(object):
     """
 
     _trained_attributes = ["_s2", "_theta"]
-    _descriptive_attributes = ["_dispersion", "_vectorizer", "_pixel_filters"]
+    _descriptive_attributes = ["_dispersion", "_vectorizer", "_censors"]
     _data_attributes = ["_labelled_set", "_normalized_flux", "_normalized_ivar"]
     
     def __init__(self, labelled_set, normalized_flux, normalized_ivar,
@@ -336,60 +336,70 @@ class BaseCannonModel(object):
 
 
     @property
-    def pixel_filters(self):
+    def censors(self):
         """
-        Return the pixel filters for the labels.
+        Return the wavelength censor masks for the labels.
         """
-        return self._pixel_filters
+        return self._censors
 
 
-    @pixel_filters.setter
-    def pixel_filters(self, pixel_filters):
+    @censors.setter
+    def censors(self, censors):
         """
-        Set the pixel filters (for each label) for the model.
+        Set the wavelength censors (per label) for the model.
 
-        :param pixel_filters:
-            A dictionary containing the labels as keys and masks as values.
+        :param censors:
+            A dictionary containing the labels as keys and masks as values. The
+            masks can be in the form of a boolean array of size `N_pixels`,
+            or a list of two-length tuples containing (start, end) regions to
+            exclude.
         """
 
-        if pixel_filters is None:
-            self._pixel_filters = None
+        if censors is None:
+            self._censors = None
             return None
 
-        # Pixel filters can't be set if we don't know what the vectorizer
-        # label names are.
+        # Wavelength censoring can't be set if we don't know the vectorizer
+        # names.
         if self.vectorizer is None:
-            raise TypeError("the model requires a vectorizer")
+            raise TypeError("model requires a vectorizer to validate the "
+                "wavelength censors")
 
-        if not isinstance(pixel_filters, dict):
-            raise TypeError("pixel filters must be specified as a dictionary")
+        if not isinstance(censors, dict):
+            raise TypeError("censored regions must be given as a dictionary")
 
         # Ignore unrecognized labels in the pixel filters that aren't in the
         # vectorizer.
-        unrecognized = set(pixel_filters).difference(self.vectorizer.label_names)
+        unrecognized = set(censors).difference(self.vectorizer.label_names)
         if any(unrecognized):
-            logger.warn("Ignoring unrecognized label names in the pixel filter "
-                        "description: {0}".format(", ".join(unrecognized)))
+            logger.warn(
+                "Ignoring unrecognized label names in the wavelength censoring "
+                "description: {0}".format(", ".join(unrecognized)))
 
-        pixel_filters = pixel_filters.copy()
-        for each in unrecognized:
-            del pixel_filters[each]
+        valid_censors = {}
+        for label in set(censors).intersection(self.vectorizer.label_names):
+            # Check the value.
+            # Can be a boolean array of the right size, or a (N, 2) shape array.
+            value = np.array(censors[label])
+            if value.size == self.dispersion.size:
+                value = value.astype(bool)
 
-        if len(pixel_filters) == 0:
-            self._pixel_filters = None
-            return None
+            elif len(value.shape) == 2 and value.shape[1] == 2:
+                # Ranges specified. Generate boolean mask.
+                value = np.ones(self.dispersion.size, dtype=bool)
+                for start, end in value:
+                    excl = (end >= self.dispersion) * (self.dispersion >= start)
+                    value[excl] = False
 
-        # Check the values in the pixel filters.
-        for label_name in pixel_filters.keys():
-            label_filter = np.array(pixel_filters[label_name], dtype=bool)
-            if label_filter.size != self.dispersion.size:
-                raise ValueError("the label filter must be set for every pixel"
-                                 " (array size {0} != {1})".format(
-                                    label_filter.size, self.dispersion.size))
+            else:
+                raise ValueError(
+                    "cannot interpret censoring "
+                    "mask for label '{}'".format(label))
 
-            pixel_filters[label_name] = label_filter
-        
-        self._pixel_filters = pixel_filters
+            valid_censors[label] = value
+
+        self._censors = valid_censors or None
+
         return None
 
 
