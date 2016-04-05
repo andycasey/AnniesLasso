@@ -338,14 +338,15 @@ def parse_label_vector_description(description, columns=None, **kwargs):
     return label_vector
 
 
-def human_readable_label_vector(terms, label_names, mul="*", pow="^"):
+def human_readable_label_vector(terms, label_names=None, mul="*", pow="^",
+    bracket=False):
     """
     Return a human-readable form of the label vector.
 
     :param terms:
         The structured terms of the label vector.
 
-    :param label_names:
+    :param label_names: [optional]
         The names for each label in the label vector.
 
     :param mul: [optional]
@@ -356,16 +357,27 @@ def human_readable_label_vector(terms, label_names, mul="*", pow="^"):
     :param pow: [optional]
         String to use to represent a power operator.
     """
-    terms = ["1"]
+    if not isinstance(terms, (list, tuple)):
+        raise TypeError("label vector is not a structured set of terms")
+
+    human_terms = ["1"]
     for term in terms:
         ct = []
         for i, o in term:
-            if o > 1:
-                ct.append("{0}{1}{2:.0f}".format(label_names[i], pow, o))
+            if isinstance(i, int) and label_names is not None:
+                label_name = label_names[i]
             else:
-                ct.append(label_names[i])
-        terms.append(mul.join(ct))
-    return terms
+                label_name = i
+            if o > 1:
+                ct.append("{0}{1}{2}".format(label_name, pow, o))
+            else:
+                ct.append(label_name)
+
+        if bracket and len(ct) > 1:
+            human_terms.append("({})".format(mul.join(ct)))
+        else:
+            human_terms.append(mul.join(ct))
+    return " + ".join(human_terms)
 
 
 def terminator(label_names, order, cross_term_order=-1, **kwargs):
