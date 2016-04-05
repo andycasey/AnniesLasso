@@ -13,9 +13,8 @@ __all__ = ["L1RegularizedCannonModel"]
 import logging
 import numpy as np
 import scipy.optimize as op
-from sys import stdout, maxsize
 
-from . import (cannon, model, utils)
+from . import (cannon, utils)
 
 logger = logging.getLogger(__name__)
 

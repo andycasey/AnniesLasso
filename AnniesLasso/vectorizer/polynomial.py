@@ -170,8 +170,8 @@ class BasePolynomialVectorizer(BaseVectorizer):
         return [indices.get(i, [None])[0] for i in range(len(self.label_names))]
 
 
-    def get_human_readable_label_vector(self, label_names=None, mul="*", pow="^",
-        **kwargs):
+
+    def get_human_readable_label_vector(self, label_names=None, **kwargs):
         """
         Return a human-readable form of the label vector.
 
@@ -179,25 +179,12 @@ class BasePolynomialVectorizer(BaseVectorizer):
             Give new label names to form the human readable label vector (e.g.,
             LaTeX label names).
 
-        :param mul: [optional]
-            String to use to represent a multiplication operator. For example,
-            if giving LaTeX label definitions one may want to use '\cdot' for
-            the `mul` term.
-
-        :param pow: [optional]
-            String to use to represent a power operator.
+        :returns:
+            A human-readable string that represents the label-vector.
         """
-        label_names = label_names or self.label_names
-        terms = ["1"]
-        for term in self.terms:
-            ct = []
-            for i, o in term:
-                if o > 1:
-                    ct.append("{0}{1}{2:.0f}".format(label_names[i], pow, o))
-                else:
-                    ct.append(label_names[i])
-            terms.append(mul.join(ct))
-        return terms
+
+        return human_readable_label_vector(
+            self.terms, label_names=label_names or self.label_names, **kwargs)
 
 
 class NormalizedPolynomialVectorizer(BasePolynomialVectorizer):
@@ -351,6 +338,36 @@ def parse_label_vector_description(description, columns=None, **kwargs):
     return label_vector
 
 
+def human_readable_label_vector(terms, label_names, mul="*", pow="^"):
+    """
+    Return a human-readable form of the label vector.
+
+    :param terms:
+        The structured terms of the label vector.
+
+    :param label_names:
+        The names for each label in the label vector.
+
+    :param mul: [optional]
+        String to use to represent a multiplication operator. For example,
+        if giving LaTeX label definitions one may want to use '\cdot' for
+        the `mul` term.
+
+    :param pow: [optional]
+        String to use to represent a power operator.
+    """
+    terms = ["1"]
+    for term in terms:
+        ct = []
+        for i, o in term:
+            if o > 1:
+                ct.append("{0}{1}{2:.0f}".format(label_names[i], pow, o))
+            else:
+                ct.append(label_names[i])
+        terms.append(mul.join(ct))
+    return terms
+
+
 def terminator(label_names, order, cross_term_order=-1, **kwargs):
     """
     Create the terms required for a label vector description based on the label
@@ -404,6 +421,9 @@ def get_label_names(label_vector):
 
     :param label_vector:
         A structured description of the label vector.
+
+    :returns:
+        A list of the label names that make up the label vector.
     """
     return list(OrderedDict.fromkeys([label for term in label_vector \
         for label, power in term if power != 0]))
