@@ -136,6 +136,9 @@ class BaseCannonModel(object):
             if dispersion is not None \
             else np.arange(self._normalized_flux.shape[1], dtype=int)
 
+        # Initialise wavelength censoring.
+        self._censors = {}
+
         # Initialize a random, yet reproducible group of subsets.
         self._metadata["q"] = np.random.randint(0, 10, len(labelled_set))
         
@@ -356,7 +359,7 @@ class BaseCannonModel(object):
         """
 
         if censors is None:
-            self._censors = None
+            self._censors = {}
             return None
 
         # Wavelength censoring can't be set if we don't know the vectorizer
@@ -398,7 +401,7 @@ class BaseCannonModel(object):
 
             valid_censors[label] = value
 
-        self._censors = valid_censors or None
+        self._censors = valid_censors
 
         return None
 
@@ -618,7 +621,7 @@ class BaseCannonModel(object):
 
 
     @property
-    @requires_model_description
+    @requires_model_description # vectorizer
     def design_matrix(self):
         """
         Return the design matrix for all pixels.
@@ -627,8 +630,39 @@ class BaseCannonModel(object):
             for label_name in self.vectorizer.label_names]).T)
 
         if not np.all(np.isfinite(matrix)):
-            logger.warn("Non-finite values in the design matrix!")
+            raise ValueError("non-finite values in the design matrix!")
+
         return matrix
+
+
+    @property
+    @requires_model_description # vectorizer, censors
+    def censored_design_matrix(self):
+        """
+        Return a censored mask of the design matrix, based on the given
+        wavelength censors.
+        """
+
+        if not self.censors or self.censors is None:
+            return self.design_matrix
+
+        censored = []
+        N = len(self.labelled_set)
+        
+        # Propagating NaNs is a nice trick to do this efficiently.
+        for label_name in self.vectorizer.label_names:
+            data = self.labelled_set[label_name].copy()
+
+            try:
+                use = self.censors[label_name]
+            except KeyError:
+                None
+            else:
+                # When the pixel mask is False, set the copied data as NaN
+                data[~use] = np.nan
+            censored.append(data)
+
+        return self.vectorizer(np.vstack(censored).T)
 
 
     @property

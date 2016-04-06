@@ -60,8 +60,9 @@ class L1RegularizedCannonModel(cannon.CannonModel):
         This argument is only used if specified and if `threads > 1`.
     """
 
-    _descriptive_attributes = ["_vectorizer", "_regularization"]
-    
+    _descriptive_attributes \
+        = ["_dispersion", "_vectorizer", "_censors", "_regularization"]
+        
     def __init__(self, *args, **kwargs):
         super(L1RegularizedCannonModel, self).__init__(*args, **kwargs)
 
