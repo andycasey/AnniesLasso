@@ -629,10 +629,9 @@ class BaseCannonModel(object):
 
         # Parse all the terms once-off.
         mapper = {}
-        pixel_masks = np.array(self.censors.values())
+        pixel_masks = np.atleast_2d(self.censors.values())
         for i, terms in enumerate(self.vectorizer.terms):
             for label_index, power in terms:
-
                 # Let's map this directly to the censors that we actually have.
                 try:
                     censor_index = self.censors.keys().index(
@@ -652,7 +651,7 @@ class BaseCannonModel(object):
 
         # We already know the number of terms from i.
         mask = np.ones((self.dispersion.size, 2 + i), dtype=bool)
-        for censor_index, pixel in zip(np.where(pixel_masks)):
+        for censor_index, pixel in zip(*np.where(pixel_masks)):
             mask[pixel, mapper[censor_index]] = False
 
         return mask
