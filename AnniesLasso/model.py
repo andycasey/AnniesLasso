@@ -24,8 +24,8 @@ from six import string_types
 from .vectorizer.base import BaseVectorizer
 from . import (utils, __version__ as code_version)
 
-
 logger = logging.getLogger(__name__)
+
 
 def requires_training_wheels(method):
     """
@@ -41,20 +41,33 @@ def requires_training_wheels(method):
     return wrapper
 
 
-def requires_model_description(method):
+def requires_model_description(descriptors=None):
     """
-    A decorator for model methods that require a full model description.
+    A decorator for model methods that require some part of a model description.
 
-    :param method:
-        A method belonging to a sub-class of BaseCannonModel.
+    :param descriptors: [optional]
+        If specified, only these descriptors will be required. If set as None,
+        then all model descriptors will be required.
     """
-    def wrapper(model, *args, **kwargs):
-        for descriptive_attribute in model._descriptive_attributes:
-            if getattr(model, descriptive_attribute) is None:
-                raise TypeError("the model requires a {} term".format(
-                    descriptive_attribute.lstrip("_")))
-        return method(model, *args, **kwargs)
-    return wrapper
+
+    def decorator(method):
+        """
+        A decorator for model methods that require a full model description.
+
+        :param method:
+            A method belonging to a sub-class of BaseCannonModel.
+        """
+    
+        def wrapper(model, *args, **kwargs):
+            required_attributes = descriptors or model._descriptive_attributes
+            for descriptive_attribute in required_attributes:
+                if getattr(model, descriptive_attribute) is None:
+                    raise TypeError("the model requires a {} term".format(
+                        descriptive_attribute.lstrip("_")))
+            return method(model, *args, **kwargs)
+        return wrapper
+
+    return decorator
 
 
 class BaseCannonModel(object):
@@ -621,7 +634,7 @@ class BaseCannonModel(object):
 
 
     @property
-    @requires_model_description # vectorizer
+    @requires_model_description(descriptors=["vectorizer"])
     def design_matrix(self):
         """
         Return the design matrix for all pixels.
@@ -636,7 +649,7 @@ class BaseCannonModel(object):
 
 
     @property
-    @requires_model_description # vectorizer, censors
+    @requires_model_description(descriptors=["vectorizer", "censors"])
     def censored_design_matrix(self):
         """
         Return a censored mask of the design matrix, based on the given
@@ -674,7 +687,7 @@ class BaseCannonModel(object):
         return self.get_labels_array(self.labelled_set)
 
 
-    @requires_model_description
+    @requires_model_description(descriptors=["vectorizer"])
     def get_labels_array(self, labelled_set):
         return np.vstack([labelled_set[label_name] \
             for label_name in self.vectorizer.label_names]).T
