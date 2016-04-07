@@ -22,7 +22,7 @@ from six.moves import cPickle as pickle
 from six import string_types
 
 from .vectorizer.base import BaseVectorizer
-from . import (utils, __version__ as code_version)
+from . import (censoring, utils, __version__ as code_version)
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ class BaseCannonModel(object):
             else np.arange(self._normalized_flux.shape[1], dtype=int)
 
         # Initialise wavelength censoring.
-        self._censors = {}
+        self._censors = censoring.CensorsDict(self)
 
         # Initialize a random, yet reproducible group of subsets.
         self._metadata["q"] = np.random.randint(0, 10, len(labelled_set))
@@ -371,50 +371,21 @@ class BaseCannonModel(object):
             exclude.
         """
 
-        if censors is None:
-            self._censors = {}
-            return None
+        if censors is not None:
+            if self.vectorizer is None:
+                # Wavelength censoring can't be set if we don't know the 
+                # vectorizer names.
+                raise TypeError("model requires a vectorizer to validate the "
+                    "wavelength censors")
 
-        # Wavelength censoring can't be set if we don't know the vectorizer
-        # names.
-        if self.vectorizer is None:
-            raise TypeError("model requires a vectorizer to validate the "
-                "wavelength censors")
+            if not isinstance(censors, (dict, censoring.CensorsDict)):
+                raise TypeError("censors must be given as a dictionary")
 
-        if not isinstance(censors, dict):
-            raise TypeError("censored regions must be given as a dictionary")
+        # Create a new dictionary, regardless of whether censors is None or not.
+        self._censors = censoring.CensorsDict(self)
 
-        # Ignore unrecognized labels in the pixel filters that aren't in the
-        # vectorizer.
-        unrecognized = set(censors).difference(self.vectorizer.label_names)
-        if any(unrecognized):
-            logger.warn(
-                "Ignoring unrecognized label names in the wavelength censoring "
-                "description: {0}".format(", ".join(unrecognized)))
-
-        valid_censors = {}
-        for label in set(censors).intersection(self.vectorizer.label_names):
-            # Check the value.
-            # Can be a boolean array of the right size, or a (N, 2) shape array.
-            value = np.array(censors[label])
-            if value.size == self.dispersion.size:
-                value = value.astype(bool)
-
-            elif len(value.shape) == 2 and value.shape[1] == 2:
-                # Ranges specified. Generate boolean mask.
-                value = np.ones(self.dispersion.size, dtype=bool)
-                for start, end in value:
-                    excl = (end >= self.dispersion) * (self.dispersion >= start)
-                    value[excl] = False
-
-            else:
-                raise ValueError(
-                    "cannot interpret censoring "
-                    "mask for label '{}'".format(label))
-
-            valid_censors[label] = value
-
-        self._censors = valid_censors
+        if censors is not None:
+            self._censors.update(censors)
 
         return None
 
@@ -649,33 +620,42 @@ class BaseCannonModel(object):
 
 
     @property
-    @requires_model_description(descriptors=["vectorizer", "censors"])
-    def censored_design_matrix(self):
+    @requires_model_description(requires=["vectorizer", "censors"])
+    def censored_vectorizer_terms(self):
         """
-        Return a censored mask of the design matrix, based on the given
-        wavelength censors.
-        """
+        Return a mask of which indices in the design matrix columns should be
+        used for a given pixel. 
+        """        
 
-        if not self.censors or self.censors is None:
-            return self.design_matrix
+        # Parse all the terms once-off.
+        mapper = {}
+        pixel_masks = np.array(self.censors.values())
+        for i, terms in enumerate(self.vectorizer.terms):
+            for label_index, power in terms:
 
-        censored = []
-        N = len(self.labelled_set)
-        
-        # Propagating NaNs is a nice trick to do this efficiently.
-        for label_name in self.vectorizer.label_names:
-            data = self.labelled_set[label_name].copy()
+                # Let's map this directly to the censors that we actually have.
+                try:
+                    censor_index = self.censors.keys().index(
+                        self.vectorizer.label_names[label_index])
 
-            try:
-                use = self.censors[label_name]
-            except KeyError:
-                None
-            else:
-                # When the pixel mask is False, set the copied data as NaN
-                data[~use] = np.nan
-            censored.append(data)
+                except ValueError:
+                    # Label name is not censored, so we don't care.
+                    continue
 
-        return self.vectorizer(np.vstack(censored).T)
+                else:
+                    # Initialize a list if necessary.
+                    mapper.setdefault(censor_index, [])
+
+                    # Note that we add +1 because the first term in the design
+                    # matrix columns will actually be the pivot point.
+                    mapper[censor_index].append(1 + i)
+
+        # We already know the number of terms from i.
+        mask = np.ones((self.dispersion.size, 2 + i), dtype=bool)
+        for censor_index, pixel in zip(np.where(pixel_masks)):
+            mask[pixel, mapper[censor_index]] = False
+
+        return mask
 
 
     @property
