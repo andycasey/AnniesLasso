@@ -620,7 +620,7 @@ class BaseCannonModel(object):
 
 
     @property
-    @requires_model_description(requires=["vectorizer", "censors"])
+    @requires_model_description(descriptors=["vectorizer", "censors"])
     def censored_vectorizer_terms(self):
         """
         Return a mask of which indices in the design matrix columns should be
