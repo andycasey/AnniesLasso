@@ -51,11 +51,16 @@ class CensorsDict(dict):
 
         elif len(value.shape) == 2 and value.shape[1] == 2:
             # Ranges specified. Generate boolean mask.
-            mask = np.ones(self.model.dispersion.size, dtype=bool)
+            mask = np.zeros(self.model.dispersion.size, dtype=bool)
             for start, end in value:
-                exc = (end >= self.model.dispersion) \
-                    * (self.model.dispersion >= start)
-                mask[exc] = False
+
+                # Allow 'None' to automatically specify edges.
+                start = start or -np.inf
+                end = end or +np.inf
+
+                censored = (end >= self.model.dispersion) \
+                         * (self.model.dispersion >= start)
+                mask[censored] = True
 
             value = mask
 

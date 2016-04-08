@@ -36,7 +36,7 @@ class TestBaseVectorizerInitialization(unittest.TestCase):
     def test_non_finite_fiducials(self):
         with self.assertRaises(ValueError):
             base.BaseVectorizer(self.label_names,
-                ([0] * len(self.label_names)) + [np.nan],
+                ([0] * (len(self.label_names) - 1)) + [np.nan],
                 np.random.uniform(size=len(self.label_names)),
                 [])
 
@@ -44,13 +44,13 @@ class TestBaseVectorizerInitialization(unittest.TestCase):
     def test_infinite_fiducials(self):
         with self.assertRaises(ValueError):
             base.BaseVectorizer(self.label_names,
-                ([0] * len(self.label_names)) + [+np.inf],
+                ([0] * (len(self.label_names) - 1) + [+np.inf],
                 np.random.uniform(size=len(self.label_names)),
                 [])
 
         with self.assertRaises(ValueError):
             base.BaseVectorizer(self.label_names,
-                ([0] * len(self.label_names)) + [-np.inf],
+                ([0] * (len(self.label_names) - 1) + [-np.inf],
                 np.random.uniform(size=len(self.label_names)),
                 [])
 
