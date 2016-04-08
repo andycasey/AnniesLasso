@@ -20,14 +20,14 @@ class TestBaseVectorizerInitialization(unittest.TestCase):
 
     def test_incompatible_scale_length(self):
         with self.assertRaises(ValueError):
-            base.BaseVectorizer(labels,
+            base.BaseVectorizer(self.labels,
                 np.random.uniform(size=len(self.labels)),
                 np.random.uniform(size=len(self.labels) + 1),
                 [])
 
     def test_incompatible_fiducial_length_1(self):
         with self.assertRaises(ValueError):
-            base.BaseVectorizer(labels,
+            base.BaseVectorizer(self.labels,
                 np.random.uniform(size=len(self.labels) - 1),
                 np.random.uniform(size=len(self.labels)),
                 [])
@@ -35,7 +35,7 @@ class TestBaseVectorizerInitialization(unittest.TestCase):
 
     def test_non_finite_fiducials(self):
         with self.assertRaises(ValueError):
-            base.BaseVectorizer(labels,
+            base.BaseVectorizer(self.labels,
                 ([0] * len(self.labels)) + [np.nan],
                 np.random.uniform(size=len(self.labels)),
                 [])
@@ -43,13 +43,13 @@ class TestBaseVectorizerInitialization(unittest.TestCase):
 
     def test_infinite_fiducials(self):
         with self.assertRaises(ValueError):
-            base.BaseVectorizer(labels,
+            base.BaseVectorizer(self.labels,
                 ([0] * len(self.labels)) + [+np.inf],
                 np.random.uniform(size=len(self.labels)),
                 [])
 
         with self.assertRaises(ValueError):
-            base.BaseVectorizer(labels,
+            base.BaseVectorizer(self.labels,
                 ([0] * len(self.labels)) + [-np.inf],
                 np.random.uniform(size=len(self.labels)),
                 [])
@@ -57,7 +57,7 @@ class TestBaseVectorizerInitialization(unittest.TestCase):
 
     def test_non_finite_scales(self):
         with self.assertRaises(ValueError):
-            base.BaseVectorizer(labels,
+            base.BaseVectorizer(self.labels,
                 np.random.uniform(size=len(self.labels)),
                 ([0] * len(self.labels)) + [np.nan],
                 [])
@@ -65,13 +65,13 @@ class TestBaseVectorizerInitialization(unittest.TestCase):
 
     def test_infinite_scales(self):
         with self.assertRaises(ValueError):
-            base.BaseVectorizer(labels,
+            base.BaseVectorizer(self.labels,
                 np.random.uniform(size=len(self.labels)),
                 ([0] * len(self.labels)) + [+np.inf],
                 [])
 
         with self.assertRaises(ValueError):
-            base.BaseVectorizer(labels,
+            base.BaseVectorizer(self.labels,
                 np.random.uniform(size=len(self.labels)),
                 ([0] * len(self.labels)) + [-np.inf],
                 [])
@@ -79,7 +79,7 @@ class TestBaseVectorizerInitialization(unittest.TestCase):
 
     def test_negative_scales(self):
         with self.assertRaises(ValueError):
-            base.BaseVectorizer(labels,
+            base.BaseVectorizer(self.labels,
                 np.random.uniform(size=len(self.labels)),
                 np.random.uniform([-2, -1], size=len(self.labels)),
                 [])
