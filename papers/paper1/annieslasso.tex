@@ -7,7 +7,7 @@
 %			our (interpret)ability to identify missing lines
 %@arxiver{M15_comparison.pdf,validation-label-recovery.pdf,sparsity.pdf,line-identification.pdf}
 
-\documentclass[12pt,preprint]{aastex}
+\documentclass[12pt,preprint]{aastex6}
 \usepackage{amsmath,amssymb}
 
 \newcommand{\project}[1]{\textsl{#1}}
@@ -33,12 +33,14 @@
 
 \title{\textsl{The Cannon 2:} A data-driven model of stellar spectra \\
        for detailed chemical abundance analyses}
+     
 \author{Andrew~R.~Casey\altaffilmark{1},
         David~W.~Hogg\altaffilmark{2,3,4,5},
         Melissa~Ness\altaffilmark{5},\\
         Hans-Walter~Rix\altaffilmark{5},
         Anna~Y.~Q.~Ho\altaffilmark{6},
     and~Gerry~Gilmore\altaffilmark{1}}
+ 
 \altaffiltext{1}{Institute of Astronomy, University of Cambridge, 
                  Madingley Road, Cambridge CB3~0HA, UK}    
 \altaffiltext{2}{Simons Center for Data Analysis, 160 Fifth Avenue, 7th Floor, 
@@ -52,6 +54,7 @@
                  D-69117 Heidelberg, Germany}
 \altaffiltext{6}{Astronomy Department, California Institute of Technology,
                  MC 249-17, 1200 East California Blvd, Pasadena, CA 91125, USA}
+
 \email{arc@ast.cam.ac.uk}
 
 
@@ -1033,7 +1036,7 @@ exhibit significantly narrower intrinsic spreads in abundances (and their anti-c
 than previously considered.  Crucially, because the detailed chemical
 abundances reflect the star forming conditions and subsequent evolution of
 the cluster, this work is a necessary and fundamental step forward in
-understanding the evolution of stars, clusters, and ultimately, the Milky Way.
+understanding the evolution of stars, clusters, and ultimately, the Milky Way.\\
 
 
 All of the code for this project is available with documentation at \url{http://thecannon.io/}.  
@@ -1044,25 +1047,15 @@ We encourage open community discussion by way of GitHub issues, and code contrib
 The authors warmly thank Daniel Foreman-Mackey (University of Washington),
 						 Jason Sanders (Cambridge), and
 						 Angus Williams (Cambridge) for valuable discussions.
-						 
+This research made use of
+  the \acronym{NASA} \project{Astrophysics Data System Bibliographic Services},
+  GitHub, and the Travis Continuous Integration service.
 This project was funded in part by
   the European Research Council under the European Union's Seventh Framework 
   Programme (FP~7) \acronym{ERC} Grant Agreement 320360,
   the \acronym{NSF} (grants \acronym{IIS-1124794}, \acronym{AST-1517237}),
   \acronym{NASA} (grant \acronym{NNX12AI50G}), and 
   the Moore-Sloan Data Science Environment at \acronym{NYU}.
-This research made use of: 
-  the \acronym{NASA} \project{Astrophysics Data System Bibliographic Services},
-  \texttt{TOPCAT} \citep{Taylor_2005},
-  GitHub, 
-  Travis CI, the
-  \texttt{IPython} \citep{Perez_2007}, 
-  \texttt{numpy} \citep{van_der_Walt_2011}, 
-  \texttt{matplotlib} \citep{Hunter_2007}, and
-  \texttt{scipy} \citep{Jones_2001} packages, as well as
-  Astropy, a community-developed core Python package for Astronomy \citep{astropy}.
-
-
 This project made use of \sdssiii\ data.
 Funding for \sdssiii\ has been provided by the Alfred P. Sloan
 Foundation, the Participating Institutions, the National Science
@@ -1084,6 +1077,13 @@ Princeton University, the Spanish Participation Group, University of
 Tokyo, University of Utah, Vanderbilt University, University of
 Virginia, University of Washington, and Yale University.
 
+\software{This research has benefited from:
+    \texttt{TOPCAT} \citep{Taylor_2005},
+    \texttt{IPython} \citep{Perez_2007},
+    \texttt{numpy} \citep{van_der_Walt_2011},
+    \texttt{matplotlib} \citep{Hunter_2007},
+    \texttt{scipy} \citep{Jones_2001},
+    and Astropy \citep{astropy}.}
 
 
 \begin{thebibliography}{dummy}\raggedright
