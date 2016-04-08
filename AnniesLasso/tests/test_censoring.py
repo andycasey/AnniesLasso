@@ -6,13 +6,8 @@ Unit tests for the censoring dictionary.
 """
 
 import numpy as np
-import os
-import tempfile
 import unittest
 from collections import namedtuple
-from six.moves import cPickle as pickle
-
-
 
 from AnniesLasso.censoring import CensorsDict
 

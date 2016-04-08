@@ -15,16 +15,24 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-
-# A custom class is needed because if you have a dictionary attribute that is
-# a @property of a class, it can be updated by `model.censors["key"] = ...`
-# which will bypass the @property.setter function of that class.
-
 class CensorsDict(dict):
 
     def __init__(self, model, *args, **kwargs):
+        """
+        A dictionary sub-class that allows for wavelength censoring masks to be
+        applied to Cannon models.
+
+        :param model:
+            The Cannon model for which this censored dictionary will be applied.
+
+        Note:   This custom class is necessary because if you have a dictionary
+                attribute that is a `@property` of a class then it can be
+                updated directly by `model.censors["label"] = ...` which will
+                bypass the `@property.setter` method of the model class.
+        """
         self.model = model
         return None
+
 
     def __setitem__(self, label_name, value):
         """
@@ -49,7 +57,7 @@ class CensorsDict(dict):
             # A mask was given. Ensure it is boolean.
             if not np.all(np.isfinite(value)):
                 raise ValueError("non-finite values given as a boolean mask")
-                
+
             value = value.flatten().astype(bool)
 
         elif len(value.shape) == 2 and value.shape[1] == 2:
