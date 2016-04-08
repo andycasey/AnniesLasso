@@ -101,24 +101,25 @@ class TestBaseVectorizerInitialization(unittest.TestCase):
             after = pickle.load(fp)
 
         # Check integrity
-        self.assertEqual(before.label_names, after.label_names)
-        self.assertEqual(before.scales, after.scales)
-        self.assertEqual(before.fiducials, after.fiducials)
-        self.assertEqual(before.terms, after.terms)
+        self.assertTrue(np.all(before.label_names == after.label_names))
+        self.assertTrue(np.all(before.scales == after.scales))
+        self.assertTrue(np.all(before.fiducials == after.fiducials))
+        self.assertTrue(np.all(before.terms == after.terms))
 
+        # Clean up.
         if os.path.exists(path):
             os.remove(path)
 
 
     def test_transforms(self):
-
         v = base.BaseVectorizer(self.label_names,
             np.random.uniform(size=len(self.label_names)),
             np.random.uniform(size=len(self.label_names)),
             [])
 
         for labels in np.random.uniform(size=(100, len(self.label_names))):
-            self.assertEqual(labels, v._inv_transform(v._transform(labels)))
+            self.assertTrue(
+                np.allclose(labels, v._inv_transform(v._transform(labels))))
 
 
     def test_no_monkey_patching(self):
