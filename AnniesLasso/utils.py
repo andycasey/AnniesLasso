@@ -9,6 +9,7 @@ __all__ = ["InterruptiblePool", "short_hash", "wrapper"]
 
 import functools
 import logging
+import os
 import signal
 import sys
 from six import string_types
@@ -21,6 +22,7 @@ from multiprocessing.pool import Pool
 from multiprocessing import Lock, TimeoutError, Value
 
 logger = logging.getLogger(__name__)
+
 
 # Initialize global counter for incrementing between threads.
 _counter = Value('i', 0)
@@ -90,17 +92,15 @@ class wrapper(object):
             _counter.value += 1
 
         index = _counter.value
-        #if self.message is None: return
-
+        
         increment = max(1, int(self.N/100))
         t = time() if index >= self.N else None
 
         status = "({0}/{1})   ".format(index, self.N) if t is None else \
                  "({0:.0f}s)                      ".format(t-self.t_init)
         sys.stdout.write(
-            "\r[{done}{not_done}] {percent:3.0f}% {status}".format(
+            "\r[{done: <100}] {percent:3.0f}% {status}".format(
             done="=" * int(index/increment),
-            not_done=" " * int((self.N - index)/increment),
             percent=100. * index/self.N,
             status=status))
         sys.stdout.flush()
@@ -215,16 +215,18 @@ class InterruptiblePool(Pool):
             # Other exceptions propagate up.
 
 
-
 def _unpack_value(value):
     """
     Unpack contents if it is pickled to a temporary file.
 
     :param value:
         A non-string variable or a string referring to a pickled file path.
+
+    :returns:
+        The original value, or the unpacked contents if a valid path was given.
     """
 
-    if isinstance(value, string_types):
+    if isinstance(value, string_types) and os.path.exists(value):
         with open(value, "rb") as fp:
             contents = pickle.load(fp)
         return contents
@@ -237,6 +239,12 @@ def _pack_value(value, protocol=-1):
 
     :param value:
         The contents to temporarily pickle.
+
+    :param protocol: [optional]
+        The pickling protocol to use.
+
+    :returns:
+        A temporary filename where the contents are stored.
     """
     
     _, temporary_filename = mkstemp()

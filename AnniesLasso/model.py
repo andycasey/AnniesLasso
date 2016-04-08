@@ -22,10 +22,10 @@ from six.moves import cPickle as pickle
 from six import string_types
 
 from .vectorizer.base import BaseVectorizer
-from . import (utils, __version__ as code_version)
-
+from . import (censoring, utils, __version__ as code_version)
 
 logger = logging.getLogger(__name__)
+
 
 def requires_training_wheels(method):
     """
@@ -41,20 +41,33 @@ def requires_training_wheels(method):
     return wrapper
 
 
-def requires_model_description(method):
+def requires_model_description(descriptors=None):
     """
-    A decorator for model methods that require a full model description.
+    A decorator for model methods that require some part of a model description.
 
-    :param method:
-        A method belonging to a sub-class of BaseCannonModel.
+    :param descriptors: [optional]
+        If specified, only these descriptors will be required. If set as None,
+        then all model descriptors will be required.
     """
-    def wrapper(model, *args, **kwargs):
-        for descriptive_attribute in model._descriptive_attributes:
-            if getattr(model, descriptive_attribute) is None:
-                raise TypeError("the model requires a {} term".format(
-                    descriptive_attribute.lstrip("_")))
-        return method(model, *args, **kwargs)
-    return wrapper
+
+    def decorator(method, *decorator_args, **decorator_kwargs):
+        """
+        A decorator for model methods that require a full model description.
+
+        :param method:
+            A method belonging to a sub-class of BaseCannonModel.
+        """
+    
+        def wrapper(model, *args, **kwargs):
+            required_attributes = descriptors or model._descriptive_attributes
+            for descriptive_attribute in required_attributes:
+                if getattr(model, descriptive_attribute) is None:
+                    raise TypeError("the model requires a {} term".format(
+                        descriptive_attribute.lstrip("_")))
+            return method(model, *args, **kwargs)
+        return wrapper
+
+    return decorator
 
 
 class BaseCannonModel(object):
@@ -102,7 +115,7 @@ class BaseCannonModel(object):
     """
 
     _trained_attributes = ["_s2", "_theta"]
-    _descriptive_attributes = ["_dispersion", "_vectorizer", "_pixel_filters"]
+    _descriptive_attributes = ["_dispersion", "_vectorizer", "_censors"]
     _data_attributes = ["_labelled_set", "_normalized_flux", "_normalized_ivar"]
     
     def __init__(self, labelled_set, normalized_flux, normalized_ivar,
@@ -135,6 +148,9 @@ class BaseCannonModel(object):
         self._dispersion = np.array(dispersion).flatten() \
             if dispersion is not None \
             else np.arange(self._normalized_flux.shape[1], dtype=int)
+
+        # Initialise wavelength censoring.
+        self._censors = censoring.CensorsDict(self)
 
         # Initialize a random, yet reproducible group of subsets.
         self._metadata["q"] = np.random.randint(0, 10, len(labelled_set))
@@ -336,60 +352,41 @@ class BaseCannonModel(object):
 
 
     @property
-    def pixel_filters(self):
+    def censors(self):
         """
-        Return the pixel filters for the labels.
+        Return the wavelength censor masks for the labels.
         """
-        return self._pixel_filters
+        return self._censors
 
 
-    @pixel_filters.setter
-    def pixel_filters(self, pixel_filters):
+    @censors.setter
+    def censors(self, censors):
         """
-        Set the pixel filters (for each label) for the model.
+        Set the wavelength censors (per label) for the model.
 
-        :param pixel_filters:
-            A dictionary containing the labels as keys and masks as values.
+        :param censors:
+            A dictionary containing the labels as keys and masks as values. The
+            masks can be in the form of a boolean array of size `N_pixels`,
+            or a list of two-length tuples containing (start, end) regions to
+            exclude.
         """
 
-        if pixel_filters is None:
-            self._pixel_filters = None
-            return None
+        if censors is not None:
+            if self.vectorizer is None:
+                # Wavelength censoring can't be set if we don't know the 
+                # vectorizer names.
+                raise TypeError("model requires a vectorizer to validate the "
+                    "wavelength censors")
 
-        # Pixel filters can't be set if we don't know what the vectorizer
-        # label names are.
-        if self.vectorizer is None:
-            raise TypeError("the model requires a vectorizer")
+            if not isinstance(censors, (dict, censoring.CensorsDict)):
+                raise TypeError("censors must be given as a dictionary")
 
-        if not isinstance(pixel_filters, dict):
-            raise TypeError("pixel filters must be specified as a dictionary")
+        # Create a new dictionary, regardless of whether censors is None or not.
+        self._censors = censoring.CensorsDict(self)
 
-        # Ignore unrecognized labels in the pixel filters that aren't in the
-        # vectorizer.
-        unrecognized = set(pixel_filters).difference(self.vectorizer.label_names)
-        if any(unrecognized):
-            logger.warn("Ignoring unrecognized label names in the pixel filter "
-                        "description: {0}".format(", ".join(unrecognized)))
+        if censors is not None:
+            self._censors.update(censors)
 
-        pixel_filters = pixel_filters.copy()
-        for each in unrecognized:
-            del pixel_filters[each]
-
-        if len(pixel_filters) == 0:
-            self._pixel_filters = None
-            return None
-
-        # Check the values in the pixel filters.
-        for label_name in pixel_filters.keys():
-            label_filter = np.array(pixel_filters[label_name], dtype=bool)
-            if label_filter.size != self.dispersion.size:
-                raise ValueError("the label filter must be set for every pixel"
-                                 " (array size {0} != {1})".format(
-                                    label_filter.size, self.dispersion.size))
-
-            pixel_filters[label_name] = label_filter
-        
-        self._pixel_filters = pixel_filters
         return None
 
 
@@ -608,7 +605,7 @@ class BaseCannonModel(object):
 
 
     @property
-    @requires_model_description
+    @requires_model_description(descriptors=["vectorizer"])
     def design_matrix(self):
         """
         Return the design matrix for all pixels.
@@ -617,8 +614,47 @@ class BaseCannonModel(object):
             for label_name in self.vectorizer.label_names]).T)
 
         if not np.all(np.isfinite(matrix)):
-            logger.warn("Non-finite values in the design matrix!")
+            raise ValueError("non-finite values in the design matrix!")
+
         return matrix
+
+
+    @property
+    @requires_model_description(descriptors=["vectorizer", "censors"])
+    def censored_vectorizer_terms(self):
+        """
+        Return a mask of which indices in the design matrix columns should be
+        used for a given pixel. 
+        """        
+
+        # Parse all the terms once-off.
+        mapper = {}
+        pixel_masks = np.atleast_2d(list(map(list, self.censors.values())))
+        for i, terms in enumerate(self.vectorizer.terms):
+            for label_index, power in terms:
+                # Let's map this directly to the censors that we actually have.
+                try:
+                    censor_index = list(self.censors.keys()).index(
+                        self.vectorizer.label_names[label_index])
+
+                except ValueError:
+                    # Label name is not censored, so we don't care.
+                    continue
+
+                else:
+                    # Initialize a list if necessary.
+                    mapper.setdefault(censor_index, [])
+
+                    # Note that we add +1 because the first term in the design
+                    # matrix columns will actually be the pivot point.
+                    mapper[censor_index].append(1 + i)
+
+        # We already know the number of terms from i.
+        mask = np.ones((self.dispersion.size, 2 + i), dtype=bool)
+        for censor_index, pixel in zip(*np.where(pixel_masks)):
+            mask[pixel, mapper[censor_index]] = False
+
+        return mask
 
 
     @property
@@ -630,7 +666,7 @@ class BaseCannonModel(object):
         return self.get_labels_array(self.labelled_set)
 
 
-    @requires_model_description
+    @requires_model_description(descriptors=["vectorizer"])
     def get_labels_array(self, labelled_set):
         return np.vstack([labelled_set[label_name] \
             for label_name in self.vectorizer.label_names]).T

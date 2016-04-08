@@ -1,11 +1,10 @@
+sudo: false
 language: python
+
 python:
   - 2.7
   - 3.4
-notifications:
-  email: true
 
-sudo: false
 before_install:
   - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
   - chmod +x miniconda.sh
@@ -20,10 +19,21 @@ before_install:
   #        way betterrer)
   #- sudo rm -rf /dev/shm
   #- sudo ln -s /run/shm /dev/shm
+
 install: 
   - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numpy scipy matplotlib nose six coverage
   - pip install coveralls
+
 script:
   - nosetests --with-coverage --cover-package=AnniesLasso 
+
 after_success:
   coveralls
+
+notifications:
+  email:
+    recipients:
+      - arc@ast.cam.ac.uk
+    on_success: change
+    on_failure: always
+
