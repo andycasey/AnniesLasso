@@ -629,12 +629,12 @@ class BaseCannonModel(object):
 
         # Parse all the terms once-off.
         mapper = {}
-        pixel_masks = np.atleast_2d(self.censors.values())
+        pixel_masks = np.atleast_2d(list(map(list, self.censors.values())))
         for i, terms in enumerate(self.vectorizer.terms):
             for label_index, power in terms:
                 # Let's map this directly to the censors that we actually have.
                 try:
-                    censor_index = self.censors.keys().index(
+                    censor_index = list(self.censors.keys()).index(
                         self.vectorizer.label_names[label_index])
 
                 except ValueError:

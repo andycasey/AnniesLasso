@@ -187,26 +187,33 @@ def _objective_function_for_a_regularized_pixel_with_fixed_scatter(theta,
         return f
 
     g = d_csq + regularization * d_L1
-    #print(f.sum(),g.sum())
+    
     return (f, g)
 
 
 def _fit_regularized_pixel(initial_theta, initial_s2, normalized_flux, 
-    normalized_ivar, regularization, design_matrix, fixed_scatter, **kwargs):
-
-    design_matrix = utils._unpack_value(design_matrix)
+    normalized_ivar, censoring_mask, regularization, design_matrix, 
+    fixed_scatter, **kwargs):
 
     # Any actual information in these pixels?
     if np.sum(normalized_ivar) < 1. * normalized_ivar.size: # MAGIC 
-        fiducial_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])
+        fiducial_theta = np.hstack([1, np.zeros(censoring_mask.size - 1)])
         metadata = { "message": "No pixel information." }
         return (np.hstack([fiducial_theta, np.inf]), metadata)
+
+    # Unpack (and mask) the design matrix.
+    design_matrix = utils._unpack_value(design_matrix)[:, censoring_mask]
 
     # Set up the method and arguments.
     if fixed_scatter:
         func = _objective_function_for_a_regularized_pixel_with_fixed_scatter
         adjusted_ivar = normalized_ivar/(1. + normalized_ivar * initial_s2)
-        args = (normalized_flux, adjusted_ivar, regularization, design_matrix)
+        args = (
+            normalized_flux,
+            adjusted_ivar,
+            regularization,
+            design_matrix
+        )
 
     else:
         raise WTF
@@ -218,6 +225,15 @@ def _fit_regularized_pixel(initial_theta, initial_s2, normalized_flux,
     if initial_theta is None:
         initial_theta, _, __ = cannon._fit_theta(
             normalized_flux, normalized_ivar, initial_s2, design_matrix)
+
+    # If the initial_theta is the same size as the censored_mask, but different
+    # to the design_matrix, then we need to censor the initial theta.
+    if initial_theta.size == censoring_mask.size \
+    and initial_theta.size != censoring_mask.sum():
+        # Censor the initial theta.
+        # Note: the fiducial theta (below) will have the correct size because
+        #       the design matrix is already censored.
+        initial_theta = initial_theta[censoring_mask]
 
     # Is the fiducial theta a better starting point?
     fiducial_theta = np.hstack([1, np.zeros(design_matrix.shape[1] - 1)])
@@ -293,7 +309,11 @@ def _fit_regularized_pixel(initial_theta, initial_s2, normalized_flux,
             "fmin_warnflag": warnflag
         })
         
-    result = np.hstack([op_params, initial_s2]) if fixed_scatter else op_params
+    # De-censor the optimized parameters!
+    labels = np.zeros(censoring_mask.size)
+    labels[censoring_mask] = op_params
+
+    result = np.hstack([labels, initial_s2]) if fixed_scatter else labels
 
     return (result, metadata)
 
