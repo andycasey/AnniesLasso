@@ -50,7 +50,7 @@ def requires_model_description(descriptors=None):
         then all model descriptors will be required.
     """
 
-    def decorator(method):
+    def decorator(method, *decorator_args, **decorator_kwargs):
         """
         A decorator for model methods that require a full model description.
 

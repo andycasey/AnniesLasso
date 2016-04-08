@@ -72,7 +72,7 @@ class CannonModel(model.BaseCannonModel):
         super(CannonModel, self).__init__(*args, **kwargs)
 
 
-    @model.requires_model_description
+    @model.requires_model_description() # TODO -->
     def train(self, fixed_scatter=True, **kwargs):
         """
         Train the model based on the labelled set.
@@ -125,17 +125,25 @@ class CannonModel(model.BaseCannonModel):
                 N_stars, N_pixels))
 
         # Arguments:
-        # initial_theta, initial_s2, flux, ivar, [additional_args], 
+        # initial_theta, initial_s2, flux, ivar, design_matrix_mask, 
+        # [additional_args], 
         # design_matrix, **kwargs
         args = [initial_theta, initial_s2, self.normalized_flux.T, 
-            self.normalized_ivar.T]
+            self.normalized_ivar.T, self.censored_vectorizer_terms]
         args.extend(kwargs.get("additional_args", []))
 
         # Write the design matrix to a temporary file.
         temporary_filenames = []
-        #temporary_filename = utils._pack_value(self.design_matrix)
-        #kwds["design_matrix"] = temporary_filename
-        #temporary_filenames.append(temporary_filename)
+        """
+        Not clear whether this is still needed because this issue was
+        complicated by some Legacy Python issues. But I'm not ready to remove
+        this comment because I have forgotten about this issue twice before in
+        the past and it ruined my day.
+
+        temporary_filename = utils._pack_value(self.design_matrix)
+        kwds["design_matrix"] = temporary_filename
+        temporary_filenames.append(temporary_filename)
+        """
 
         # Wrap the function so we can parallelize it out.
         mapper = map if self.pool is None else self.pool.map
@@ -143,37 +151,37 @@ class CannonModel(model.BaseCannonModel):
             f = utils.wrapper(fitting_function, None, kwds, N_pixels)
             if self.pool is None and use_neighbouring_pixels:
                 output = []
-                neighbour_theta = []
+                last_theta = []
                 for j, row in enumerate(zip(*args)):
                     if j > 0:
                         # Update with determined theta from neighbour pixel.
                         row = list(row)
-                        row[0] = neighbour_theta
+                        row[0] = last_theta
                         row = tuple(row)
                     output.append(f(row))
-                    neighbour_theta = output[-1][0][:self.design_matrix.shape[1]]
+                    last_theta = output[-1][0][:self.design_matrix.shape[1]]
             else:
                 output = mapper(f, [row for row in zip(*args)])
 
         except KeyboardInterrupt:
-            logger.debug("Removing temporary filenames:\n{}".format(
-                "\n".join(temporary_filenames)))
-            map(os.remove, temporary_filenames)
+            logger.warn("Keyboard interrupted training step!")
 
-        else:
-            results = []
-            metadata = []
-            for r, m in output:
-                results.append(r)
-                metadata.append(m)
+            # Clean up any temporary files in case we are debugging.
+            for filename in temporary_filenames:
+                if os.path.exists(filename): os.remove(filename)
 
-            results = np.array(results)
+            # re-raise a suppressed exception?
+            raise
+
 
         # Clean up any temporary files.
         for filename in temporary_filenames:
             if os.path.exists(filename): os.remove(filename)
 
         # Unpack the results.
+        results, metadata = zip(*output)
+        results = np.array(results)
+
         self.theta, self.s2 = (results[:, :-1], results[:, -1])
 
         return None

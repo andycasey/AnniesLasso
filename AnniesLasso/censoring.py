@@ -64,5 +64,3 @@ class CensorsDict(dict):
                 .format(label_name))
 
         dict.__setitem__(self, label_name, value)
-
-
