@@ -92,17 +92,15 @@ class wrapper(object):
             _counter.value += 1
 
         index = _counter.value
-        #if self.message is None: return
-
+        
         increment = max(1, int(self.N/100))
         t = time() if index >= self.N else None
 
         status = "({0}/{1})   ".format(index, self.N) if t is None else \
                  "({0:.0f}s)                      ".format(t-self.t_init)
         sys.stdout.write(
-            "\r[{done}{not_done}] {percent:3.0f}% {status}".format(
+            "\r[{done: <100}] {percent:3.0f}% {status}".format(
             done="=" * int(index/increment),
-            not_done=" " * int((self.N - index)/increment),
             percent=100. * index/self.N,
             status=status))
         sys.stdout.flush()
