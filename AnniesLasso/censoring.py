@@ -47,6 +47,9 @@ class CensorsDict(dict):
         value = np.atleast_2d(value)
         if value.size == self.model.dispersion.size:
             # A mask was given. Ensure it is boolean.
+            if not np.all(np.isfinite(value)):
+                raise ValueError("non-finite values given as a boolean mask")
+                
             value = value.flatten().astype(bool)
 
         elif len(value.shape) == 2 and value.shape[1] == 2:
