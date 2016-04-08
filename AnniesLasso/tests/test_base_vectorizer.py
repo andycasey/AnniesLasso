@@ -9,6 +9,8 @@ import numpy as np
 import os
 import tempfile
 import unittest
+from six.moves import cPickle as pickle
+
 from AnniesLasso.vectorizer import base
 
 
