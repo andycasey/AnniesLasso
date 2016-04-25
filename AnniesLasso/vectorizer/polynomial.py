@@ -114,7 +114,8 @@ class BasePolynomialVectorizer(BaseVectorizer):
             # If labels are not in this term, the derivative w.r.t. them is zero
             indices_missing_in_term = np.array(list(set(range(N_labels))\
                 .difference(indices_used_in_term)))
-            column[:, indices_missing_in_term] = 0
+            if indices_missing_in_term.size > 0:
+                column[:, indices_missing_in_term] = 0
             columns.append(column)
 
         return np.hstack(columns).reshape((N_objects, -1, N_labels))[0]
