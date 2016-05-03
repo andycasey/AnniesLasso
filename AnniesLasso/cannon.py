@@ -370,7 +370,8 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
         "diag": 1.0/vectorizer.scales
     }
     # Only update the keywords with things that op.leastsq expects.
-    kwds.update({ k: v for k, v in kwargs.items() if k != "Dfun" and k in kwds })
+    kwds.update(
+        { k: kwargs[k] for k in set(kwargs).intersection(kwds) if k != "Dfun" })
 
     logger.debug("Optimizing from K = {0} initialization points".format(
         initial_labels.shape[0]))
