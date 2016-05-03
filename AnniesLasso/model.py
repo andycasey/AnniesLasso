@@ -41,16 +41,16 @@ def requires_training_wheels(method):
     return wrapper
 
 
-def requires_model_description(descriptors=None):
+def requires_model_description(*args):
     """
     A decorator for model methods that require some part of a model description.
 
-    :param descriptors: [optional]
+    :param args: [optional]
         If specified, only these descriptors will be required. If set as None,
         then all model descriptors will be required.
     """
 
-    def decorator(method, *decorator_args, **decorator_kwargs):
+    def decorator(method):
         """
         A decorator for model methods that require a full model description.
 
@@ -59,15 +59,19 @@ def requires_model_description(descriptors=None):
         """
     
         def wrapper(model, *args, **kwargs):
-            required_attributes = descriptors or model._descriptive_attributes
-            for descriptive_attribute in required_attributes:
-                if getattr(model, descriptive_attribute) is None:
+            for attr in descriptors or model._descriptive_attributes:
+                if getattr(model, attr) is None:
                     raise TypeError("the model requires a {} term".format(
-                        descriptive_attribute.lstrip("_")))
+                        attr.lstrip("_")))
             return method(model, *args, **kwargs)
         return wrapper
 
+    # This decorator can have optional descriptors.
+    descriptors = None if len(args) == 1 and callable(args[0]) else args[1:]
+    if descriptors is None:
+        return decorator(args[0])
     return decorator
+
 
 
 class BaseCannonModel(object):
@@ -121,7 +125,6 @@ class BaseCannonModel(object):
     def __init__(self, labelled_set, normalized_flux, normalized_ivar,
         dispersion=None, threads=1, pool=None, copy=False, verify=True):
 
-        self._metadata = {}
         if threads == 1:
             self.pool = None
         else:
@@ -129,6 +132,8 @@ class BaseCannonModel(object):
             threads = None if threads < 0 else threads
             self.pool = pool or utils.InterruptiblePool(threads,
                 initializer=utils._init_pool, initargs=(utils._counter, ))
+
+        self._metadata = { "threads": threads }
 
         # Initialise descriptive attributes for the model and verify the data.
         for attribute in self._descriptive_attributes:
@@ -605,7 +610,7 @@ class BaseCannonModel(object):
 
 
     @property
-    @requires_model_description(descriptors=["vectorizer"])
+    @requires_model_description("vectorizer")
     def design_matrix(self):
         """
         Return the design matrix for all pixels.
@@ -620,7 +625,7 @@ class BaseCannonModel(object):
 
 
     @property
-    @requires_model_description(descriptors=["vectorizer", "censors"])
+    @requires_model_description("vectorizer", "censors")
     def censored_vectorizer_terms(self):
         """
         Return a mask of which indices in the design matrix columns should be
@@ -666,7 +671,7 @@ class BaseCannonModel(object):
         return self.get_labels_array(self.labelled_set)
 
 
-    @requires_model_description(descriptors=["vectorizer"])
+    @requires_model_description("vectorizer")
     def get_labels_array(self, labelled_set):
         return np.vstack([labelled_set[label_name] \
             for label_name in self.vectorizer.label_names]).T
@@ -693,8 +698,11 @@ class BaseCannonModel(object):
 
         debug = kwargs.pop("debug", False)
         
-        kwds = { "threads": self.threads }
+        kwds = { "threads": self._metadata.get("threads", 1) }
         kwds.update(kwargs)
+
+        logger.debug("LOO-CV options: {0} {1} {2} {3} {4}".format(
+            N_training_set, N_labels, N_stop_at, debug, kwds))
 
         for i in range(N_training_set):
             

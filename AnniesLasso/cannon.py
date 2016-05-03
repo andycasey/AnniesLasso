@@ -72,7 +72,7 @@ class CannonModel(model.BaseCannonModel):
         super(CannonModel, self).__init__(*args, **kwargs)
 
 
-    @model.requires_model_description() # TODO -->
+    @model.requires_model_description
     def train(self, fixed_scatter=True, **kwargs):
         """
         Train the model based on the labelled set.
