@@ -735,6 +735,13 @@ class BaseCannonModel(object):
                                  "with index {0}:".format(i))
                 if debug: raise
 
+            finally:
+                if model.pool:
+                    model.pool.close()
+                    model.pool.join()
+
+                del model
+
             if i == N_stop_at + 1:
                 break
 
