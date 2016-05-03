@@ -331,7 +331,7 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
     adjusted_ivar = normalized_ivar/(1. + normalized_ivar * s2)
     
     def objective(labels):
-        model_flux = np.dot(theta, vectorizer(labels).T).flatten()
+        model_flux = np.dot(theta, vectorizer(labels).T)[:, 0]
         return adjusted_ivar * (model_flux - normalized_flux)
 
     # Check the vectorizer whether it has a derivative built in.
