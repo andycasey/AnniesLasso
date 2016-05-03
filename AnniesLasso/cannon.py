@@ -329,50 +329,48 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
     """
 
     adjusted_ivar = normalized_ivar/(1. + normalized_ivar * s2)
-    adjusted_inv_sigma = np.sqrt(adjusted_ivar)
-
+    
     def objective(labels):
         model_flux = np.dot(theta, vectorizer(labels).T).flatten()
-        return adjusted_inv_sigma * (model_flux - normalized_flux)
+        return adjusted_ivar * (model_flux - normalized_flux)
 
     # Check the vectorizer whether it has a derivative built in.
-    try:
-        vectorizer.get_label_vector_derivative(vectorizer.fiducials)
-    
-    except NotImplementedError:
-        logger.debug("No label vector derivative available!")
-        Dfun = None
-
-    except:
-        logger.exception("Exception raised when trying to calculate the label "
-                         "vector derivative at the fiducial values:")
-        raise
-
-    else:
-        # Use the label vector derivative.
-        # Presumably because of the way leastsq works, the adjusted_inv_sigma
-        # does not enter here, otherwise we get incorrect results.
+    if kwargs.get("Dfun", False):
+        try:
+            vectorizer.get_label_vector_derivative(vectorizer.fiducials)
         
-        # TODO: Revisit this with Hogg.
-        #Dfun = lambda labels: \
-        #    np.dot(theta, vectorizer.get_label_vector_derivative(labels)).T
+        except NotImplementedError:
+            logger.debug("No label vector derivative available!")
+            Dfun = None
+
+        except:
+            logger.exception("Exception raised when trying to calculate the "
+                             "label vector derivative at the fiducial values:")
+            raise
+
+        else:
+            # Use the label vector derivative.
+            # Presumably because of the way leastsq works, the adjusted_inv_sigma
+            # does not enter here, otherwise we get incorrect results.
+            Dfun = lambda labels: \
+                np.dot(theta, vectorizer.get_label_vector_derivative(labels)).T
+    else:
         Dfun = None
-    
+
     kwds = {
         "func": objective,
-        "args": (),
         "Dfun": Dfun,
         "col_deriv": True,
         "ftol": 7./3 - 4./3 - 1, # Machine precision.
         "xtol": 7./3 - 4./3 - 1, # Machine precision.
         "gtol": 0.0,
-        "maxfev": int(2e4), # MAGIC
+        "maxfev": 100000, # MAGIC
         "epsfcn": None,
         "factor": 0.1, # Smallest step size available for gradient approximation
         "diag": 1.0/vectorizer.scales
     }
     # Only update the keywords with things that op.leastsq expects.
-    kwds.update({ k: v for k, v in kwargs.items() if k in kwds })
+    kwds.update({ k: v for k, v in kwargs.items() if k != "Dfun" and k in kwds })
 
     logger.debug("Optimizing from K = {0} initialization points".format(
         initial_labels.shape[0]))
