@@ -370,7 +370,7 @@ def human_readable_label_vector(terms, label_names=None, mul="*", pow="^",
             else:
                 label_name = i
             if o > 1:
-                ct.append("{0}{1}{2}".format(label_name, pow, o))
+                ct.append("{0}{1}{2:.0f}".format(label_name, pow, o))
             else:
                 ct.append(label_name)
 
