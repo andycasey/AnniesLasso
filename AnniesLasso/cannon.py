@@ -241,7 +241,10 @@ class CannonModel(model.BaseCannonModel):
         args = (normalized_flux, normalized_ivar)
         mapper = map if self.pool is None else self.pool.map
 
+        # Python2/3 incompatibility?
+        # Python3 requires mapper, not *mapper.
         labels, cov, metadata = zip(*mapper(f, zip(*args)))
+
         labels, cov = (np.array(labels), np.array(cov))
 
         return (labels, cov, metadata) if full_output else labels
@@ -315,8 +318,7 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
         The inverse variance array for the normalized fluxes.
 
     :param initial_labels:
-        The point(s) to initialize optimization from. If `None` is given, only
-        one optimization will be performed from the vectorizer fiducials.
+        The point(s) to initialize optimization from.
 
     :param vectorizer:
         The vectorizer to use when fitting the data.
@@ -329,20 +331,23 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
     """
 
     adjusted_ivar = normalized_ivar/(1. + normalized_ivar * s2)
+    adjusted_sigma = np.sqrt(1.0/adjusted_ivar)
     
-    def objective(labels):
-        model_flux = np.dot(theta, vectorizer(labels).T)[:, 0]
-        return adjusted_ivar * (model_flux - normalized_flux)
-
+    # Exclude non-finite points (e.g., points with zero inverse variance 
+    # or non-finite flux values, but the latter shouldn't exist anyway).
+    use = np.isfinite(adjusted_sigma * normalized_flux)
+    normalized_flux = normalized_flux[use]
+    adjusted_sigma = adjusted_sigma[use]
+    
     # Check the vectorizer whether it has a derivative built in.
     if kwargs.get("Dfun", False):
         try:
             vectorizer.get_label_vector_derivative(vectorizer.fiducials)
         
         except NotImplementedError:
-            logger.debug("No label vector derivative available!")
             Dfun = None
-
+            logger.debug("No label vector derivative available!")
+            
         except:
             logger.exception("Exception raised when trying to calculate the "
                              "label vector derivative at the fiducial values:")
@@ -350,15 +355,31 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
 
         else:
             # Use the label vector derivative.
+            """
             # Presumably because of the way leastsq works, the adjusted_inv_sigma
             # does not enter here, otherwise we get incorrect results.
-            Dfun = lambda labels: \
-                np.dot(theta, vectorizer.get_label_vector_derivative(labels)).T
+            Dfun = lambda xdata, l: \
+                np.dot(theta, vectorizer.get_label_vector_derivative(*l)).T[use]
+            """
+            raise NotImplementedError("requires a thinko")
+
+            def Dfun(labels, xdata, ydata, f, adjusted_inv_sigma):
+                return np.dot(theta, 
+                    vectorizer.get_label_vector_derivative(labels)).T[:, use]
     else:
         Dfun = None
 
+    def f(xdata, *labels):
+        return np.dot(theta, vectorizer(labels).T)[use, 0]
+    
     kwds = {
-        "func": objective,
+        "f": f,
+        "xdata": None,
+        "ydata": normalized_flux,
+        "sigma": adjusted_sigma,
+        "absolute_sigma": True,
+
+        # These get passed through to leastsq:
         "Dfun": Dfun,
         "col_deriv": True,
         "ftol": 7./3 - 4./3 - 1, # Machine precision.
@@ -369,38 +390,41 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
         "factor": 0.1, # Smallest step size available for gradient approximation
         "diag": 1.0/vectorizer.scales
     }
-    # Only update the keywords with things that op.leastsq expects.
+
+    # Only update the keywords with things that op.curve_fit/op.leastsq expects.
     kwds.update(
         { k: kwargs[k] for k in set(kwargs).intersection(kwds) if k != "Dfun" })
 
-    logger.debug("Optimizing from K = {0} initialization points".format(
-        initial_labels.shape[0]))
-
     results = []
-    best_result_metric = []
-    for x0 in initial_labels:
-        kwds["x0"] = x0
-        op_labels, cov, meta, message, ier = op.leastsq(full_output=True, **kwds)
-        results.append((op_labels, cov, meta, message, ier))
-        best_result_metric.append(np.sum(meta["fvec"]**2))
+    
+    # Go through the initial labels.
+    for p0 in np.atleast_2d(initial_labels):
+        kwds["p0"] = p0
+        op_labels, cov = op.curve_fit(**kwds)
+        fvec = f(None, op_labels)
 
-    best_result_index = np.argmin(best_result_metric)
-    op_labels, cov, meta, message, ier = results[best_result_index]
+        meta = {
+            "p0": p0,
+            "fvec": fvec,
+            "chi-sq": np.sum((fvec - normalized_flux)**2 / adjusted_sigma**2),
+        }
+        results.append((op_labels, cov, meta))
 
-    if ier not in range(1, 5):
-        logger.warn("Least-squares result was {0}: {1}".format(ier, message))
+    best_result_index = np.nanargmin([m["chi-sq"] for (o, c, m) in results])
+    op_labels, cov, meta = results[best_result_index]
+
+    if not np.any(np.isfinite(cov)):
+        logger.warn("Non-finite covariance matrix returned!")
+
+        # We are in dire straits. We should not trust the result.
+        op_labels *= np.nan
 
     # Save additional information.
-    _ = np.sum(meta["fvec"]**2)
     meta.update({
         "best_result_index": best_result_index,
-        "x0": initial_labels[best_result_index],
-        "method": "leastsq",
-        "ier": ier,
-        "message": message,
-        "Dfun": Dfun is not None,
-        "chi_sq": _,
-        "r_chi_sq": _/(normalized_flux.size - len(vectorizer.fiducials) - 1),
+        "method": "curve_fit",
+        "derivatives_used": Dfun is not None,
+        "r-chi-sq": meta["chi-sq"]/(use.sum() - len(vectorizer.fiducials) - 1),
         "model_flux": np.dot(theta, vectorizer(op_labels).T).flatten()
     })
     meta.update({ k: kwds[k] for k in \
