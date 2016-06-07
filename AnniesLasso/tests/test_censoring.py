@@ -24,16 +24,6 @@ class fake_model(object):
 
 class TestCensorsDict(unittest.TestCase):
 
-    def test_unknown_label_name(self):
-
-        f = fake_model(label_names=["a", "b", "c"])
-
-        # Label 'd' does not exist.
-        f.censors["d"] = [[0, 100]]
-        with self.assertRaises(KeyError):
-            f.censors["d"]
-
-
     def test_boolean_mask(self):
 
         N = 1000
