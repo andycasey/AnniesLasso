@@ -15,8 +15,6 @@ import numpy as np
 import scipy.optimize as op
 import os
 
-from time import time # DEBUGGING
-
 from . import (model, utils)
 
 logger = logging.getLogger(__name__)
@@ -397,14 +395,10 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
     kwds.update(
         { k: kwargs[k] for k in set(kwargs).intersection(kwds) if k != "Dfun" })
 
-    # Go through the initial labels.
-    initial_labels = np.atleast_2d(initial_labels)
-
-    logger.debug("Optimizing from K = {0} initialization points".format(
-        initial_labels.shape[0]))
-
     results = []
-    for p0 in initial_labels:
+    
+    # Go through the initial labels.
+    for p0 in np.atleast_2d(initial_labels):
         kwds["p0"] = p0
         op_labels, cov = op.curve_fit(**kwds)
         fvec = f(None, op_labels)
