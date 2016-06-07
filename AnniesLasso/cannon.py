@@ -14,6 +14,7 @@ import logging
 import numpy as np
 import scipy.optimize as op
 import os
+from scipy.ndimage import gaussian_filter
 
 from . import (model, utils)
 
@@ -202,13 +203,13 @@ class CannonModel(model.BaseCannonModel):
 
     @model.requires_training_wheels
     def fit(self, normalized_flux, normalized_ivar, initial_labels=None,
-        full_output=False, **kwargs):
+        model_lsf=False, model_redshift=False, full_output=False, **kwargs):
         """
         Solve the labels for the given normalized fluxes and inverse variances.
 
         :param normalized_flux:
-            The normalized fluxes. These should be on the same dispersion scale
-            as the trained data.
+            A `(N_star, N_pixels)` shape of normalized fluxes that are on the 
+            same dispersion scale as the trained data.
 
         :param normalized_ivar:
             The inverse variances of the normalized flux values. This should
@@ -218,8 +219,16 @@ class CannonModel(model.BaseCannonModel):
             The initial points to optimize from. If not given, only one
             initialization will be made from the fiducial label point.
 
+        :param model_lsf: [optional]
+            Optionally convolve the spectral model with a Gaussian broadening
+            kernel of unknown width when fitting the data.
+
+        :param model_redshift: [optional]
+            Optionally redshift the spectral model when fitting the data.
+
         :returns:
-            The labels.
+            The labels. If `full_output` is set to True, then a three-length
+            tuple of `(labels, covariance_matrix, metadata)` will be returned.
         """
         
         normalized_flux = np.atleast_2d(normalized_flux)
@@ -235,17 +244,19 @@ class CannonModel(model.BaseCannonModel):
             else "Fitting {0} spectra".format(N_spectra)
 
         f = utils.wrapper(_fit_spectrum, 
-            (initial_labels, self.vectorizer, self.theta, self.s2),
+            (self.dispersion, initial_labels, self.vectorizer, self.theta, 
+                self.s2, model_lsf, model_redshift),
             kwargs, N_spectra, message=message)
 
         args = (normalized_flux, normalized_ivar)
         mapper = map if self.pool is None else self.pool.map
 
-        # Python2/3 incompatibility?
-        # Python3 requires mapper, not *mapper.
         labels, cov, metadata = zip(*mapper(f, zip(*args)))
-
         labels, cov = (np.array(labels), np.array(cov))
+
+        # Extract model_lsf and model_redshift?
+        if model_lsf or model_redshift:
+            raise a
 
         return (labels, cov, metadata) if full_output else labels
 
@@ -306,8 +317,8 @@ def _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar,
     return np.linalg.solve(A, B)
 
 
-def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
-    theta, s2, **kwargs):
+def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels, 
+    vectorizer, theta, s2, model_lsf=False, model_redshift=False, **kwargs):
     """
     Fit a single spectrum by least-squared fitting.
     
@@ -316,6 +327,9 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
 
     :param normalized_ivar:
         The inverse variance array for the normalized fluxes.
+
+    :param dispersion:
+        The dispersion (e.g., wavelength) points for the normalized fluxes.
 
     :param initial_labels:
         The point(s) to initialize optimization from.
@@ -328,6 +342,12 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
 
     :param s2:
         The pixel scatter (s^2) array for each pixel.
+
+    :param model_lsf: [optional]
+        Convolve the spectral model with a Gaussian kernel at fitting time.
+
+    :param model_redshift: [optional]
+        Allow for a residual redshift in the spectral model at fitting time.
     """
 
     adjusted_ivar = normalized_ivar/(1. + normalized_ivar * s2)
@@ -369,9 +389,38 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
     else:
         Dfun = None
 
-    def f(xdata, *labels):
-        return np.dot(theta, vectorizer(labels).T)[use, 0]
+    # Construct the objective function depending on what inputs were supplied,
+    if not model_lsf and not model_redshift:
+        def f(xdata, *labels):
+            return np.dot(theta, vectorizer(labels).T)[use, 0]
     
+    elif model_redshift and not model_lsf:
+        def f(xdata, *parameters):
+            labels, z = parameters[:-1], parameters[-1]
+            rest_frame_model_fluxes = np.dot(theta, vectorizer(labels).T)[:, 0]
+
+            return np.interp(
+                dispersion, dispersion * (1 + z), rest_frame_model_fluxes,
+                left=None, right=None)[use]
+
+    elif model_lsf and not model_redshift:
+
+        None
+
+    elif model_lsf and model_redshift:
+
+        def f(xdata, *parameters):
+            labels, z, kernel = parameters[:-2], parameters[-2], parameters[-1]
+
+            y = np.dot(theta, vectorizer(labels).T)[:, 0]
+
+            # Convolve with the kernel.
+            y = gaussian_filter(y, abs(kernel))
+
+            # Redshift.
+            return np.interp(dispersion, dispersion * (1 + z), y)[use]
+
+
     kwds = {
         "f": f,
         "xdata": None,
@@ -399,9 +448,15 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
     
     # Go through the initial labels.
     for p0 in np.atleast_2d(initial_labels):
-        kwds["p0"] = p0
+        kwds["p0"] = list(p0)
+
+        if model_redshift:
+            kwds["p0"] += [0]
+        if model_lsf:
+            kwds["p0"] += [1] # MAGIC
+
         op_labels, cov = op.curve_fit(**kwds)
-        fvec = f(None, op_labels)
+        fvec = f(None, *op_labels)
 
         meta = {
             "p0": p0,
@@ -418,6 +473,8 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
 
         # We are in dire straits. We should not trust the result.
         op_labels *= np.nan
+
+    
 
     # Save additional information.
     meta.update({
