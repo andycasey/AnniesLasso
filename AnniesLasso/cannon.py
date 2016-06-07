@@ -406,7 +406,7 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
             y = np.interp(dispersion, dispersion * (1 + parameters[index]), y,
                 left=None, right=None)
 
-        return y
+        return y[use]
 
 
     kwds = {
@@ -462,8 +462,13 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
         # We are in dire straits. We should not trust the result.
         op_labels *= np.nan
 
+    # Defaults for LSF/redshift parameters
+    meta.update(kernel=0, redshift=0)
+    for key, effect in zip(("kernel", "redshift"), (model_lsf, model_redshift)):
+        if effect:
+            meta[key] = op_labels[-1]
+            op_labels[:-1]
     
-
     # Save additional information.
     meta.update({
         "best_result_index": best_result_index,
