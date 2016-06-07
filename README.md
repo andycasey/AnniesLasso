@@ -1,4 +1,4 @@
-# The Cannon 2: Annie's Lasso, the Compressed Sensing Edition
+# The Cannon 2: The Compressed Sensing Edition
 
 If we take *The Cannon* to large numbers of labels (say chemical abundances),
 the model complexity grows very fast.  At the same time, we know that most 
