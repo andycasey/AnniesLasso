@@ -389,36 +389,24 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
     else:
         Dfun = None
 
-    # Construct the objective function depending on what inputs were supplied,
-    if not model_lsf and not model_redshift:
-        def f(xdata, *labels):
-            return np.dot(theta, vectorizer(labels).T)[use, 0]
-    
-    elif model_redshift and not model_lsf:
-        def f(xdata, *parameters):
-            labels, z = parameters[:-1], parameters[-1]
-            rest_frame_model_fluxes = np.dot(theta, vectorizer(labels).T)[:, 0]
+    N_labels = vectorizer.scales.size
+   
+    def f(xdata, *parameters):
 
-            return np.interp(
-                dispersion, dispersion * (1 + z), rest_frame_model_fluxes,
-                left=None, right=None)[use]
+        y = np.dot(theta, vectorizer(labels[:N_labels]).T)[:, 0]
 
-    elif model_lsf and not model_redshift:
+        # Convolve?
+        if model_lsf:
+            # This will always be the last parameter.
+            y = gaussian_filter(y, abs(parameters[-1])) 
+        
+        # Redshift?
+        if model_redshift:
+            index = -2 if model_lsf else -1
+            y = np.interp(dispersion, dispersion * (1 + parameters[index]), y,
+                left=None, right=None)
 
-        None
-
-    elif model_lsf and model_redshift:
-
-        def f(xdata, *parameters):
-            labels, z, kernel = parameters[:-2], parameters[-2], parameters[-1]
-
-            y = np.dot(theta, vectorizer(labels).T)[:, 0]
-
-            # Convolve with the kernel.
-            y = gaussian_filter(y, abs(kernel))
-
-            # Redshift.
-            return np.interp(dispersion, dispersion * (1 + z), y)[use]
+        return y
 
 
     kwds = {
