@@ -10,7 +10,7 @@ from sys import version_info
 
 from .cannon import *
 from .regularized import *
-from . import (continuum, diagnostics, utils, vectorizer)
+from . import (censoring, continuum, diagnostics, utils, vectorizer)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO) # TODO: Remove this when stable.
@@ -79,6 +79,9 @@ def load_model(filename, **kwargs):
 
     for attribute in attributes:
         setattr(model, "_{}".format(attribute), contents[attribute])
+
+    # Censors must be correctly linked.
+    model._censors = censoring.CensorsDict(model, model._censors)
 
     return model
 

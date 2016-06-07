@@ -536,6 +536,10 @@ class BaseCannonModel(object):
         contents["training_set_hash"] = utils.short_hash(getattr(self, attr) \
             for attr in self._data_attributes)
 
+        # Censors must be treated a little bit differently, because they contain
+        # a link to the parent model, which we cannot save as-is.
+        contents["censors"] = contents["censors"].__getstate__()
+
         if include_training_data:
             contents.update([(attr.lstrip("_"), getattr(self, attr)) \
                 for attr in self._data_attributes])
@@ -603,6 +607,10 @@ class BaseCannonModel(object):
             setattr(self, "_{}".format(attribute), contents[attribute])
         for attribute in contents["metadata"]["trained_attributes"]:
             setattr(self, "_{}".format(attribute), contents[attribute])
+
+        # Censors must be reconstructed so that they link to the parent model
+        # correctly.
+        self._censors = censoring.CensorsDict(self, self._censors)
 
         # And update the metadata.
         setattr(self, "_metadata", contents["metadata"].get("metadata", {}))

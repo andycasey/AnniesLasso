@@ -30,6 +30,7 @@ class CensorsDict(dict):
                 updated directly by `model.censors["label"] = ...` which will
                 bypass the `@property.setter` method of the model class.
         """
+        super(CensorsDict, self).__init__(*args, **kwargs)
         self.model = model
         return None
 
@@ -46,11 +47,11 @@ class CensorsDict(dict):
             of (start, end) ranges to censor (*exclude*).
         """
 
-        if label_name not in self.model.vectorizer.label_names:
+        if  self.model.vectorizer is not None \
+        and label_name not in self.model.vectorizer.label_names:
             logger.warn(
                 "Ignoring unrecognized label name '{}' in the wavelength "
                 "censoring description".format(label_name))
-            return None
 
         value = np.atleast_2d(value)
         if value.size == self.model.dispersion.size:
@@ -80,3 +81,9 @@ class CensorsDict(dict):
                 .format(label_name))
 
         dict.__setitem__(self, label_name, value)
+
+
+    def __getstate__(self):
+        """ Return the state of this censoring mask in a serializable form. """
+
+        return self.items()
