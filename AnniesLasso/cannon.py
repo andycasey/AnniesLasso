@@ -275,14 +275,11 @@ class CannonModel(model.BaseCannonModel):
 
         s = []
         for j in range(self.dispersion.size):
-            print(j)
             s.append(op.fmin(objective_function, 0,
                 args=(residuals_squared[:, j], self.normalized_ivar[:, j]), 
                 disp=False))
 
-        s2 = np.array(s)**2
-        s2[s2 == 0] = np.inf
-        self.s2 = s2
+        self.s2 = np.array(s)**2
         return True
 
 
@@ -426,12 +423,12 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
     }
 
     # Only update the keywords with things that op.curve_fit/op.leastsq expects.
-    kwds.update(
-        { k: kwargs[k] for k in set(kwargs).intersection(kwds) if k != "Dfun" })
+    for key in set(kwargs).intersection(kwds):
+        if key == "Dfun": continue
+        kwds[key] = kwargs[key]
+
 
     results = []
-    
-    # Go through the initial labels.
     for p0 in np.atleast_2d(initial_labels):
         kwds["p0"] = list(p0)
         
