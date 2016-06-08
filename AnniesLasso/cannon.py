@@ -14,6 +14,7 @@ import logging
 import numpy as np
 import scipy.optimize as op
 import os
+from scipy.ndimage import gaussian_filter
 
 from . import (model, utils)
 
@@ -202,13 +203,13 @@ class CannonModel(model.BaseCannonModel):
 
     @model.requires_training_wheels
     def fit(self, normalized_flux, normalized_ivar, initial_labels=None,
-        full_output=False, **kwargs):
+        model_lsf=False, model_redshift=False, full_output=False, **kwargs):
         """
         Solve the labels for the given normalized fluxes and inverse variances.
 
         :param normalized_flux:
-            The normalized fluxes. These should be on the same dispersion scale
-            as the trained data.
+            A `(N_star, N_pixels)` shape of normalized fluxes that are on the 
+            same dispersion scale as the trained data.
 
         :param normalized_ivar:
             The inverse variances of the normalized flux values. This should
@@ -218,8 +219,16 @@ class CannonModel(model.BaseCannonModel):
             The initial points to optimize from. If not given, only one
             initialization will be made from the fiducial label point.
 
+        :param model_lsf: [optional]
+            Optionally convolve the spectral model with a Gaussian broadening
+            kernel of unknown width when fitting the data.
+
+        :param model_redshift: [optional]
+            Optionally redshift the spectral model when fitting the data.
+
         :returns:
-            The labels.
+            The labels. If `full_output` is set to True, then a three-length
+            tuple of `(labels, covariance_matrix, metadata)` will be returned.
         """
         
         normalized_flux = np.atleast_2d(normalized_flux)
@@ -235,16 +244,14 @@ class CannonModel(model.BaseCannonModel):
             else "Fitting {0} spectra".format(N_spectra)
 
         f = utils.wrapper(_fit_spectrum, 
-            (initial_labels, self.vectorizer, self.theta, self.s2),
+            (self.dispersion, initial_labels, self.vectorizer, self.theta, 
+                self.s2, model_lsf, model_redshift),
             kwargs, N_spectra, message=message)
 
         args = (normalized_flux, normalized_ivar)
         mapper = map if self.pool is None else self.pool.map
 
-        # Python2/3 incompatibility?
-        # Python3 requires mapper, not *mapper.
         labels, cov, metadata = zip(*mapper(f, zip(*args)))
-
         labels, cov = (np.array(labels), np.array(cov))
 
         return (labels, cov, metadata) if full_output else labels
@@ -268,14 +275,11 @@ class CannonModel(model.BaseCannonModel):
 
         s = []
         for j in range(self.dispersion.size):
-            print(j)
             s.append(op.fmin(objective_function, 0,
                 args=(residuals_squared[:, j], self.normalized_ivar[:, j]), 
                 disp=False))
 
-        s2 = np.array(s)**2
-        s2[s2 == 0] = np.inf
-        self.s2 = s2
+        self.s2 = np.array(s)**2
         return True
 
 
@@ -306,8 +310,8 @@ def _estimate_label_vector(theta, s2, normalized_flux, normalized_ivar,
     return np.linalg.solve(A, B)
 
 
-def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
-    theta, s2, **kwargs):
+def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels, 
+    vectorizer, theta, s2, model_lsf=False, model_redshift=False, **kwargs):
     """
     Fit a single spectrum by least-squared fitting.
     
@@ -316,6 +320,9 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
 
     :param normalized_ivar:
         The inverse variance array for the normalized fluxes.
+
+    :param dispersion:
+        The dispersion (e.g., wavelength) points for the normalized fluxes.
 
     :param initial_labels:
         The point(s) to initialize optimization from.
@@ -328,6 +335,12 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
 
     :param s2:
         The pixel scatter (s^2) array for each pixel.
+
+    :param model_lsf: [optional]
+        Convolve the spectral model with a Gaussian kernel at fitting time.
+
+    :param model_redshift: [optional]
+        Allow for a residual redshift in the spectral model at fitting time.
     """
 
     adjusted_ivar = normalized_ivar/(1. + normalized_ivar * s2)
@@ -369,9 +382,27 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
     else:
         Dfun = None
 
-    def f(xdata, *labels):
-        return np.dot(theta, vectorizer(labels).T)[use, 0]
-    
+    N_labels = vectorizer.scales.size
+    mean_pixel_scale = 1.0/np.diff(dispersion).mean() # px/Angstrom
+
+    def f(xdata, *parameters):
+
+        y = np.dot(theta, vectorizer(parameters[:N_labels]).T)[:, 0]
+
+        # Convolve?
+        if model_lsf:
+            # This will always be the last parameter.
+            y = gaussian_filter(y, abs(parameters[-1]) * mean_pixel_scale)
+            
+        # Redshift?
+        if model_redshift:
+            index = -2 if model_lsf else -1
+            y = np.interp(dispersion, dispersion * (1 + parameters[index]), y,
+                left=None, right=None)
+
+        return y[use]
+
+
     kwds = {
         "f": f,
         "xdata": None,
@@ -392,19 +423,26 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
     }
 
     # Only update the keywords with things that op.curve_fit/op.leastsq expects.
-    kwds.update(
-        { k: kwargs[k] for k in set(kwargs).intersection(kwds) if k != "Dfun" })
+    for key in set(kwargs).intersection(kwds):
+        if key == "Dfun": continue
+        kwds[key] = kwargs[key]
+
 
     results = []
-    
-    # Go through the initial labels.
     for p0 in np.atleast_2d(initial_labels):
-        kwds["p0"] = p0
+        kwds["p0"] = list(p0)
+        
+        if model_redshift:
+            kwds["p0"] += [0]
+        
+        if model_lsf:
+            kwds["p0"] += [5] # MAGIC
+        
         op_labels, cov = op.curve_fit(**kwds)
-        fvec = f(None, op_labels)
+        fvec = f(None, *op_labels)
 
         meta = {
-            "p0": p0,
+            "p0": kwds["p0"],
             "fvec": fvec,
             "chi-sq": np.sum((fvec - normalized_flux)**2 / adjusted_sigma**2),
         }
@@ -413,23 +451,35 @@ def _fit_spectrum(normalized_flux, normalized_ivar, initial_labels, vectorizer,
     best_result_index = np.nanargmin([m["chi-sq"] for (o, c, m) in results])
     op_labels, cov, meta = results[best_result_index]
 
-    if not np.any(np.isfinite(cov)):
-        logger.warn("Non-finite covariance matrix returned!")
+    if np.allclose(op_labels, meta["p0"]):
+        logger.warn("Discarding optimized result because it is the same as the "
+            "initial value!")
 
         # We are in dire straits. We should not trust the result.
         op_labels *= np.nan
 
+    if not np.any(np.isfinite(cov)):
+        logger.warn("Non-finite covariance matrix returned!")
+        
+    # Defaults for LSF/redshift parameters
+    meta.update(kernel=0, redshift=0)
+    for key, effect in zip(("kernel", "redshift"), (model_lsf, model_redshift)):
+        if effect:
+            meta[key] = op_labels[-1]
+            op_labels = op_labels[:-1]
+    
     # Save additional information.
     meta.update({
+        "kernel": abs(meta["kernel"]),
         "best_result_index": best_result_index,
         "method": "curve_fit",
         "derivatives_used": Dfun is not None,
         "r-chi-sq": meta["chi-sq"]/(use.sum() - len(vectorizer.fiducials) - 1),
         "model_flux": np.dot(theta, vectorizer(op_labels).T).flatten()
     })
-    meta.update({ k: kwds[k] for k in \
-        ("ftol", "xtol", "gtol", "maxfev", "factor", "epsfcn") })
-
+    for key in ("ftol", "xtol", "gtol", "maxfev", "factor", "epsfcn"):
+        meta[key] = kwds[key]
+    
     return (op_labels, cov, meta)
 
 
