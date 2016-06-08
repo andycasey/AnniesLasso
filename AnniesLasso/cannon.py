@@ -254,10 +254,6 @@ class CannonModel(model.BaseCannonModel):
         labels, cov, metadata = zip(*mapper(f, zip(*args)))
         labels, cov = (np.array(labels), np.array(cov))
 
-        # Extract model_lsf and model_redshift?
-        if model_lsf or model_redshift:
-            raise a
-
         return (labels, cov, metadata) if full_output else labels
 
 
@@ -390,16 +386,17 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
         Dfun = None
 
     N_labels = vectorizer.scales.size
-   
+    mean_pixel_scale = 1.0/np.diff(dispersion).mean() # px/Angstrom
+
     def f(xdata, *parameters):
 
-        y = np.dot(theta, vectorizer(labels[:N_labels]).T)[:, 0]
+        y = np.dot(theta, vectorizer(parameters[:N_labels]).T)[:, 0]
 
         # Convolve?
         if model_lsf:
             # This will always be the last parameter.
-            y = gaussian_filter(y, abs(parameters[-1])) 
-        
+            y = gaussian_filter(y, abs(parameters[-1]) * mean_pixel_scale)
+            
         # Redshift?
         if model_redshift:
             index = -2 if model_lsf else -1
@@ -437,17 +434,18 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
     # Go through the initial labels.
     for p0 in np.atleast_2d(initial_labels):
         kwds["p0"] = list(p0)
-
+        
         if model_redshift:
             kwds["p0"] += [0]
+        
         if model_lsf:
-            kwds["p0"] += [1] # MAGIC
-
+            kwds["p0"] += [5] # MAGIC
+        
         op_labels, cov = op.curve_fit(**kwds)
         fvec = f(None, *op_labels)
 
         meta = {
-            "p0": p0,
+            "p0": kwds["p0"],
             "fvec": fvec,
             "chi-sq": np.sum((fvec - normalized_flux)**2 / adjusted_sigma**2),
         }
@@ -456,21 +454,26 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
     best_result_index = np.nanargmin([m["chi-sq"] for (o, c, m) in results])
     op_labels, cov, meta = results[best_result_index]
 
-    if not np.any(np.isfinite(cov)):
-        logger.warn("Non-finite covariance matrix returned!")
+    if np.allclose(op_labels, meta["p0"]):
+        logger.warn("Discarding optimized result because it is the same as the "
+            "initial value!")
 
         # We are in dire straits. We should not trust the result.
         op_labels *= np.nan
 
+    if not np.any(np.isfinite(cov)):
+        logger.warn("Non-finite covariance matrix returned!")
+        
     # Defaults for LSF/redshift parameters
     meta.update(kernel=0, redshift=0)
     for key, effect in zip(("kernel", "redshift"), (model_lsf, model_redshift)):
         if effect:
             meta[key] = op_labels[-1]
-            op_labels[:-1]
+            op_labels = op_labels[:-1]
     
     # Save additional information.
     meta.update({
+        "kernel": abs(meta["kernel"]),
         "best_result_index": best_result_index,
         "method": "curve_fit",
         "derivatives_used": Dfun is not None,
