@@ -9,6 +9,7 @@
 
 \documentclass[manuscript]{aastex6}
 \usepackage{amsmath,amssymb}
+\usepackage{minted}
 
 \newcommand{\project}[1]{\textsl{#1}}
 \newcommand{\TheCannon}{\project{The~Cannon}}
@@ -22,6 +23,7 @@
 \newcommand{\dr}{\acronym{DR12}}
 \newcommand{\logg}{\log g}
 \newcommand{\mh}{\mathrm{[M/H]}}
+\newcommand{\xh}[1]{\mathrm{[#1/H]}}
 \newcommand{\Teff}{T_{\mathrm{eff}}}
 \newcommand{\Dvector}[1]{\boldsymbol{#1}}
 \newcommand{\vectheta}{\Dvector{\theta}}
@@ -306,9 +308,10 @@ $\vectheta_j$ is a vector of length $D$ of parameters controlling the model at
 wavelength pixel $j$, and $e_{jn}$ is a noise draw or residual.  We refer to 
 $\vecv(\ell_n)$ as ``the vectorizing function'', which allows for arbitrarily 
 complex functions that might not be simple polynomial expansions of the label 
-list $\ell_n$ (e.g., sums of sines and cosines).  Inasmuch as the model is good,
-the noise values $e_{jn}$ can be taken to be drawn from a Gaussian with zero 
-mean and variance $\sigma^2_{jn}+s^2_j$, where $\sigma^2_{jn}$ is the 
+list $\ell_n$ (e.g., sums of sines and cosines).  An example expansion of 
+$\vecv(\ell_n)$ is given in Appendix \ref{app:vectorizer}.  Inasmuch as the model
+is good, the noise values $e_{jn}$ can be taken to be drawn from a Gaussian with
+zero mean and variance $\sigma^2_{jn}+s^2_j$, where $\sigma^2_{jn}$ is the 
 pipeline-reported uncertainty variance on datum $y_{jn}$ and $s^2_j$ is a 
 parameter describing excess variance at wavelength pixel $j$.
 
@@ -1102,6 +1105,81 @@ Virginia, University of Washington, and Yale University.
     \texttt{scipy} \citep{Jones_2001},
     and Astropy \citep{astropy}.}
 
+
+\appendix
+\label{app:vectorizer}
+Recall the model we adopt is
+\begin{eqnarray}
+  y_{jn} &=& \vecv(\ell_n)\cdot\vectheta_j + e_{jn}
+  \label{eq:model}\quad ,
+\end{eqnarray}
+
+where $\vecv(\ell_n)$ is a vectorizing function.  For a quadratic (second-order)
+model with three labels $\ell_n = [\Teff, \logg, \mh]$, the following vector is
+produced:
+\begin{eqnarray}
+\vecv(\ell_n) &\rightarrow& [1, \Teff, \logg, \mh, \Teff^2, \logg\cdot\Teff, \mh\cdot\Teff, \logg^2, \logg\cdot\mh, \mh^2]\quad .
+\end{eqnarray} 
+
+The constructed vector is used at each pixel to optimize $\theta$ and $\s^2$ (\ref{eq:train}).
+The first element produced by the vectorizer is always "1", allowing the
+model to ``pivot'' around a reasonable (central) point in label space
+\citep{tc}.  A polynomial vectorizer of order $N$ includes $N$-th order 
+terms of all labels and $(N-1)$-th order cross-terms.  
+
+The vectorizer for 
+the 17-label second-order model adopted in this paper expands as
+\small
+\begin{eqnarray}
+\vecv(\ell_n) &\rightarrow [&1, \Teff, \logg, \xh{Al}, \xh{Ca}, \xh{C}, \xh{Fe}, \xh{K}, \xh{Mg}, \xh{Mn}, \xh{Na}, \xh{Ni}, \xh{N}, \xh{O}, \xh{Si},\nonumber\\
+&& \xh{S}, \xh{Ti}, \xh{V}, \Teff^2, \logg\cdot\Teff, \xh{Al}\cdot\Teff, \xh{Ca}\cdot\Teff, \xh{C}\cdot\Teff, \xh{Fe}\cdot\Teff, \xh{K}\cdot\Teff, \nonumber\\
+&& \xh{Mg}\cdot\Teff, \xh{Mn}\cdot\Teff, \xh{Na}\cdot\Teff, \xh{Ni}\cdot\Teff, \xh{N}\cdot\Teff, \xh{O}\cdot\Teff, \xh{Si}\cdot\Teff, \xh{S}\cdot\Teff,\nonumber\\
+&& \Teff\cdot\xh{Ti}, \Teff\cdot\xh{V}, \logg^2, \xh{Al}\cdot\logg, \xh{Ca}\cdot\logg, \xh{C}\cdot\logg, \xh{Fe}\cdot\logg, \xh{K}\cdot\logg, \nonumber\\
+&& \logg\cdot\xh{Mg}, \logg\cdot\xh{Mn}, \logg\cdot\xh{Na}, \logg\cdot\xh{Ni}, \logg\cdot\xh{N}, \logg\cdot\xh{O}, \logg\cdot\xh{Si}, \nonumber\\
+&& \logg\cdot\xh{S}, \logg\cdot\xh{Ti}, \logg\cdot\xh{V}, \xh{Al}^2, \xh{Al}\cdot\xh{Ca}, \xh{Al}\cdot\xh{C}, \xh{Al}\cdot\xh{Fe}, \nonumber\\
+&& \xh{Al}\cdot\xh{K}, \xh{Al}\cdot\xh{Mg}, \xh{Al}\cdot\xh{Mn}, \xh{Al}\cdot\xh{Na}, \xh{Al}\cdot\xh{Ni}, \xh{Al}\cdot\xh{N}, \nonumber\\
+&& \xh{Al}\cdot\xh{O}, \xh{Al}\cdot\xh{Si}, \xh{Al}\cdot\xh{S}, \xh{Al}\cdot\xh{Ti}, \xh{Al}\cdot\xh{V}, \xh{Ca}^2, \xh{Ca}\cdot\xh{C}, \nonumber\\
+&& \xh{Ca}\cdot\xh{Fe}, \xh{Ca}\cdot\xh{K}, \xh{Ca}\cdot\xh{Mg}, \xh{Ca}\cdot\xh{Mn}, \xh{Ca}\cdot\xh{Na}, \xh{Ca}\cdot\xh{Ni}, \nonumber\\
+&& \xh{Ca}\cdot\xh{N}, \xh{Ca}\cdot\xh{O}, \xh{Ca}\cdot\xh{Si}, \xh{Ca}\cdot\xh{S}, \xh{Ca}\cdot\xh{Ti}, \xh{Ca}\cdot\xh{V}, \xh{C}^2, \nonumber\\
+&& \xh{C}\cdot\xh{Fe}, \xh{C}\cdot\xh{K}, \xh{C}\cdot\xh{Mg}, \xh{C}\cdot\xh{Mn}, \xh{C}\cdot\xh{Na}, \xh{C}\cdot\xh{Ni}, \nonumber\\
+&& \xh{C}\cdot\xh{N}, \xh{C}\cdot\xh{O}, \xh{C}\cdot\xh{Si}, \xh{C}\cdot\xh{S}, \xh{C}\cdot\xh{Ti}, \xh{C}\cdot\xh{V}, \xh{Fe}^2, \nonumber\\
+&& \xh{Fe}\cdot\xh{K}, \xh{Fe}\cdot\xh{Mg}, \xh{Fe}\cdot\xh{Mn}, \xh{Fe}\cdot\xh{Na}, \xh{Fe}\cdot\xh{Ni}, \xh{Fe}\cdot\xh{N}, \nonumber\\
+&& \xh{Fe}\cdot\xh{O}, \xh{Fe}\cdot\xh{Si}, \xh{Fe}\cdot\xh{S}, \xh{Fe}\cdot\xh{Ti}, \xh{Fe}\cdot\xh{V}, \xh{K}^2, \xh{K}\cdot\xh{Mg}, \nonumber\\
+&& \xh{K}\cdot\xh{Mn}, \xh{K}\cdot\xh{Na}, \xh{K}\cdot\xh{Ni}, \xh{K}\cdot\xh{N}, \xh{K}\cdot\xh{O}, \xh{K}\cdot\xh{Si}, \nonumber\\
+&& \xh{K}\cdot\xh{S}, \xh{K}\cdot\xh{Ti}, \xh{K}\cdot\xh{V}, \xh{Mg}^2, \xh{Mg}\cdot\xh{Mn}, \xh{Mg}\cdot\xh{Na}, \nonumber\\
+&& \xh{Mg}\cdot\xh{Ni}, \xh{Mg}\cdot\xh{N}, \xh{Mg}\cdot\xh{O}, \xh{Mg}\cdot\xh{Si}, \xh{Mg}\cdot\xh{S}, \xh{Mg}\cdot\xh{Ti}, \nonumber\\
+&& \xh{Mg}\cdot\xh{V}, \xh{Mn}^2, \xh{Mn}\cdot\xh{Na}, \xh{Mn}\cdot\xh{Ni}, \xh{Mn}\cdot\xh{N}, \xh{Mn}\cdot\xh{O}, \nonumber\\
+&& \xh{Mn}\cdot\xh{Si}, \xh{Mn}\cdot\xh{S}, \xh{Mn}\cdot\xh{Ti}, \xh{Mn}\cdot\xh{V}, \xh{Na}^2, \xh{Na}\cdot\xh{Ni}, \nonumber\\
+&& \xh{Na}\cdot\xh{N}, \xh{Na}\cdot\xh{O}, \xh{Na}\cdot\xh{Si}, \xh{Na}\cdot\xh{S}, \xh{Na}\cdot\xh{Ti}, \xh{Na}\cdot\xh{V},\nonumber\\
+&& \xh{Ni}^2, \xh{Ni}\cdot\xh{N}, \xh{Ni}\cdot\xh{O}, \xh{Ni}\cdot\xh{Si}, \xh{Ni}\cdot\xh{S}, \xh{Ni}\cdot\xh{Ti}, \xh{Ni}\cdot\xh{V},\nonumber\\
+&& \xh{N}^2, \xh{N}\cdot\xh{O}, \xh{N}\cdot\xh{Si}, \xh{N}\cdot\xh{S}, \xh{N}\cdot\xh{Ti}, \xh{N}\cdot\xh{V}, \xh{O}^2, \nonumber\\
+&& \xh{O}\cdot\xh{Si}, \xh{O}\cdot\xh{S}, \xh{O}\cdot\xh{Ti}, \xh{O}\cdot\xh{V}, \xh{Si}^2, \xh{Si}\cdot\xh{S}, \xh{Si}\cdot\xh{Ti}, \nonumber\\
+&& \xh{Si}\cdot\xh{V}, \xh{S}^2, \xh{S}\cdot\xh{Ti}, \xh{S}\cdot\xh{V}, \xh{Ti}^2, \xh{Ti}\cdot\xh{V}, \xh{V}^2\quad .
+\end{eqnarray}
+\normalsize
+
+
+Vectorizers can be constructed using our code available online:
+
+\small
+\begin{minted}{python}
+>>> import AnniesLasso as tc
+>>> from astropy.table import Table
+
+>>> labelled_set = Table.read("APOGEE-allStar-v603.fits")
+>>> label_names = ["TEFF", "LOGG", "AL_H", "C_H", "FE_H", "K_H", "MG_H", "MN_H",
+		"NA_H", "NI_H", "N_H", "O_H", "SI_H", "S_H", "TI_H", "V_H"]
+
+# Here the NormalizedPolynomialVectorizer scales the labels following Eq. 4,
+# and the 2 indicates a second-order model.
+>>> vectorizer = tc.vectorizer.NormalizedPolynomialVectorizer(labelled_set,
+    	tc.vectorizer.polynomial.terminator(label_names, 2))
+   
+>>> print(vectorizer.get_human_readable_label_vector())
+1 + TEFF + LOGG + AL_H + CA_H + C_H + FE_H + K_H + MG_H + MN_H + NA_H + NI_H + ...
+... + SI_H*TI_H + SI_H*V_H + S_H^2 + S_H*TI_H + S_H*V_H + TI_H^2 + TI_H*V_H + V_H^2
+\end{minted}
+\normalsize
 
 \begin{thebibliography}{dummy}\raggedright
 

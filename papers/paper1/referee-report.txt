@@ -4,9 +4,9 @@ Please find below the response to our referee report on manuscript AAS00008.
 We have addressed all of the issues raised by the referee, and included some
 additional changes that have improved the paper.
 
-Our responses to the Reviewer's comments are marked below. We have also uploaded
-a PDF which highlights the changes between the current version and the original
-manuscript.
+Our responses to the Reviewer's comments are marked below. We have also 
+uploaded a PDF which highlights the changes between the current version and 
+the original manuscript.
 
 ----
 
@@ -38,14 +38,17 @@ not only because of misused or missing technical terms.
             Author's response:
 
             We have added an Appendix that includes a mathematical expansion
-            of v(l) and example code to demonstrate (and reproduce) our work.
+            of v(l) and example code to demonstrate our work. We are happy to
+            include additional pseudo code or diagrams for any specific items
+            that are not clear.
 
-            Our adopted mathematical nomenclature is clear, distinct, consistent
-            throughout the manuscript, and complies with all of the AAS
-            guidelines on manuscript preparation. In the absence of a more 
-            specific or reasoned request from the Reviewer as to why the current
-            nomenclature should be changed, we have chosen not to update the 
-            nomenclature.
+            Regarding lower case scalars: The mathematical nomenclature that we
+            have adopted is consistent throughout the manuscript and complies 
+            with all of the AAS guidelines on manuscript preparation. 
+
+            Unfortunately in the absence of a more specific request from the 
+            Reviewer that explains why the current nomenclature should be changed,
+            we have chosen not to update the nomenclature.
 
     - The presented method is not unconventional, it is a data-driven approach 
       instead of the common physical model based solution. Clearly state these
@@ -74,7 +77,7 @@ not only because of misused or missing technical terms.
       Recognition and Machine Learning" to get a deeper introduction to machine
       learning.
 
-      % TODO
+      % TODO: Discuss with others.
 
     - You describe your approach like you are solving a classification task with
       discrete class labels, even though you are solving a regression problem. 
@@ -82,7 +85,7 @@ not only because of misused or missing technical terms.
       for input data and regression values, output values or estimated values 
       for your model outputs.
 
-      % TODO
+      % TODO: Discuss with others.
 
     - You use the word "seek" when you determine, derive or calculate a value. 
       Seeking is something that is appropriate for ,e.g. a harddisk but not in 
@@ -186,15 +189,12 @@ first publication.
 
     Author's response:
 
-    We have added an Appendix that expands v(l) and fully details how \theta and
-    s^2 are optimized.  We have included both a full mathematical expansion and
+    We have added an Appendix that further describes v(l), which should resolve
+    this (and other) issues. We have included both a full mathematical expansion and
     example code in this Appendix so that it is clear to the reader.
 
     The code will be registered with the ASCL upon acceptance of this paper such
     that the abstracts (via AAS and ASCL) are the same.
-
-    % #TODO: Add appendix.
-
 
 8. [method p6] You mention a probabilistic model with a PDF. Where do the 
 probabilities get lost. There are no probabilities specified with your results.
@@ -205,7 +205,7 @@ PDF.
 
     ARC to ask DWH: Is it sufficient just to say that we include uncertainties
     with our results? Or should we clarify the terminology here about defining
-    the model as being a probabilistic model for y? # TODO
+    the model as being a probabilistic model for y? % TODO: Discuss with DWH
 
 9. [method p6] You specify a likelihood without motivating how you derived it.
 You should show that this equation is a real likelihood, especially as some
@@ -231,7 +231,7 @@ predicting a set of regression values.
     terms. This issue is a consequence of Point 7 raised by the referee. 
 
     In the text we have tried to clarify this directly after Equation 3. With
-    the updated text and Appendix A, we hope that it is clear to the reader.
+    the updated text and new Appendix, we hope that it is clear to the reader.
 
 11. [method p8] In Equation 5 you exclude the first component of theta from your
 calculation without mentioning that this is the temperature and therefore it 
@@ -390,6 +390,8 @@ numerical results. Root mean square error / standard deviation / MAD ... and
 compare this with the baseline performance when just using the mean abundance 
 value per abundance or another simple regression method.
 
+% TODO
+
 21. [validation p13] The [V/H] abundance values seem to be problematic. Perhaps 
 the uncertainty of the abundance values should be considered when training the 
 model. Simple sampling techniques could help. What does mean that the [V/H] 
@@ -425,7 +427,7 @@ consideration.
 
     The header of Section 4.3 has been renamed. 
 
-    % Consider updating Figure 7
+    % TODO: Consider updating Figure 7
 
 23. [results p15/p16] The results need to be discussed more qualitatively. I do 
 not find Figure 11 striking! For me it just looks like a smoothing effect 
@@ -480,3 +482,5 @@ the scientific interpretation done in the discussion.
     Author's response:
 
     % Update with numbers based on how big the ASCPAP GC spreads are in CNO
+
+    

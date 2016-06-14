@@ -1,4 +1,4 @@
-LATEX       = pdflatex
+LATEX       = pdflatex -shell-escape
 CHECK_RERUN = grep Rerun $*.log
 
 all: annieslasso.pdf
