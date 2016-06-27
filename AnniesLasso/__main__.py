@@ -46,7 +46,7 @@ def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
     logger = logging.getLogger("AnniesLasso")
     assert model.is_trained
 
-    chunk_size = 1000 if threads > 1 else 1
+    chunk_size = kwargs.pop("parallel_chunks", 1000) if threads > 1 else 1
     fluxes = []
     ivars = []
     output_filenames = []
@@ -130,7 +130,7 @@ def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
     return None
 
 
-def train(model_filename, threads, condor, chunks, memory, save_training_data,
+def train(model_filename, threads, condor, condor_chunks, memory, save_training_data,
     condor_check_frequency, re_train, **kwargs):
     """
     Train an existing model, with the option to distribute the work across many
@@ -169,9 +169,9 @@ def train(model_filename, threads, condor, chunks, memory, save_training_data,
 
         # Split up the model into chunks based on the number of pixels.
         condor_job = "condor.job" # MAGIC
-        chunk_size = int(ceil(model.dispersion.size / float(chunks)))
+        chunk_size = int(ceil(model.dispersion.size / float(condor_chunks)))
         chunk_filenames = []
-        for i in range(chunks):
+        for i in range(condor_chunks):
             # Let's not assume anything about the model (e.g., it may have many
             # attributes from a sub-class that we do not know about).
 
@@ -294,7 +294,7 @@ def main():
         dest="condor", action="store_true", default=False,
         help="Distribute action using Condor.")
     parent_parser.add_argument("--condor-chunks",
-        dest="chunks", type=int, default=100,
+        dest="condor_chunks", type=int, default=100,
         help="The number of chunks to distribute across Condor. "\
              "This argument is ignored if --condor is not used.")
     parent_parser.add_argument("--condor-memory",
@@ -339,6 +339,8 @@ def main():
         help="The path of a trained Cannon model.")
     fit_parser.add_argument("spectrum_filenames", nargs="+", type=str,
         help="Paths of spectra to fit.")
+    fit_parser.add_argument("--parallel-chunks", dest="parallel_chunks",
+        type=int, default=1000, help="The number of spectra to fit in a chunk.")
     fit_parser.add_argument("--clobber", dest="clobber", default=False,
         type=bool, help="Overwrite existing output files.")
     fit_parser.add_argument("--from-filename", dest="from_filename",
@@ -353,7 +355,8 @@ def main():
     if args.verbose:
         logger.setLevel(logging.DEBUG)
 
-    if args.chunks != parent_parser.get_default("chunks") and not args.condor:
+    if args.condor_chunks != parent_parser.get_default("condor_chunks") \
+    and not args.condor:
         logger.warn("Ignoring chunks argument because Condor is not in use.")
 
     # Do things.
