@@ -349,6 +349,13 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
     # Exclude non-finite points (e.g., points with zero inverse variance 
     # or non-finite flux values, but the latter shouldn't exist anyway).
     use = np.isfinite(adjusted_sigma * normalized_flux)
+    N_labels = vectorizer.scales.size
+    
+    if not np.any(use):
+        logger.warn("No information in spectrum!")
+        return (np.nan * np.ones(N_labels), None, {
+                "fail_message": "Pixels contained no information"})
+
     normalized_flux = normalized_flux[use]
     adjusted_sigma = adjusted_sigma[use]
     
@@ -382,7 +389,6 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
     else:
         Dfun = None
 
-    N_labels = vectorizer.scales.size
     mean_pixel_scale = 1.0/np.diff(dispersion).mean() # px/Angstrom
 
     def f(xdata, *parameters):
@@ -438,7 +444,13 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
         if model_lsf:
             kwds["p0"] += [5] # MAGIC
         
-        op_labels, cov = op.curve_fit(**kwds)
+        try:
+            op_labels, cov = op.curve_fit(**kwds)
+        
+        except RuntimeError:
+            logger.exception("Exception in fitting from {}".format(p0))
+            continue
+
         fvec = f(None, *op_labels)
 
         meta = {
@@ -447,6 +459,10 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
             "chi-sq": np.sum((fvec - normalized_flux)**2 / adjusted_sigma**2),
         }
         results.append((op_labels, cov, meta))
+
+    if len(results) == 0:
+        logger.warn("No results found!")
+        return (np.nan * np.ones(N_labels), None, {"fail_message": "No results found"})
 
     best_result_index = np.nanargmin([m["chi-sq"] for (o, c, m) in results])
     op_labels, cov, meta = results[best_result_index]
