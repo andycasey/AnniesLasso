@@ -56,6 +56,8 @@ setup(
     entry_points={
         "console_scripts": [
             "tc = AnniesLasso.__main__:main",
+            "cannon = AnniesLasso.__main__:main",
+            "cannon-local = AnniesLasso.local_cannon:main"
         ]
     }
 )
