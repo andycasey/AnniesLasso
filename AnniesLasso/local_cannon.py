@@ -169,6 +169,10 @@ def loocv(labelled_set, label_names, K=None, model_order=1,
             full_output=True)
         results.append([spectrum_filename] + list(result.flatten()))
 
+        # Insert a flag as to whether the result is within a convex hull of the
+        # labelled set.
+        meta["in_convex_hull"] = model.in_convex_hull(result)[0]
+        
         with open(output_filename, "wb") as fp:
             pickle.dump((result, cov, meta), fp, 2) # For legacy.
         logger.info("Saved output to {}".format(output_filename))

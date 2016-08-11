@@ -20,6 +20,7 @@ from datetime import datetime
 from os import path
 from six.moves import cPickle as pickle
 from six import string_types
+from scipy.spatial import Delaunay
 
 from .vectorizer.base import BaseVectorizer
 from . import (censoring, utils, __version__ as code_version)
@@ -514,6 +515,31 @@ class BaseCannonModel(object):
     def fit(self, *args, **kwargs):
         raise NotImplementedError("The fit method must be "
                                   "implemented by subclasses")
+
+
+    def in_convex_hull(self, labels):
+        """
+        Return whether the provided labels are inside a complex hull constructed
+        from the labelled set.
+
+        :param labels:
+            A `NxK` array of `N` sets of `K` labels, where `K` is the number of
+            labels that make up the vectorizer.
+
+        :returns:
+            A boolean array as to whether the points are in the complex hull of
+            the labelled set.
+        """
+
+        labels = np.atleast_2d(labels)
+        if labels.shape[1] != self.labels_array.shape[1]:
+            raise ValueError("expected {} labels; got {}".format(
+                self.labels_array.shape[1], labels.shape[1]))
+
+        hull = Delaunay(self.labels_array)
+
+        return hull.find_simplex(labels) >= 0
+
 
 
     def save(self, filename, include_training_data=False, overwrite=False,
