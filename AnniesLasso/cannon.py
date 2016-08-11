@@ -456,7 +456,7 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
         meta = {
             "p0": kwds["p0"],
             "fvec": fvec,
-            "chi-sq": np.sum((fvec - normalized_flux)**2 / adjusted_sigma**2),
+            "chi_sq": np.sum((fvec - normalized_flux)**2 / adjusted_sigma**2),
         }
         results.append((op_labels, cov, meta))
 
@@ -464,7 +464,7 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
         logger.warn("No results found!")
         return (np.nan * np.ones(N_labels), None, {"fail_message": "No results found"})
 
-    best_result_index = np.nanargmin([m["chi-sq"] for (o, c, m) in results])
+    best_result_index = np.nanargmin([m["chi_sq"] for (o, c, m) in results])
     op_labels, cov, meta = results[best_result_index]
 
     if np.allclose(op_labels, meta["p0"]):
@@ -490,7 +490,7 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
         "best_result_index": best_result_index,
         "method": "curve_fit",
         "derivatives_used": Dfun is not None,
-        "r-chi-sq": meta["chi-sq"]/(use.sum() - len(vectorizer.fiducials) - 1),
+        "r_chi_sq": meta["chi_sq"]/(use.sum() - len(vectorizer.fiducials) - 1),
         "model_flux": np.dot(theta, vectorizer(op_labels).T).flatten()
     })
     for key in ("ftol", "xtol", "gtol", "maxfev", "factor", "epsfcn"):

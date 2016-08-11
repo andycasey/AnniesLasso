@@ -10,8 +10,12 @@ import logging
 import os
 import numpy as np
 from six.moves import cPickle as pickle
-from six.moves import string_types
+from six import string_types
 
+from astropy.table import Table
+
+
+logger = logging.getLogger("AnniesLasso")
 
 _DEFAULT_FILENAME_COLUMN = "FILENAME"
 _DEFAULT_OUTPUT_SUFFIX = "result"
@@ -49,6 +53,7 @@ def get_neighbours(labelled_set, star, label_names, K, exclude=None):
     assert np.all(np.isfinite(D))
 
     if exclude is not None:
+        if isinstance(exclude, int): exclude = [exclude]
         max_D = 1 + np.max(D)
         for index in exclude:
             D[index] = max_D
@@ -57,7 +62,7 @@ def get_neighbours(labelled_set, star, label_names, K, exclude=None):
 
 
 def loocv(labelled_set, label_names, K=None, model_order=1, 
-    filename_column=None, output_suffix=None, overwrite=False):
+    filename_column=None, output_suffix=None, overwrite=False, **kwargs):
     """
     Perform leave-one-out cross-validation using a local Cannon model at every
     point in the labelled set.
@@ -98,6 +103,10 @@ def loocv(labelled_set, label_names, K=None, model_order=1,
     if 2 > K:
         raise ValueError("K must be greater than 1")
 
+    # This is *really* bad practice, but we do it here to keep the CLI fast.
+    import AnniesLasso as tc
+
+    results = []
 
     failed, N = (0, len(labelled_set))
     for i, star in enumerate(labelled_set):
@@ -106,7 +115,7 @@ def loocv(labelled_set, label_names, K=None, model_order=1,
         basename, _ = os.path.splitext(spectrum_filename)
         output_filename = "{}.pkl".format("-".join([basename, output_suffix]))
 
-        logger.info("At star {0}/{1}: {2}".format(i + 1, N, filename))
+        logger.info("At star {0}/{1}: {2}".format(i + 1, N, spectrum_filename))
 
         if os.path.exists(output_filename) and not overwrite:
             logger.info("Output filename {} already exists and not overwriting."\
@@ -140,8 +149,8 @@ def loocv(labelled_set, label_names, K=None, model_order=1,
 
 
         # [4] Train a model using those K nearest neighbours.
-        model = tc.L1RegularizedCannonModel(
-            labelled_set[indices], train_flux, train_ivar)
+        model = tc.L1RegularizedCannonModel(labelled_set[indices], train_flux, 
+            train_ivar, threads=kwargs.get("threads", 1))
         
         # TODO: Revisit this. Should these default to zero?
         model.s2 = 0
@@ -155,16 +164,29 @@ def loocv(labelled_set, label_names, K=None, model_order=1,
         model._set_s2_by_hogg_heuristic()
 
         # [5] Test on that star, using the initial labels.
-        result, cov, meta = model.fit(train_flux, train_ivar, 
+        result, cov, meta = model.fit(test_flux, test_ivar, 
             initial_labels=[star[label_name] for label_name in label_names],
             full_output=True)
+        results.append([spectrum_filename] + list(result.flatten()))
 
         with open(output_filename, "wb") as fp:
             pickle.dump((result, cov, meta), fp, 2) # For legacy.
         logger.info("Saved output to {}".format(output_filename))
 
-    logger.info("Number of failures: {}".format(failures))
-    logger.info("Number of successes: {}".format(N - failures))
+        # Close the pool
+        if model.pool is not None:
+            model.pool.close()
+            model.pool.join()
+
+        del model
+
+    logger.info("Number of failures: {}".format(failed))
+    logger.info("Number of successes: {}".format(N - failed))
+
+    # Make the comparisons to the original set!
+    t = Table(results, names=["FILENAME"] + list(label_names))
+    t.write("cannon-local-loocv-{}.fits".format(output_suffix),
+        overwrite=overwrite)
 
     return None
 
@@ -182,7 +204,7 @@ def _loocv_wrapper(labelled_set, label_names, **kwargs):
 
 
 def test(labelled_set, test_set, label_names, K=None, model_order=1,
-    filename_column=None, output_suffix=None, overwrite=False):
+    filename_column=None, output_suffix=None, overwrite=False, **kwargs):
     """
     Perform the test step on stars in the test set, by building local Cannon
     models from stars in the labelled set.
@@ -362,15 +384,15 @@ def main():
         help="The number of nearest labelled set neighbours to train on. "\
              "By default, this will be set to 2 * N_labels")
     loocv_parser.add_argument(
-        "--model_order", dest="model_order", type=int, default=1,
+        "--model-order", dest="model_order", type=int, default=1,
         help="The maximum order of the label. For example, if A is a label, "\
              "and `model_order` is 3, then that implies `A^3` is a model term")
     loocv_parser.add_argument(
-        "--filename_column", dest="filename_column", type=str,
+        "--filename-column", dest="filename_column", type=str,
         help="Name of the column in the `labelled_set` that refers to the "\
              "path location of the spectrum for that star")
     loocv_parser.add_argument(
-        "--output_suffix", dest="output_suffix", type=str,
+        "--output-suffix", dest="output_suffix", type=str,
         help="A string suffix that will be added to the spectrum filenames "\
              "when creating the result filename")
     loocv_parser.add_argument(
@@ -398,15 +420,15 @@ def main():
         help="The number of nearest labelled set neighbours to train on. "\
              "By default, this will be set to 2 * N_labels")
     test_parser.add_argument(
-        "--model_order", dest="model_order", type=int, default=1,
+        "--model-order", dest="model_order", type=int, default=1,
         help="The maximum order of the label. For example, if A is a label, "\
              "and `model_order` is 3, then that implies `A^3` is a model term")
     test_parser.add_argument(
-        "--filename_column", dest="filename_column", type=str,
+        "--filename-column", dest="filename_column", type=str,
         help="Name of the column in the `labelled_set` that refers to the "\
              "path location of the spectrum for that star")
     test_parser.add_argument(
-        "--output_suffix", dest="output_suffix", type=str,
+        "--output-suffix", dest="output_suffix", type=str,
         help="A string suffix that will be added to the spectrum filenames "\
              "when creating the result filename")
     test_parser.add_argument(
@@ -417,7 +439,6 @@ def main():
     args = parser.parse_args()
     if args.action is None: return
 
-    logger = logging.getLogger("AnniesLasso")
     if args.verbose:
         logger.setLevel(logging.DEBUG)
 

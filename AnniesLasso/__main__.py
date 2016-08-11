@@ -8,7 +8,7 @@ A basic command line interface for The Cannon.
 import argparse
 import logging
 import os
-from numpy import ceil, loadtxt, zeros
+from numpy import ceil, loadtxt, zeros, nan
 from subprocess import check_output
 from six.moves import cPickle as pickle
 from tempfile import mkstemp
@@ -58,7 +58,7 @@ def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
 
     if from_filename:
         with open(spectrum_filenames[0], "r") as fp:
-            _ = map(str.strip, fp.readlines())
+            _ = list(map(str.strip, fp.readlines()))
         spectrum_filenames = _
 
     N = len(spectrum_filenames)
@@ -128,6 +128,7 @@ def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
     logger.info("Number of successes: {}".format(N - failures))
 
     return None
+
 
 
 def train(model_filename, threads, condor, condor_chunks, memory, save_training_data,
@@ -217,7 +218,7 @@ def train(model_filename, threads, condor, condor_chunks, memory, save_training_
             os.remove(condor_job)
 
         # Wait for completion of all jobs.
-        waiting = map(_condorlock_filename, chunk_filenames)
+        waiting = list(map(_condorlock_filename, chunk_filenames))
         logger.info("Waiting for completion of {} jobs".format(len(waiting)))
         while True:
             completed = []
@@ -270,6 +271,75 @@ def train(model_filename, threads, condor, condor_chunks, memory, save_training_
 
     logger.info("Done")
     return model
+
+
+def join_results(output_filename, model_filename, result_filenames, clobber,
+    from_filename, **kwargs):
+    """
+    Join the test results from multiple files into a single table file.
+    """
+
+    import AnniesLasso as tc
+    from astropy.table import Table
+
+    meta_keys = kwargs.pop("meta_keys", {})
+    meta_keys.update({
+        "chi-sq": nan,
+        "r-chi-sq": nan
+    })
+
+    logger = logging.getLogger("AnniesLasso")
+
+    # Does the output filename already exist?
+    if os.path.exists(output_filename) and not clobber:
+        logger.info("Output filename {} already exists and not clobbering."\
+            .format(output_filename))
+        return None
+
+    # We need the label names from the model.
+    model = tc.load_model(model_filename)
+    assert model.is_trained
+
+    if from_filename:
+        with open(result_filenames[0], "r") as fp:
+            _ = list(map(str.strip, fp.readlines()))
+        result_filenames = _
+
+
+
+    # Load results from each file.
+    results = []
+    failed = []
+    N = len(result_filenames)
+    for i, filename in enumerate(result_filenames):
+        logger.info("{}/{}: {}".format(i, N, filename))
+
+        if not os.path.exists(filename):
+            logger.warn("Path {} does not exist. Continuing..".format(filename))
+            failed.append(filename)
+            continue
+
+        with open(filename, "rb") as fp:
+            contents = pickle.load(fp)
+
+        if len(contents) == 3:
+            labels, _, meta = contents
+        else:
+            labels, meta = contents
+
+        result = [filename] + list(labels) + [meta.get(k, v) for k, v in meta_keys.items()]
+        results.append(result)
+
+    if failed:
+        logger.warn(
+            "The following {} result file(s) could not be found: \n{}".format(
+                len(failed), "\n".join(failed)))
+
+    columns = ["FILENAME"] + model.vectorizer.label_names + meta_keys.keys()
+    table = Table(rows=results, names=columns)
+    table.write(output_filename, overwrite=clobber)
+    logger.info("Written to {}".format(output_filename))
+    
 
 
 
@@ -347,6 +417,23 @@ def main():
         action="store_true", default=False, help="Read spectrum filenames from file")
     fit_parser.set_defaults(func=fit)
 
+
+    # Join results parser.
+    join_parser = subparsers.add_parser("join", parents=[parent_parser],
+        help="Join results from individual stars into a single table.")
+    join_parser.add_argument("output_filename", type=str,
+        help="The path to write the output filename.")
+    join_parser.add_argument("model_filename", type=str,
+        help="The path of a Cannon model that was used to test the stars.")
+    join_parser.add_argument("result_filenames", nargs="+", type=str,
+        help="Paths of result files to include.")
+    join_parser.add_argument("--clobber", dest="clobber", default=False,
+        action="store_true", help="Ovewrite an existing table file.")
+    join_parser.add_argument("--from-filename", 
+        dest="from_filename", action="store_true", default=False,
+        help="Read result filenames from a file.")
+    join_parser.set_defaults(func=join_results)
+
     # Parse the arguments and take care of any top-level arguments.
     args = parser.parse_args()
     if args.action is None: return
@@ -369,5 +456,7 @@ if __name__ == "__main__":
     Usage examples:
     # tc train model.pickle --condor --chunks 100
     # tc train model.pickle --threads 8
+    # tc join model.pickle --from-filename files
+
     """
     _ = main()

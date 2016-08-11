@@ -201,6 +201,24 @@ class BaseCannonModel(object):
         self._labelled_set = labelled_set
         self._normalized_flux = np.atleast_2d(normalized_flux)
         self._normalized_ivar = np.atleast_2d(normalized_ivar)
+        
+        flux_mask = ~np.isfinite(self._normalized_flux)
+        N = np.sum(flux_mask)
+        if N > 0:
+            logger.warn(
+                "Found {} non-finite flux values in the labelled set! "\
+                "Replacing with 1 and setting inverse variance as 0.".format(N))
+            self._normalized_flux[flux_mask] = 1.0
+            self._normalized_ivar[flux_mask] = 0.0
+
+        ivar_mask = ~np.isfinite(self._normalized_ivar)
+        N = np.sum(ivar_mask)
+        if N > 0:
+            logger.warn(
+                "Found {} non-finite ivar values in the labelled set! "\
+                "Replacing with zeros.".format(N))
+            self._normalized_ivar[ivar_mask] = 0.0
+
         return None
 
 
@@ -623,7 +641,7 @@ class BaseCannonModel(object):
         """
         Return the design matrix for all pixels.
         """
-        matrix = self.vectorizer(np.vstack([self.labelled_set[label_name] \
+        matrix = self.vectorizer(np.array([self.labelled_set[label_name] \
             for label_name in self.vectorizer.label_names]).T)
 
         if not np.all(np.isfinite(matrix)):
@@ -681,7 +699,7 @@ class BaseCannonModel(object):
 
     @requires_model_description("vectorizer")
     def get_labels_array(self, labelled_set):
-        return np.vstack([labelled_set[label_name] \
+        return np.array([labelled_set[label_name] \
             for label_name in self.vectorizer.label_names]).T
 
 
