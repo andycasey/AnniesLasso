@@ -61,13 +61,14 @@ def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
             _ = list(map(str.strip, fp.readlines()))
         spectrum_filenames = _
 
+    output_suffix = kwargs.get("output_suffix", "result")
     N = len(spectrum_filenames)
     for i, filename in enumerate(spectrum_filenames):
         logger.info("At spectrum {0}/{1}: {2}".format(i + 1, N, filename))
 
         basename, _ = os.path.splitext(filename)
-        output_filename = "{}_result.pkl".format(basename)
-
+        output_filename = "-".join([basename, output_suffix]) + ".pkl"
+        
         if os.path.exists(output_filename) and not clobber:
             logger.info("Output filename {} already exists and not clobbering."\
                 .format(output_filename))
@@ -413,6 +414,10 @@ def main():
         type=int, default=1000, help="The number of spectra to fit in a chunk.")
     fit_parser.add_argument("--clobber", dest="clobber", default=False,
         type=bool, help="Overwrite existing output files.")
+    fit_parser.add_argument(
+        "--output-suffix", dest="output_suffix", type=str,
+        help="A string suffix that will be added to the spectrum filenames "\
+             "when creating the result filename")
     fit_parser.add_argument("--from-filename", dest="from_filename",
         action="store_true", default=False, help="Read spectrum filenames from file")
     fit_parser.set_defaults(func=fit)
