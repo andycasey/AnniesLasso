@@ -146,10 +146,12 @@ class CannonModel(model.BaseCannonModel):
         temporary_filenames.append(temporary_filename)
         """
 
+        N_items = N_pixels if kwargs.get("progressbar", True) else 0
+
         # Wrap the function so we can parallelize it out.
         mapper = map if self.pool is None else self.pool.map
         try:
-            f = utils.wrapper(fitting_function, None, kwds, N_pixels)
+            f = utils.wrapper(fitting_function, None, kwds, N_items)
             if self.pool is None and use_neighbouring_pixels:
                 output = []
                 last_theta = []

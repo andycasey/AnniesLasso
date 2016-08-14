@@ -75,6 +75,9 @@ class wrapper(object):
         self.N = N
         self.t_init = time()
         self.message = message
+        if 0 >= self.N:
+            return None
+
         if message is not None:
             logger.info(message.rstrip())
         
@@ -87,6 +90,9 @@ class wrapper(object):
         """
         Increment the progressbar by one iteration.
         """
+        if 0 >= self.N:
+            return None
+
         global _counter, _counter_lock
         with _counter_lock:
             _counter.value += 1

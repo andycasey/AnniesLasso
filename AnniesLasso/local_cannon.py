@@ -7,12 +7,16 @@ A basic command line interface for a local version of The Cannon.
 
 import argparse
 import logging
-import os
+import multiprocessing as mp
 import numpy as np
+import os
+from random import shuffle
 from six.moves import cPickle as pickle
 from six import string_types
 
 from astropy.table import Table
+
+import AnniesLasso as tc
 
 
 logger = logging.getLogger("AnniesLasso")
@@ -103,8 +107,8 @@ def loocv(labelled_set, label_names, K=None, model_order=1,
     if 2 > K:
         raise ValueError("K must be greater than 1")
 
-    # This is *really* bad practice, but we do it here to keep the CLI fast.
-    import AnniesLasso as tc
+    if kwargs.get("shuffle", False):
+        labelled_set = shuffle(labelled_set)
 
     results = []
 
@@ -171,6 +175,7 @@ def loocv(labelled_set, label_names, K=None, model_order=1,
 
         # Insert a flag as to whether the result is within a convex hull of the
         # labelled set.
+        meta = meta[0] # The first (and only) star we tested against.
         meta["in_convex_hull"] = model.in_convex_hull(result)[0]
         
         with open(output_filename, "wb") as fp:
@@ -188,7 +193,7 @@ def loocv(labelled_set, label_names, K=None, model_order=1,
     logger.info("Number of successes: {}".format(N - failed))
 
     # Make the comparisons to the original set!
-    t = Table(results, names=["FILENAME"] + list(label_names))
+    t = Table(rows=results, names=["FILENAME"] + list(label_names))
     t.write("cannon-local-loocv-{}.fits".format(output_suffix),
         overwrite=overwrite)
 
@@ -205,6 +210,45 @@ def _loocv_wrapper(labelled_set, label_names, **kwargs):
 
     return loocv(labelled_set, label_names, **kwargs)
 
+
+
+
+def _train_and_test(labelled_set, train_flux, train_ivar, label_names,
+    model_order, test_flux, test_ivar, initial_labels, output_filename,
+    **kwargs):
+
+    print("Doing {} in parallel".format(output_filename))
+
+    # [4] Train a model using those K nearest neighbours.
+    model = tc.L1RegularizedCannonModel(labelled_set, train_flux, train_ivar, 
+        **kwargs)
+    
+    # TODO: Revisit this. Should these default to zero?
+    model.s2 = 0
+    model.regularization = 0
+
+    model.vectorizer = tc.vectorizer.NormalizedPolynomialVectorizer(
+        labelled_set, 
+        tc.vectorizer.polynomial.terminator(label_names, model_order))
+
+    model.train(progressbar=False)
+    model._set_s2_by_hogg_heuristic()
+
+    # [5] Test on that star, using the initial labels.
+    result, cov, meta = model.fit(test_flux, test_ivar, 
+        initial_labels=initial_labels, full_output=True)
+    
+    with open(output_filename, "wb") as fp:
+        pickle.dump((result, cov, meta), fp, 2) # For legacy.
+    logger.info("Saved output to {}".format(output_filename))
+
+    if model.pool is not None:
+        model.pool.close()
+        model.pool.join()
+
+    del model
+
+    return None
 
 
 def test(labelled_set, test_set, label_names, K=None, model_order=1,
@@ -253,6 +297,15 @@ def test(labelled_set, test_set, label_names, K=None, model_order=1,
     if 2 > K:
         raise ValueError("K must be greater than 1")
 
+    if kwargs.get("shuffle", False):
+        test_set = shuffle(test_set)
+
+    threads = kwargs.get("threads", 1)
+    threads = threads if threads > 0 else mp.cpu_count()
+
+    pool = None if threads < 2 else mp.Pool(threads)
+
+    processes = []
     failed, N = (0, len(test_set))
     for i, star in enumerate(test_set):
 
@@ -260,7 +313,7 @@ def test(labelled_set, test_set, label_names, K=None, model_order=1,
         basename, _ = os.path.splitext(spectrum_filename)
         output_filename = "{}.pkl".format("-".join([basename, output_suffix]))
 
-        logger.info("At star {0}/{1}: {2}".format(i + 1, N, filename))
+        logger.info("At star {0}/{1}: {2}".format(i + 1, N, spectrum_filename))
 
         if os.path.exists(output_filename) and not overwrite:
             logger.info("Output filename {} already exists and not overwriting."\
@@ -292,37 +345,29 @@ def test(labelled_set, test_set, label_names, K=None, model_order=1,
             train_flux[j, :] = flux
             train_ivar[j, :] = ivar
 
-
         # --- parallelism can begin here
+        initial_labels = [star[label_name] for label_name in label_names]
+        args = (labelled_set[indices], train_flux, train_ivar, label_names,
+            model_order, test_flux, test_ivar, initial_labels, output_filename)
 
-        # [4] Train a model using those K nearest neighbours.
-        model = tc.L1RegularizedCannonModel(
-            labelled_set[indices], train_flux, train_ivar)
-        
-        # TODO: Revisit this. Should these default to zero?
-        model.s2 = 0
-        model.regularization = 0
+        if pool is None:
+            _train_and_test(*args)
 
-        model.vectorizer = tc.vectorizer.NormalizedPolynomialVectorizer(
-            labelled_set[indices], 
-            tc.vectorizer.polynomial.terminator(label_names, model_order))
+        else:
+            processes.append(pool.apply_async(_train_and_test, args))
 
-        model.train()
-        model._set_s2_by_hogg_heuristic()
-
-        # [5] Test on that star, using the initial labels.
-        result, cov, meta = model.fit(train_flux, train_ivar, 
-            initial_labels=[star[label_name] for label_name in label_names],
-            full_output=True)
-
-        with open(output_filename, "wb") as fp:
-            pickle.dump((result, cov, meta), fp, 2) # For legacy.
-        logger.info("Saved output to {}".format(output_filename))
+            while len(processes) >= threads:
+                processes.pop(0).get()
 
         # --- parallelism can end here
 
-    logger.info("Number of failures: {}".format(failures))
-    logger.info("Number of successes: {}".format(N - failures))
+    if pool is not None:
+        logger.info("Cleaning up the pool..")
+        pool.close()
+        pool.join()
+
+    logger.info("Number of failures: {}".format(failed))
+    logger.info("Number of successes: {}".format(N - failed))
 
     return None
 
@@ -402,6 +447,10 @@ def main():
     loocv_parser.add_argument(
         "--overwrite", action="store_true", default=False,
         help="Overwrite existing result files")
+    loocv_parser.add_argument(
+        "--shuffle", action="store_true", default=False,
+        help="Shuffle the input spectra (useful for running multiple jobs "\
+             "in parallel)")
     loocv_parser.set_defaults(func=_loocv_wrapper)
 
 
@@ -438,6 +487,10 @@ def main():
     test_parser.add_argument(
         "--overwrite", action="store_true", default=False,
         help="Overwrite existing result files")
+    test_parser.add_argument(
+        "--shuffle", action="store_true", default=False,
+        help="Shuffle the input list of spectra (useful for running parallel "\
+             "jobs)")
     test_parser.set_defaults(func=_test_wrapper)
 
     args = parser.parse_args()
