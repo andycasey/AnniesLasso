@@ -275,7 +275,7 @@ def train(model_filename, threads, condor, condor_chunks, memory, save_training_
 
 
 def join_results(output_filename, model_filename, result_filenames, clobber,
-    from_filename, **kwargs):
+    from_filename, errors, **kwargs):
     """
     Join the test results from multiple files into a single table file.
     """
@@ -285,8 +285,8 @@ def join_results(output_filename, model_filename, result_filenames, clobber,
 
     meta_keys = kwargs.pop("meta_keys", {})
     meta_keys.update({
-        "chi-sq": nan,
-        "r-chi-sq": nan
+        "chi_sq": nan,
+        "r_chi_sq": nan
     })
 
     logger = logging.getLogger("AnniesLasso")
@@ -324,11 +324,19 @@ def join_results(output_filename, model_filename, result_filenames, clobber,
             contents = pickle.load(fp)
 
         if len(contents) == 3:
-            labels, _, meta = contents
+            labels, cov, meta = contents
+            if errors:
+                label_errors = np.sqrt(np.diag(cov))
         else:
             labels, meta = contents
+            if errors:
+                label_errors = np.nan * np.ones(len(labels))
 
-        result = [filename] + list(labels) + [meta.get(k, v) for k, v in meta_keys.items()]
+        result = [filename] + list(labels) 
+        if errors:
+            result += list(label_errors)
+            
+        result += [meta.get(k, v) for k, v in meta_keys.items()]
         results.append(result)
 
     if failed:
@@ -336,7 +344,11 @@ def join_results(output_filename, model_filename, result_filenames, clobber,
             "The following {} result file(s) could not be found: \n{}".format(
                 len(failed), "\n".join(failed)))
 
-    columns = ["FILENAME"] + model.vectorizer.label_names + meta_keys.keys()
+    columns = ["FILENAME"] + model.vectorizer.label_names 
+    if errors:
+        columns += ["E_{}".format(label_name) for label_name in label_names]
+    columns += meta_keys.keys()
+
     table = Table(rows=results, names=columns)
     table.write(output_filename, overwrite=clobber)
     logger.info("Written to {}".format(output_filename))
@@ -432,6 +444,8 @@ def main():
         help="The path of a Cannon model that was used to test the stars.")
     join_parser.add_argument("result_filenames", nargs="+", type=str,
         help="Paths of result files to include.")
+    join_parser.add_argument("--errors", dest="errors", default=False,
+        action="store_true", help="Include formal errors in destination table.")
     join_parser.add_argument("--clobber", dest="clobber", default=False,
         action="store_true", help="Ovewrite an existing table file.")
     join_parser.add_argument("--from-filename", 
