@@ -286,7 +286,8 @@ def join_results(output_filename, model_filename, result_filenames, clobber,
     meta_keys = kwargs.pop("meta_keys", {})
     meta_keys.update({
         "chi_sq": nan,
-        "r_chi_sq": nan
+        "r_chi_sq": nan,
+        "snr": nan
     })
 
     logger = logging.getLogger("AnniesLasso")
