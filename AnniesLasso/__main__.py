@@ -52,6 +52,8 @@ def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
     output_filenames = []
     failures = 0
 
+    fit_velocity = kwargs.pop("fit_velocity", False)
+
     # MAGIC HACK
     delete_meta_keys = ("fjac", ) # To save space...
     initial_labels = loadtxt("initial_labels.txt")
@@ -90,7 +92,8 @@ def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
             if len(output_filenames) >= chunk_size:
                 
                 results, covs, metas = model.fit(fluxes, ivars,
-                    initial_labels=initial_labels, full_output=True)
+                    initial_labels=initial_labels, model_redshift=fit_velocity,
+                    full_output=True)
 
                 for result, cov, meta, output_filename \
                 in zip(results, covs, metas, output_filenames):
@@ -109,7 +112,8 @@ def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
     if len(output_filenames) > 0:
         
         results, covs, metas = model.fit(fluxes, ivars, 
-            initial_labels=initial_labels, full_output=True)
+            initial_labels=initial_labels, model_redshift=fit_velocity,
+            full_output=True)
 
         for result, cov, meta, output_filename \
         in zip(results, covs, metas, output_filenames):
@@ -287,7 +291,8 @@ def join_results(output_filename, model_filename, result_filenames, clobber,
     meta_keys.update({
         "chi_sq": nan,
         "r_chi_sq": nan,
-        "snr": nan
+        "snr": nan,
+        "redshift": nan,
     })
 
     logger = logging.getLogger("AnniesLasso")
@@ -306,8 +311,6 @@ def join_results(output_filename, model_filename, result_filenames, clobber,
         with open(result_filenames[0], "r") as fp:
             _ = list(map(str.strip, fp.readlines()))
         result_filenames = _
-
-
 
     # Load results from each file.
     results = []
@@ -423,10 +426,12 @@ def main():
         help="The path of a trained Cannon model.")
     fit_parser.add_argument("spectrum_filenames", nargs="+", type=str,
         help="Paths of spectra to fit.")
+    fit_parser.add_argument("--rv", dest="fit_velocity", default=False,
+        action="store_true", type=bool, help="Fit radial velocity at test time.")
     fit_parser.add_argument("--parallel-chunks", dest="parallel_chunks",
         type=int, default=1000, help="The number of spectra to fit in a chunk.")
     fit_parser.add_argument("--clobber", dest="clobber", default=False,
-        type=bool, help="Overwrite existing output files.")
+        action="store_true", type=bool, help="Overwrite existing output files.")
     fit_parser.add_argument(
         "--output-suffix", dest="output_suffix", type=str,
         help="A string suffix that will be added to the spectrum filenames "\
