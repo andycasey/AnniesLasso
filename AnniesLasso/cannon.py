@@ -492,7 +492,7 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
         "best_result_index": best_result_index,
         "method": "curve_fit",
         "derivatives_used": Dfun is not None,
-        "snr": np.nanmedian(normalized_flux * np.sqrt(normalized_ivar)),
+        "snr": np.nanmedian(normalized_flux * np.sqrt(normalized_ivar[use])),
         "r_chi_sq": meta["chi_sq"]/(use.sum() - len(vectorizer.fiducials) - 1),
         "model_flux": np.dot(theta, vectorizer(op_labels).T).flatten(),
     })
