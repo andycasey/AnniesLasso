@@ -360,6 +360,8 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
 
     normalized_flux = normalized_flux[use]
     adjusted_sigma = adjusted_sigma[use]
+
+    max_abs_velocity = abs(kwargs.get("max_abs_velocity", 10))
     
     # Check the vectorizer whether it has a derivative built in.
     if kwargs.get("Dfun", False):
@@ -405,8 +407,15 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
         # Redshift?
         if model_redshift:
             index = -2 if model_lsf else -1
-            y = np.interp(dispersion, dispersion * (1 + parameters[index]), y,
-                left=None, right=None)
+            v = parameters[index]
+            
+            if np.abs(v) >= max_abs_velocity:
+                logger.debug("Returning NaNs because outside of max velocity")
+                return np.nan * np.ones(sum(use))
+
+            y = np.interp(dispersion, 
+                dispersion * (1 + v/299792.458), y,
+                left=np.nan, right=np.nan)
 
         return y[use]
 
@@ -489,6 +498,7 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
     # Save additional information.
     meta.update({
         "kernel": abs(meta["kernel"]),
+        "label_names": vectorizer.label_names,
         "best_result_index": best_result_index,
         "method": "curve_fit",
         "derivatives_used": Dfun is not None,

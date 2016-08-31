@@ -8,7 +8,8 @@ A basic command line interface for The Cannon.
 import argparse
 import logging
 import os
-from numpy import ceil, loadtxt, zeros, nan
+from collections import OrderedDict
+from numpy import ceil, loadtxt, zeros, nan, diag, ones
 from subprocess import check_output
 from six.moves import cPickle as pickle
 from tempfile import mkstemp
@@ -278,21 +279,21 @@ def train(model_filename, threads, condor, condor_chunks, memory, save_training_
     return model
 
 
-def join_results(output_filename, model_filename, result_filenames, clobber,
-    from_filename, errors, **kwargs):
+def join_results(output_filename, result_filenames, model_filename=None, 
+    from_filename=False, clobber=False, errors=False, cov=False, **kwargs):
     """
     Join the test results from multiple files into a single table file.
     """
 
     import AnniesLasso as tc
-    from astropy.table import Table
+    from astropy.table import Table, TableColumns
 
     meta_keys = kwargs.pop("meta_keys", {})
     meta_keys.update({
         "chi_sq": nan,
         "r_chi_sq": nan,
         "snr": nan,
-        "redshift": nan,
+    #    "redshift": nan,
     })
 
     logger = logging.getLogger("AnniesLasso")
@@ -303,21 +304,52 @@ def join_results(output_filename, model_filename, result_filenames, clobber,
             .format(output_filename))
         return None
 
-    # We need the label names from the model.
-    model = tc.load_model(model_filename)
-    assert model.is_trained
-
     if from_filename:
         with open(result_filenames[0], "r") as fp:
             _ = list(map(str.strip, fp.readlines()))
         result_filenames = _
 
+    # We might need the label names from the model.
+    if model_filename is not None:
+        model = tc.load_model(model_filename)
+        assert model.is_trained
+        label_names = model.vectorizer.label_names
+        logger.warn(
+            "Results produced from newer models do not need a model_filename "\
+            "to be specified when joining results.")
+
+    else:
+        with open(result_filenames[0], "rb") as fp:
+            contents = pickle.load(fp)
+            if "label_names" not in contents[-1]:
+                raise ValueError(
+                    "cannot find label names; please provide the model used "\
+                    "to produce these results")
+            label_names = contents[-1]["label_names"]
+
+
     # Load results from each file.
-    results = []
     failed = []
     N = len(result_filenames)
+
+    # Create an ordered dictionary of lists for all the data.
+    data_dict = OrderedDict([("FILENAME", [])])
+    for label_name in label_names:
+        data_dict[label_name] = []
+        
+    if errors:
+        for label_name in label_names:
+            data_dict["E_{}".format(label_name)] = []
+    
+    if cov:
+        data_dict["COV"] = []
+
+    for key in meta_keys:
+        data_dict[key] = []
+    
+    # Iterate over all the result filenames
     for i, filename in enumerate(result_filenames):
-        logger.info("{}/{}: {}".format(i, N, filename))
+        logger.info("{}/{}: {}".format(i + 1, N, filename))
 
         if not os.path.exists(filename):
             logger.warn("Path {} does not exist. Continuing..".format(filename))
@@ -327,33 +359,28 @@ def join_results(output_filename, model_filename, result_filenames, clobber,
         with open(filename, "rb") as fp:
             contents = pickle.load(fp)
 
-        if len(contents) == 3:
-            labels, cov, meta = contents
-            if errors:
-                label_errors = np.sqrt(np.diag(cov))
-        else:
-            labels, meta = contents
-            if errors:
-                label_errors = np.nan * np.ones(len(labels))
+        assert len(contents) == 3, "You are using some old school version!"
+        
+        labels, Sigma, meta = contents
 
         result = [filename] + list(labels) 
         if errors:
-            result += list(label_errors)
-            
+            result.extend(diag(Sigma)**0.5) 
+        if cov:
+            result.append(Sigma)
         result += [meta.get(k, v) for k, v in meta_keys.items()]
-        results.append(result)
 
+        for key, value in zip(data_dict.keys(), result):
+            data_dict[key].append(value)
+
+    # Warn of any failures.
     if failed:
         logger.warn(
             "The following {} result file(s) could not be found: \n{}".format(
                 len(failed), "\n".join(failed)))
 
-    columns = ["FILENAME"] + model.vectorizer.label_names 
-    if errors:
-        columns += ["E_{}".format(label_name) for label_name in label_names]
-    columns += meta_keys.keys()
-
-    table = Table(rows=results, names=columns)
+    # Construct the table.
+    table = Table(TableColumns(data_dict))
     table.write(output_filename, overwrite=clobber)
     logger.info("Written to {}".format(output_filename))
     
@@ -427,11 +454,11 @@ def main():
     fit_parser.add_argument("spectrum_filenames", nargs="+", type=str,
         help="Paths of spectra to fit.")
     fit_parser.add_argument("--rv", dest="fit_velocity", default=False,
-        action="store_true", type=bool, help="Fit radial velocity at test time.")
+        action="store_true", help="Fit radial velocity at test time.")
     fit_parser.add_argument("--parallel-chunks", dest="parallel_chunks",
         type=int, default=1000, help="The number of spectra to fit in a chunk.")
     fit_parser.add_argument("--clobber", dest="clobber", default=False,
-        action="store_true", type=bool, help="Overwrite existing output files.")
+        action="store_true", help="Overwrite existing output files.")
     fit_parser.add_argument(
         "--output-suffix", dest="output_suffix", type=str,
         help="A string suffix that will be added to the spectrum filenames "\
@@ -446,17 +473,25 @@ def main():
         help="Join results from individual stars into a single table.")
     join_parser.add_argument("output_filename", type=str,
         help="The path to write the output filename.")
-    join_parser.add_argument("model_filename", type=str,
-        help="The path of a Cannon model that was used to test the stars.")
     join_parser.add_argument("result_filenames", nargs="+", type=str,
         help="Paths of result files to include.")
-    join_parser.add_argument("--errors", dest="errors", default=False,
-        action="store_true", help="Include formal errors in destination table.")
-    join_parser.add_argument("--clobber", dest="clobber", default=False,
-        action="store_true", help="Ovewrite an existing table file.")
     join_parser.add_argument("--from-filename", 
         dest="from_filename", action="store_true", default=False,
         help="Read result filenames from a file.")
+    join_parser.add_argument("--model-filename", dest="model_filename",
+        type=str, default=None,
+        help="The path of a Cannon model that was used to test the stars. "\
+             "(Note this is only required for older models.)")
+    join_parser.add_argument(
+        "--errors", dest="errors", default=False, action="store_true", 
+        help="Include formal errors in destination table.")
+    join_parser.add_argument(
+        "--cov", dest="cov", default=False, action="store_true", 
+        help="Include covariance matrix in destination table.")
+    join_parser.add_argument(
+        "--clobber", dest="clobber", default=False, action="store_true", 
+        help="Ovewrite an existing table file.")
+
     join_parser.set_defaults(func=join_results)
 
     # Parse the arguments and take care of any top-level arguments.
