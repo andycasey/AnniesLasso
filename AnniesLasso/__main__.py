@@ -364,7 +364,7 @@ def join_results(output_filename, result_filenames, model_filename=None,
         labels, Sigma, meta = contents
 
         if Sigma is None:
-            Sigma = np.nan * np.ones((labels.size, labels.size))
+            Sigma = nan * ones((labels.size, labels.size))
 
         result = [filename] + list(labels) 
         if errors:
