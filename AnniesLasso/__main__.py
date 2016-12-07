@@ -64,7 +64,8 @@ def fit(model_filename, spectrum_filenames, threads, clobber, from_filename,
             _ = list(map(str.strip, fp.readlines()))
         spectrum_filenames = _
 
-    output_suffix = kwargs.get("output_suffix", "result")
+    output_suffix = kwargs.get("output_suffix", None)
+    output_suffix = "result" if output_suffix is None else str(output_suffix)
     N = len(spectrum_filenames)
     for i, filename in enumerate(spectrum_filenames):
         logger.info("At spectrum {0}/{1}: {2}".format(i + 1, N, filename))
