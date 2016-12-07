@@ -428,7 +428,7 @@ def _fit_spectrum(normalized_flux, normalized_ivar, dispersion, initial_labels,
         "absolute_sigma": True,
 
         # These get passed through to leastsq:
-        "Dfun": Dfun,
+        #"Dfun": Dfun,
         "col_deriv": True,
         "ftol": 7./3 - 4./3 - 1, # Machine precision.
         "xtol": 7./3 - 4./3 - 1, # Machine precision.
