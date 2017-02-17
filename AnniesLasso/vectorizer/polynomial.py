@@ -2,74 +2,85 @@
 # -*- coding: utf-8 -*-
 
 """
-A polynomial vectorizer for use in The Cannon.
+A polynomial vectorizer for The Cannon.
 """
 
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
-__all__ = ["BasePolynomialVectorizer", "NormalizedPolynomialVectorizer",
-    "terminator", "get_label_names"]
+__all__ = ["PolynomialVectorizer"]
 
 import numpy as np
 from collections import (Counter, OrderedDict)
 from itertools import combinations_with_replacement
 from six import string_types
 
-from AnniesLasso.vectorizer.base import BaseVectorizer
+from .base import BaseVectorizer
 
 
-class BasePolynomialVectorizer(BaseVectorizer):
+class PolynomialVectorizer(BaseVectorizer):
     """
-    A base vectorizer class that models spectral fluxes as a linear combination
-    of label terms in a polynomial fashion.
+    A vectorizer that models spectral fluxes as combination of polynomial terms.
+    Note that either `label_names` *and* `order` must be provided, or the `terms`
+    keyword argument needs to be explicitly specified.
 
-    :param label_names:
-        The names of the labels that will be used by the vectorizer.
 
-    :param fiducials:
-        The fiducial offsets for the labels.
+    :param label_names: [optional]
+        A list of label names that are terms in the label vector.
 
-    :param scales:
-        The scaling values for the labels.
+    :param order: [optional]
+        The maximal order for the vectorizer.
 
-    :param terms:
-        The terms that constitute the label vector.
+    :param terms: [optional]
+        A structured list of tuples that defines the full extent of the label
+        vector. Note that `terms` *must* be `None` if `label_names` or `order`
+        are provided.
     """
 
-    def __init__(self, *args, **kwargs):
-        super(BasePolynomialVectorizer, self).__init__(*args, **kwargs)
+    def __init__(self, label_names=None, order=None, terms=None, **kwargs):
+        
+        # Check to see if we have a terms/(label_names and order) dichotamy/
+        if (terms is None and None in (label_names, order)) \
+        or (terms is not None and label_names is not None and order is not None):
+            raise ValueError(
+                "label_names and order must be None if terms are provided, "
+                "and terms must be None if label_names or order are provided")
 
-        # Check that the terms are OK, and parse them into a useful format.
-        self._terms = parse_label_vector_description(
-            self._terms, columns=self.label_names)
+        if terms is None:
+            # Parse human-readable terms.
+            terms = terminator(label_names, order, **kwargs)
+
+        else:
+            # Parse label names from the terms.
+            label_names = get_label_names(parse_label_vector_description(terms))
+
+        # Convert terms to use indices.
+        terms = parse_label_vector_description(terms, label_names=label_names)
+
+        super(PolynomialVectorizer, self).__init__(
+            label_names=label_names, terms=terms, **kwargs)
         return None
 
 
     def get_label_vector(self, labels):
         """
-        Return the values of the label vector, given the labels.
+        Return the values of the label vector, given the scaled labels.
 
         :param labels:
-            The labels to calculate the label vector for. This can be a 
-            one-dimensional vector of `K` labels (using the same order and
-            length provided by self.label_names), or a two-dimensional array of
-            `N` by `K` values. The returning array will be of shape `(N, D)`,
-            where `D` is the number of terms in the label vector description.
+            The scaled and offset labels to use to calculate the label vector(s). 
+            This can be a ond-dimensional vector of `K` labels, or a 
+            two-dimensional array of `N` by `K` labels.
         """
 
         labels = np.atleast_2d(labels)
         if labels.ndim > 2:
             raise ValueError("labels must be a 1-d or 2-d array")
 
-        # Offset and scale the labels before building the vector.
-        scaled_labels = self._transform(labels)
-
         columns = [np.ones(labels.shape[0], dtype=float)]
         for term in self.terms:
             column = 1. # This works; don't use np.multiply/np.product.
             for index, order in term:
-                column *= scaled_labels[:, index]**order
+                column *= labels[:, index]**order
             columns.append(column)
         return np.vstack(columns).T
 
@@ -79,7 +90,7 @@ class BasePolynomialVectorizer(BaseVectorizer):
         Return the derivatives of the label vector with respect to fluxes.
 
         :param labels:
-            The labels to calculate the label vector derivatives for. This can 
+            The scaled labels to calculate the label vector derivatives. This can 
             be a one-dimensional vector of `K` labels (using the same order and
             length provided by self.label_names), or a two-dimensional array of
             `N` by `K` values. The returning array will be of shape `(N, D)`,
@@ -91,9 +102,6 @@ class BasePolynomialVectorizer(BaseVectorizer):
         if labels.ndim > 2:
             raise ValueError("labels must be a 1-d or 2-d array")
 
-        # Offset and scale the labels before building the vector.
-        scaled_labels = self._transform(labels)
-
         assert N_objects == 1
 
         slices = np.arange(N_labels)
@@ -102,8 +110,8 @@ class BasePolynomialVectorizer(BaseVectorizer):
             indices_used_in_term = []
             column = np.ones((N_objects, N_labels))
             for index, order in term:
-                f = scaled_labels[:, index]**order
-                g = order * (scaled_labels[:, index]**(order - 1))
+                f = labels[:, index]**order
+                g = order * (labels[:, index]**(order - 1))
 
                 # If it's the index w.r.t. it, take derivative.
                 column[:, slices == index] *= g.reshape((-1, 1))
@@ -121,111 +129,34 @@ class BasePolynomialVectorizer(BaseVectorizer):
         return np.hstack(columns).reshape((N_objects, -1, N_labels))[0]
 
 
-    def get_approximate_labels(self, label_vector):
+    def get_human_readable_label_vector(self, mul="*", pow="^", bracket=False):
         """
-        Return the approximate labels that would produce the given label_vector.
-        If all terms are linearly specified in the label vector, then this is
-        trivial. Otherwise, this is a per-vectorizer method.
+        Return a human-readable form of the label vector.
+        
+        :param mul: [optional]
+            String to use to represent a multiplication operator. For example,
+            if giving LaTeX label definitions one may want to use '\cdot' for
+            the `mul` term.
 
-        :param label_vector:
-            The values of the label vector.
+        :param pow: [optional]
+            String to use to represent a power operator.
+
+        :param bracket: [optional]
+            Show brackets around each term.
+
+        :returns:
+            A human-readable string representing the label vector.
         """
-
-        # Need to match the label vector terms back to real labels.
-        # (Maybe this should use some general non-linear simultaneous solver?)
-
-        # The term_index tells us which term in the label vector is the best to
-        # estimate the label from (e.g., a linear term).
-
-        # The label_index tells us which label this term is actually
-        # referring to.
-
-        labels = np.nan * np.ones(len(self.label_names))
-        for term_index in self._lowest_order_label_indices:
-            if term_index is None: continue
-
-            label_index, order = self.terms[term_index][0]
-            # The +1 index offset is because the first theta is a scaling.
-            labels[label_index] = abs(label_vector[1 + term_index])**(1./order)
-
-        # There could be some coefficients that are only used in cross-terms...
-        # We could solve for them, or just take them as zeros (which will then
-        # put them as the fiducials)
-        labels[~np.isfinite(labels)] = 0.
-
-        return self._inv_transform(labels)
+        return human_readable_label_vector(
+            self.terms, self.label_names, mul=mul, pow=pow, bracket=bracket)
 
 
     @property
-    def _lowest_order_label_indices(self):
-        """
-        Get the indices for the lowest power label terms in the label vector.
-        """
-        indices = OrderedDict()
-        for i, term in enumerate(self.terms):
-            if len(term) > 1: continue
-            index, order = term[0]
-            if order < indices.get(index, [None, np.inf])[-1]:
-                indices[index] = (i, order)
-
-        return [indices.get(i, [None])[0] for i in range(len(self.label_names))]
-
-
-
-    def get_human_readable_label_vector(self, label_names=None, **kwargs):
+    def human_readable_label_vector(self):
         """
         Return a human-readable form of the label vector.
-
-        :param label_names: [optional]
-            Give new label names to form the human readable label vector (e.g.,
-            LaTeX label names).
-
-        :returns:
-            A human-readable string that represents the label-vector.
         """
-
-        return human_readable_label_vector(
-            self.terms, label_names=label_names or self.label_names, **kwargs)
-
-
-class NormalizedPolynomialVectorizer(BasePolynomialVectorizer):
-    """
-    A vectorizer class that models spectral fluxes as a linear combination of
-    label terms in a polynomial fashion. The fiducials and scales are determined
-    automatically such that each label dimension has nearly unit variance.
-
-    :param labelled_set:
-        A table containing the label values for all of the labels that will form
-        this label vector. These data are used to calculate the fiducials and
-        scales.
-
-    :param terms:
-        The terms that constitute the label vector.
-    """
-
-    def __init__(self, labelled_set, terms, scale_factor=1.0):
-        # First parse the terms so that we can get the label names.
-        structured_terms = parse_label_vector_description(terms)
-        label_names = get_label_names(structured_terms)
-        terms = parse_label_vector_description(terms, columns=label_names)
-
-        # Ensure the requested label names are actually in the available tables.
-        for label_name in label_names:
-            try:
-                labelled_set[label_name]
-            except KeyError:
-                raise KeyError("missing label '{}' in the table"\
-                    .format(label_name))
-
-        # Calculate the scales and fiducials.
-        scale_factor = float(scale_factor)
-        scales = [
-            np.ptp(np.percentile(labelled_set[_], [2.5, 97.5])) * scale_factor \
-            for _ in label_names]
-        fiducials = [np.percentile(labelled_set[_], 50) for _ in label_names]
-
-        super(NormalizedPolynomialVectorizer, self).__init__(
-            label_names, fiducials, scales, terms)
+        return self.get_human_readable_label_vector()
 
 
 def _is_structured_label_vector(label_vector):
@@ -254,7 +185,7 @@ def _is_structured_label_vector(label_vector):
     return True
 
 
-def parse_label_vector_description(description, columns=None, **kwargs):
+def parse_label_vector_description(description, label_names=None, **kwargs):
     """
     Return a structured form of a label vector from unstructured,
     human-readable input.
@@ -265,10 +196,9 @@ def parse_label_vector_description(description, columns=None, **kwargs):
     :type description:
         str or list
 
-    :param columns: [optional]
-        If `columns` are provided, instead of text columns being provided as the
-        output parameter, the corresponding index location in `column` will be
-        given.
+    :param label_names: [optional]
+        If `label_names` are provided, instead of label names being provided as 
+        the output parameter, the corresponding index location will be given.
 
     :returns:
         A structured form of the label vector as a multi-level list.
@@ -310,10 +240,10 @@ def parse_label_vector_description(description, columns=None, **kwargs):
 
     # Functions to parse the parameter (or index) and order for each term.
     get_power = lambda t: float(t.split(pow)[1].strip()) if pow in t else 1
-    if columns is None:
+    if label_names is None:
         get_label = lambda d: d.split(pow)[0].strip()
     else:
-        get_label = lambda d: list(columns).index(d.split(pow)[0].strip())
+        get_label = lambda d: list(label_names).index(d.split(pow)[0].strip())
 
     label_vector = []
     for descriptor in (item.split(mul) for item in description):
@@ -357,6 +287,12 @@ def human_readable_label_vector(terms, label_names=None, mul="*", pow="^",
 
     :param pow: [optional]
         String to use to represent a power operator.
+
+    :param bracket: [optional]
+        Show brackets around each term.
+
+    :returns:
+        A human-readable string representing the label vector.
     """
     if not isinstance(terms, (list, tuple)):
         raise TypeError("label vector is not a structured set of terms")

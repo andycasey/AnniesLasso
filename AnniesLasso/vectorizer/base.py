@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-A base vectorizer for use in The Cannon.
+A base vectorizer for The Cannon.
 """
 
 from __future__ import (division, print_function, absolute_import,
@@ -15,49 +15,13 @@ import numpy as np
 
 class BaseVectorizer(object):
     """
-    A vectorizer class that models spectral fluxes, allows for offsets and
-    scaling of different labels, and computes the derivatives for the underlying
-    spectral model.
-
-    :param label_names:
-        The names of the labels that will be used by the vectorizer.
-
-    :param fiducials:
-        The fiducial offsets for the `label_names` provided.
-
-    :param scales:
-        The scaling values for the `label_names` provided.
-
-    :param terms:
-        The terms that constitute the label vector.
+    A vectorizer class that models spectral fluxes and its derivatives.
     """
 
-    def __init__(self, label_names, fiducials, scales, terms):
-
-        N = len(label_names)        
-        fiducials = np.array(fiducials)
-        scales = np.array(scales)
-
-        if N != fiducials.size:
-            raise ValueError("the number of fiducials does not match "
-                             "the number of label_names ({0} != {1})".format(
-                                N, fiducials.size))
-
-        if N != scales.size:
-            raise ValueError("the number of fiducials does not match "
-                             "the number of scales {0} != {1}".format(
-                                N, scales.size))
-
-        # Fiducials can be any finite value, but scales must be finite values
-        # and be positive.
-        if not all(np.isfinite(fiducials)):
-            raise ValueError("fiducials must be finite values")
-
-        if not all(np.isfinite(scales)) or not all(scales > 0):
-            raise ValueError("scales must be finite and positive values")
-
-        # Set the state of the vectorizer.
-        self.__setstate__((label_names, fiducials, scales, terms))
+    def __init__(self, label_names, terms, **kwargs):
+        self._terms = terms
+        self._label_names = tuple(label_names)
+        self._metadata = {}
         return None
 
 
@@ -66,7 +30,7 @@ class BaseVectorizer(object):
     def __str__(self):
         return "<{module}.{name} object consisting of {K} labels and {D} terms>"\
             .format(module=self.__module__, name=type(self).__name__,
-                K=len(self.label_names), D=len(self.terms))
+                D=len(self.terms), K=len())
 
     def __repr__(self):
         return "<{0}.{1} object at {2}>".format(
@@ -78,7 +42,7 @@ class BaseVectorizer(object):
         """
         Return the state of the vectorizer.
         """
-        return (self._label_names, self._fiducials, self._scales, self._terms)
+        return (self._label_names, self._terms, self._metadata)
 
 
     def __setstate__(self, state):
@@ -89,65 +53,24 @@ class BaseVectorizer(object):
             The state of the vectorizer. This should be a four-length tuple that
             contains the label names, fiducials, scales, and terms.
         """
-        self._label_names, self._fiducials, self._scales, self._terms = state
-        self._inv_scales = 1.0/self._scales
 
-
-    def _transform(self, labels):
-        """
-        Transform the labels by subtracting the fiducial values and dividing it
-        by the scaling terms.
-
-        :param labels:
-            The (un-transformed) values of the labels, as they correspond to the
-            vectorizer's label names.
-        """
-        return (labels - self._fiducials) * self._inv_scales
-
-
-    def _inv_transform(self, transformed_labels):
-        """
-        De-transform the transformed labels. This multiplies the transformed
-        labels by the scales and adds the fiducial values.
-
-        :param transformed_labels:
-            The transformed values of the labels, as they correspond to the
-            vectorizer's label names.
-        """
-        return transformed_labels * self._scales + self._fiducials
-
-
-    # Read-only attributes. Don't try and change the state; create a new object.
-    @property
-    def label_names(self):
-        """
-        Return the names of the labels that contribute to the label vector.
-        """
-        return self._label_names
-
-
-    @property
-    def scales(self):
-        """
-        Return the scales for all labels that contribute to the label vector.
-        """
-        return self._scales
-
-
-    @property
-    def fiducials(self):
-        """
-        Return the fiducials for all labels that contribute to the label vector.
-        """
-        return self._fiducials
+        # TODO Legacy models?
+        self._label_names, self._terms, self._metadata = state
+        return None
 
 
     @property
     def terms(self):
-        """
-        Return the terms provided for this vectorizer.
-        """
+        """ Return the terms provided for this vectorizer. """
         return self._terms
+
+
+    @property
+    def label_names(self):
+        """
+        Return the label names that are used in this vectorizer.
+        """
+        return self._label_names
 
 
     def __call__(self, *args, **kwargs):
@@ -182,30 +105,3 @@ class BaseVectorizer(object):
         """
         raise NotImplementedError("the get_label_vector_derivative method "
                                   "must be specified by the sub-classes")
-
-
-    def get_approximate_labels(self, label_vector, *args, **kwargs):
-        """
-        Return the approximate labels that would produce the given label_vector.
-        If all terms are linearly specified in the label vector, then this is
-        trivial. Otherwise, this is a per-vectorizer method.
-
-        :param label_vector:
-            The values of the label vector, typically estimated from a matrix
-            inversion using observed fluxes and uncertainties.
-        """
-        raise NotImplementedError("the get_approximate_labels method "
-                                  "must be specified by the sub-classes")
-
-
-    def get_human_readable_label_vector(self, label_names=None, *args, **kwargs):
-        """
-        Return a human-readable form of the label vector.
-
-        :param label_names: [optional]
-            Give new label names to form the human readable label vector (e.g.,
-            LaTeX label names).
-        """
-        raise NotImplementedError("the get_human_readable_label_vector method "
-                                  "must be specified by the sub-classes")        
-
