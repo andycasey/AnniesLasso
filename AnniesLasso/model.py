@@ -11,12 +11,13 @@ from __future__ import (division, print_function, absolute_import,
 __all__ = ["CannonModel"]
 
 import logging
+import multiprocessing as mp
 import numpy as np
 import scipy.optimize as op
-
-import tensorflow as tf
+from time import time
 
 from .base import BaseCannonModel
+from . import utils
 
 logger = logging.getLogger(__name__)
 
@@ -81,43 +82,153 @@ class CannonModel(BaseCannonModel):
         self._design_matrix = vectorizer(self._scaled_training_set_labels)
 
         # Check the regularization and censoring.
+        self.regularization = regularization
+
+        self._theta, self._s2 = (None, None)
         return None
 
 
 
-    def train(self, threads=None):
+    def train(self, threads=None, **kwargs):
+        """
+        Train the model.
+
+        :param threads: [optional]
+            The number of parallel threads to use.
+
+        :returns:
+            A three-length tuple containing the spectral coefficients `theta`,
+            the squared scatter term at each pixel `s2`, and metadata related to
+            the training of each pixel.
+        """
+
+        S, P = self.training_set_flux.shape
+        T = self.design_matrix.shape[1]
+
+        logger.info("Training {0}-label {1} with {2} stars and {3} pixels/star"\
+            .format(len(self.vectorizer.label_names), type(self).__name__, S, P))
+
+        # Parallelise out.
+        if threads in (1, None):
+            mapper, pool = (map, None)
+
+        else:
+            pool = mp.Pool(threads)
+            mapper = pool.map
+
+        func = utils.wrapper(_fit_pixel_fixed_scatter, None, {}, P)
+
+        metadata = []
+        theta = np.nan * np.ones((P, T))
+        s2 = np.nan * np.ones(P)
+
+        for pixel, (flux, ivar) \
+        in enumerate(zip(self.training_set_flux.T, self.training_set_ivar.T)):
+
+            args = (
+                flux, ivar, 
+                self._initial_theta(pixel),
+                self.design_matrix,
+                self._pixel_access(self.regularization, pixel, 0.0),
+                None
+            )
+            (pixel_theta, pixel_s2, pixel_metadata), = mapper(func, [args])
+
+            metadata.append(pixel_metadata)
+            theta[pixel], s2[pixel] = (pixel_theta, pixel_s2)
+
+        self._theta, self._s2, self._training_metadata = (theta, s2, metadata)
+
+        if pool is not None:
+            pool.close()
+            pool.join()
+
+        return (theta, s2, metadata)
 
 
-        for i in range(self.training_set_flux.shape[1]):
 
-            print(" ON {}".format(i))
-
-            initial_theta = np.hstack([1.0, np.zeros(len(self.vectorizer.terms))])
-
-            initial_theta, ATCiAinv, adjusted_ivar = _fit_theta_by_linalg(
-                self.training_set_flux[:, i], 
-                self.training_set_ivar[:, i], 
-                s2=0, design_matrix=self.design_matrix)
-
-            # TODO: Check if the fiducial theta is a better starting point?
-
-            # Use a previously-trained value as the starting point?
-            # Use a neighbouring value?
-            if not np.all(np.isfinite(initial_theta)):
-                continue
-
-            foo = _fit_pixel_fixed_scatter(self.training_set_flux[:, i], self.training_set_ivar[:, i], 
-                initial_theta, self.design_matrix, regularization=0.0, censoring_mask=None)
-
-        raise NotImplementedError
+    def test(self, flux, ivar, initial_labels=None, full_output=False, 
+        threads=None, **kwargs):
 
 
-    def test(self, threads=None):
-        raise NotImplementedError
+        if threads in (1, None):
+            mapper, pool = (map, None)
+
+        else:
+            pool = mp.Pool(threads)
+            mapper = pool.map
+
+
+        initial_labels = np.atleast_2d(initial_labels or self._fiducials)
+
+        func = utils.wrapper(
+            _fit_spectrum, (initial_labels, self.vectorizer, self.theta, self.s2),
+            message="Fitting {} spectra".format(len(flux)))
+
+        args = (np.atleast_2d(flux), np.atleast_2d(ivar))
+
+        output = mapper(func, args)
+
+        raise a
 
 
     def fit(self, *args, **kwargs):
         return self.test(*args, **kwargs)
+
+
+
+    def _initial_theta(self, pixel_index, **kwargs):
+        """
+        Return a list of guesses of the spectral coefficients for the given
+        pixel index.
+
+        :param pixel_index:
+            The zero-indexed integer of the pixel.
+
+        :returns:
+            A list of initial theta guesses, and the source of each guess.
+        """
+
+        # Preference:
+        # - a previously trained theta value
+        # - an estimate from linear algebra
+        # - a neighbouring pixel's value
+        # - a fiducial value
+
+        guesses = []
+
+        if self.theta is not None:
+            # Previously trained theta value.
+            if np.all(np.isfinite(self.theta[pixel_index])):
+                guesses.append((self.theta[pixel_index], "previously_trained"))
+
+        # Estimate from linear algebra.
+        theta, cov = _fit_theta_by_linalg(
+            self.training_set_flux[:, pixel_index],
+            self.training_set_ivar[:, pixel_index],
+            s2=kwargs.get("s2", 0.0), design_matrix=self.design_matrix)
+
+        if np.all(np.isfinite(theta)):
+            guesses.append((theta, "linear_algebra"))
+
+        if self.theta is not None:
+            # Neighbouring pixels value.
+            for neighbour_pixel_index in set(np.clip(
+                [pixel_index - 1, pixel_index + 1], 
+                0, self.training_set_flux.shape[1] - 1)):
+
+                if np.all(np.isfinite(self.theta[neighbour_pixel_index])):
+                    guesses.append(
+                        (self.theta[neighbour_pixel_index], "neighbour_pixel"))
+
+        # Fiducial value.
+        fiducial = np.hstack([1.0, np.zeros(len(self.vectorizer.terms))])
+        guesses.append((fiducial, "fiducial"))
+
+        return guesses
+
+
+
 
 
 
@@ -148,41 +259,44 @@ def _fit_theta_by_linalg(flux, ivar, s2, design_matrix):
     try:
         ATCiAinv = np.linalg.inv(np.dot(design_matrix.T, CiA))
     except np.linalg.linalg.LinAlgError:
-        return (np.hstack([1, np.zeros(design_matrix.shape[1] - 1)]), None, adjusted_ivar)
+        N = design_matrix.shape[1]
+        return (np.hstack([1, np.zeros(N - 1)]), np.inf * np.eye(N))
 
     ATY = np.dot(design_matrix.T, flux * adjusted_ivar)
     theta = np.dot(ATCiAinv, ATY)
 
-    return (theta, ATCiAinv, adjusted_ivar)
+    return (theta, ATCiAinv)
 
 
 
 
 # TODO: This logic should probably go somewhere else.
 
-
+    
 def chi_sq(theta, design_matrix, flux, ivar, axis=None, gradient=True):
     """
     Calculate the chi-squared difference between the spectral model and flux.
     """
     residuals = np.dot(theta, design_matrix.T) - flux
 
-    f = np.sum(ivar * residuals**2, axis=axis)
+    ivar_residuals = ivar * residuals
+    f = np.sum(ivar_residuals * residuals, axis=axis)
     if not gradient:
         return f
 
-    g = 2.0 * np.dot(design_matrix.T, ivar * residuals)
+    g = 2.0 * np.dot(design_matrix.T, ivar_residuals)
     return (f, g)
 
-    
-def L1Norm(Q):
-    """
-    Return the L1 normalization of Q and its derivative.
 
-    :param Q:
+def L1Norm_variation(theta):
+    """
+    Return the L1 norm of theta (except the first entry) and its derivative.
+
+    :param theta:
         An array of finite values.
     """
-    return (np.sum(np.abs(Q)), np.sign(Q))
+
+    return (np.sum(np.abs(theta[1:])), np.hstack([0.0, np.sign(theta[1:])]))
 
 
 def _pixel_objective_function_fixed_scatter(theta, design_matrix, flux, ivar, 
@@ -213,30 +327,40 @@ def _pixel_objective_function_fixed_scatter(theta, design_matrix, flux, ivar,
 
     if gradient:
         csq, d_csq = chi_sq(theta, design_matrix, flux, ivar, gradient=True)
-        L1, d_L1 = L1Norm(theta)
+        L1, d_L1 = L1Norm_variation(theta)
 
-        # We are using a variation of L1 norm that ignores the first coefficient.
-        f = csq + regularization * (L1 - np.abs(theta[0]))
+        f = csq + regularization * L1
         g = d_csq + regularization * d_L1
         
-        print("opt", f)
         return (f, g)
 
     else:
         csq = chi_sq(theta, design_matrix, flux, ivar, gradient=False)
-        L1, d_L1 = L1Norm(theta)
+        L1, d_L1 = L1Norm_variation(theta)
 
-        # We are using a variation of L1 norm that ignores the first coefficient.
-        return csq + regularization * (L1 - np.abs(theta[0]))
-        
+        return csq + regularization * L1
 
-def _fit_pixel_fixed_scatter(flux, ivar, initial_theta, design_matrix, 
+
+def _scatter_objective_function(scatter, residuals_squared, ivar):
+    adjusted_ivar = ivar/(1.0 + ivar * scatter**2)
+    chi_sq = residuals_squared * adjusted_ivar
+    return (np.mean(chi_sq) - 1.0)**2
+    
+
+def _fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix, 
     regularization, censoring_mask, **kwargs): 
 
     if np.sum(ivar) < 1.0 * ivar.size: # MAGIC
-        metadata = dict(message="No pixel information.")
-        return (initial_theta, metadata)
+        metadata = dict(message="No pixel information.", op_time=0.0)
+        fiducial = np.hstack([1.0, np.zeros(design_matrix.shape[1] - 1)])
+        return (fiducial, np.inf, metadata) # MAGIC
 
+    feval = []
+    for initial_theta, initial_theta_source in initial_thetas:
+        feval.append(_pixel_objective_function_fixed_scatter(
+            initial_theta, design_matrix, flux, ivar, regularization, False))
+
+    initial_theta, initial_theta_source = initial_thetas[np.nanargmin(feval)]
 
     # If the initial_theta is the same size as the censored_mask, but different
     # to the design_matrix, then we need to censor the initial theta.
@@ -250,114 +374,48 @@ def _fit_pixel_fixed_scatter(flux, ivar, initial_theta, design_matrix,
             #       the design matrix is already censored.
             initial_theta = initial_theta.copy()[censoring_mask]
 
+    op_kwds = dict(args=[design_matrix, flux, ivar, regularization, True], 
+        disp=False, maxfun=np.inf, maxiter=np.inf)
 
-    #initial_theta = np.hstack([1, np.zeros(initial_theta.size - 1)])
-    
+    # Allow either l_bfgs_b or powell
+    t_init = time()
+    op_method = kwargs.get("op_method", "l_bfgs_b").lower()
+    if op_method == "l_bfgs_b":
 
-    from time import time
+        op_kwds.update(m=design_matrix.shape[1], factr=10.0, pgtol=1e-6)
+        op_kwds.update(kwargs.get("op_kwds", {}))
 
+        op_params, fopt, metadata = op.fmin_l_bfgs_b(
+            _pixel_objective_function_fixed_scatter, initial_theta, 
+            fprime=None, approx_grad=None, **op_kwds)
 
-    # Optimization keyword arguments.
-    kwds = dict(args=(design_matrix, flux, ivar, regularization), disp=False,
-        maxfun=np.inf, maxiter=np.inf, m=initial_theta.size, factr=10.0,
-        pgtol=1e-6)
-    kwds.update(kwargs.pop("op_bfgs_kwds", {}))
+        metadata.update(dict(fopt=fopt))
 
-    ta = time()
+    elif op_method == "powell":
+        
+        op_kwds.update(xtol=1e-6, ftol=1e-6)
+        op_kwds.update(kwargs.get("op_kwds", {}))
 
-    op_params, fopt, metadata = op.fmin_l_bfgs_b(
-        _pixel_objective_function_fixed_scatter, initial_theta, 
-        fprime=None, approx_grad=None, **kwds)
+        # Set 'False' in args so that we don't return the gradient, because fmin
+        # doesn't want it.
+        op_kwds["args"][-1] = False
 
-    t_opt = time() - ta
+        t_init = time()
 
-    metadata.update(dict(fopt=fopt, p0=initial_theta))
+        op_params, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
+            _pixel_objective_function_fixed_scatter, initial_theta,
+            full_output=True, **op_kwds)
 
+        metadata = dict(fopt=fopt, direc=direc, n_iter=n_iter, n_funcs=n_funcs,
+            warnflag=warnflag)
 
-    import pystan as stan
+    else:
+        raise ValueError("unknown optimization method '{}' -- "
+                         "powell or l_bfgs_b are available".format(op_method))
 
-    stan_model = stan.StanModel(model_code="""
-        data {
-            int<lower=1> S; // number of stars
-            int<lower=1> T; // number of terms
-            real flux[S];
-            real flux_sigma[S];
-            matrix[T, S] DM;
-        }
-
-        parameters {
-            row_vector[T] theta;
-        }
-
-        model {
-            flux ~ normal(theta * DM, flux_sigma);    
-        }
-        """)
-
-    data = dict(S=flux.size, T=initial_theta.size,
-        flux=flux, flux_sigma=ivar**-0.5, DM=design_matrix.T)
-
-    ta = time()
-    stan_params = stan_model.optimizing(data=data, init={"theta": initial_theta},
-        iter=10000)
-    t_stan = time() - ta
-
-    raise a
-
-
-    # TENSORFLOW TEST
-
-    print("A")
-    theta = tf.Variable(initial_theta.reshape((-1, 1)), trainable=True, name="theta")
-
-    print("B")
-    loss = tf.reduce_sum(tf.multiply(ivar, tf.square(tf.reduce_sum(tf.multiply(theta, design_matrix.T), 0) - flux)))
-
-
-    #    loss = tf.reduce_sum(tf.mul(theta, design_matrix), 1) - flux)**2
-
-    #loss = tf.einsum('i,i->', theta, design_matrix.T) - flux
-
-    
-    print("C")
-    opt = tf.train.AdamOptimizer(0.1).minimize(loss)
-
-    tb = time() 
-    
-    with tf.Session() as session:
-
-        session.run(tf.global_variables_initializer())
-
-        for i in range(1000):
-
-            session.run(opt)
-            lossed = session.run(loss)
-            print("tf", i, lossed, fopt)
-
-        done = session.run(theta)
-        t_tf = time() - tb
-
-        print(done, lossed)
-
-        #print("TF", session.run(loss))
-        #for i in range(100):
-        #    print("TF", session.run([theta, loss]))
-
-
-    raise a
-
-
-
-
-
-
-
-
-
-
-    if metadata["warnflag"] > 0:
-        logger.warn(
-            "BFGS optimization stopped with message: {}".format(metadata["task"]))
+    # Additional metadata common to both optimizers.
+    metadata.update(dict(op_method=op_method, op_time=time() - t_init,
+        initial_theta=initial_theta, initial_theta_source=initial_theta_source))
 
     # De-censor the optimized parameters.
     if censoring_mask is not None:
@@ -367,4 +425,9 @@ def _fit_pixel_fixed_scatter(flux, ivar, initial_theta, design_matrix,
     else:
         theta = op_params
 
-    return (theta, metadata)
+    # Fit the scatter.
+    residuals_squared = (flux - np.dot(theta, design_matrix.T))**2
+    scatter = op.fmin(_scatter_objective_function, 0.0,
+        args=(residuals_squared, ivar), disp=False)
+
+    return (theta, scatter**2, metadata)

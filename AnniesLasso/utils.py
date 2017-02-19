@@ -72,7 +72,19 @@ class wrapper(object):
         :param message: [optional]
             An information message to log before showing the progressbar.
         """
-        self.N = N
+
+        self.N = int(N)
+        
+        try:
+            rows, columns = os.popen('stty size', 'r').read().split()
+
+        except:
+            logger.debug("Couldn't get screen size. Progressbar may look odd.")
+            self.W = 100
+
+        else:
+            self.W = min(100, int(columns) - (12 + 2 * len(str(self.N))))
+
         self.t_init = time()
         self.message = message
         if 0 >= self.N:
@@ -90,6 +102,7 @@ class wrapper(object):
         """
         Increment the progressbar by one iteration.
         """
+        
         if 0 >= self.N:
             return None
 
@@ -99,13 +112,13 @@ class wrapper(object):
 
         index = _counter.value
         
-        increment = max(1, int(self.N/100))
+        increment = max(1, int(self.N/float(self.W)))
         t = time() if index >= self.N else None
 
-        status = "({0}/{1})   ".format(index, self.N) if t is None else \
+        status = "({0}/{1})".format(index, self.N) if t is None else \
                  "({0:.0f}s)                      ".format(t-self.t_init)
         sys.stdout.write(
-            "\r[{done: <100}] {percent:3.0f}% {status}".format(
+            ("\r[{done: <" + str(self.W) + "}] {percent:3.0f}% {status}").format(
             done="=" * int(index/increment),
             percent=100. * index/self.N,
             status=status))

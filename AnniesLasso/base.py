@@ -16,6 +16,7 @@ import numpy as np
 from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime
+from functools import wraps
 from os import path
 from six.moves import cPickle as pickle
 from six import string_types
@@ -34,6 +35,7 @@ def requires_training_wheels(method):
     :param method:
         A method belonging to a sub-class of BaseCannonModel.
     """
+    @wraps(method)
     def wrapper(model, *args, **kwargs):
         if not model.is_trained:
             raise TypeError("the model needs training first")
@@ -127,6 +129,35 @@ class BaseCannonModel(object):
             type(self).__name__, hex(id(self)))
 
 
+    @requires_training_wheels
+    def __call__(self, labels):
+        """
+        Return spectral fluxes, given the labels.
+
+        :param labels:
+            An array of stellar labels.
+        """
+
+        # Scale and offset the labels.
+        scaled_labels = (np.atleast_2d(labels) - self._fiducials)/self._scales
+        flux = np.dot(self.theta, self.vectorizer(scaled_labels).T).T
+        return flux[0] if flux.shape[0] == 1 else flux
+
+
+
+    def _pixel_access(self, array, index, default=None):
+
+        if array is None:
+            return default
+
+        try:
+            return array[index]
+        
+        except TypeError:
+            return array
+
+
+
     def reset(self):
         """
         Clear any attributes that have been trained upon.
@@ -200,6 +231,45 @@ class BaseCannonModel(object):
         return self._training_set_ivar
 
 
+    @property
+    def regularization(self):
+        """
+        Return the strength of the L1 regularization for this model.
+        """
+        return self._regularization
+
+
+    @regularization.setter
+    def regularization(self, regularization):
+        """
+        Specify the strength of the regularization for the model, either as a
+        single value for all pixels, or a different strength for each pixel.
+
+        :param regularization:
+            The L1-regularization strength for the model.
+        """
+
+        if regularization is None:
+            self._regularization = None
+            return None
+
+        regularization = np.array(regularization).flatten()
+        if regularization.size == 1:
+            regularization = regularization[0]
+            if 0 > regularization or not np.isfinite(regularization):
+                raise ValueError("regularization must be positive and finite")
+
+        elif regularization.size != self.training_set_flux.shape[1]:
+            raise ValueError("regularization array must be of size `num_pixels`")
+
+            if any(0 > regularization) \
+            or not np.all(np.isfinite(regularization)):
+                raise ValueError("regularization must be positive and finite")
+
+        self._regularization = regularization
+        return None
+
+
     def _verify_training_data(self):
         """
         Verify the training data for the appropriate shape and content.
@@ -213,6 +283,13 @@ class BaseCannonModel(object):
                 "the first axes of the training set flux array should "
                 "have the same shape as the nuber of rows in the labelled set"
                 "(N_stars, N_pixels)")
+
+        if not np.all(np.isfinite(self.training_set_flux)):
+            raise ValueError("training set fluxes are not all finite")
+
+        if not np.all(self.training_set_ivar >= 0) \
+        or not np.all(np.isfinite(self.training_set_ivar)):
+            raise ValueError("training set ivars are not all positive finite")
 
         if self.dispersion is not None:
             dispersion = np.atleast_1d(self.dispersion).flatten()
