@@ -124,7 +124,7 @@ class CannonModel(base.BaseCannonModel):
 
         func = utils.wrapper(_fit_pixel_fixed_scatter, None, kwargs, P)
 
-        metadata = []
+        meta = []
         theta = np.nan * np.ones((P, T))
         s2 = np.nan * np.ones(P)
 
@@ -138,23 +138,22 @@ class CannonModel(base.BaseCannonModel):
                 self._pixel_access(self.regularization, pixel, 0.0),
                 None
             )
-            (pixel_theta, pixel_s2, pixel_metadata), = mapper(func, [args])
+            (pixel_theta, pixel_s2, pixel_meta), = mapper(func, [args])
 
-            metadata.append(pixel_metadata)
+            meta.append(pixel_meta)
             theta[pixel], s2[pixel] = (pixel_theta, pixel_s2)
 
-        self._theta, self._s2, self._training_metadata = (theta, s2, metadata)
+        self._theta, self._s2 = (theta, s2)
 
         if pool is not None:
             pool.close()
             pool.join()
 
-        return (theta, s2, metadata)
+        return (theta, s2, meta)
 
 
 
-    def test(self, flux, ivar, initial_labels=None, full_output=False, 
-        threads=None, **kwargs):
+    def test(self, flux, ivar, initial_labels=None, threads=None, **kwargs):
         """
         Run the test step on spectra.
 
@@ -167,11 +166,6 @@ class CannonModel(base.BaseCannonModel):
         :param initial_labels: [optional]
             The initial labels to try for each spectrum. This can be a single
             set of initial values, or one set of initial values for each star.
-
-        :param full_output: [optional]
-            If `True`, return a three-length tuple containing the optimized
-            labels, the associated covariance matrices, and metadata.
-            Otherwise, just return the optimized labels.
 
         :param threads: [optional]
             The number of parallel threads to use.
@@ -207,9 +201,6 @@ class CannonModel(base.BaseCannonModel):
         if pool is not None:
             pool.close()
             pool.join()
-
-        if not full_output:
-            return np.array(labels)
 
         return (np.array(labels), np.array(cov), meta)
 

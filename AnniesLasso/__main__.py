@@ -408,47 +408,10 @@ def main():
     parent_parser.add_argument("-t", "--threads",
         dest="threads", type=int, default=1,
         help="The number of threads to use.")
-    parent_parser.add_argument("--condor",
-        dest="condor", action="store_true", default=False,
-        help="Distribute action using Condor.")
-    parent_parser.add_argument("--condor-chunks",
-        dest="condor_chunks", type=int, default=100,
-        help="The number of chunks to distribute across Condor. "\
-             "This argument is ignored if --condor is not used.")
-    parent_parser.add_argument("--condor-memory",
-        dest="memory", type=int, default=2000,
-        help="The amount of memory (MB) to request for each Condor job. "\
-             "This argument is ignored if --condor is not used.")
-    parent_parser.add_argument("--condor-check-frequency",
-        dest="condor_check_frequency", type=int, default=1,
-        help="The number of seconds to wait before checking for finished Condor jobs.")
-
-
+    
     # Allow for multiple actions.
     subparsers = parser.add_subparsers(title="action", dest="action",
         description="Specify the action to perform.")
-
-    # Training parsers.
-    train_parser = subparsers.add_parser("train", parents=[parent_parser],
-        help="Train an existing Cannon model.")
-    train_parser.add_argument("--save_training_data", default=False,
-        action="store_true", dest="save_training_data",
-        help="Once trained, save the model using the training data.")
-    train_parser.add_argument("--re-train", default=False,
-        action="store_true", dest="re_train",
-        help="Re-train the model if it is already trained.")
-    train_parser.add_argument("model_filename", type=str,
-        help="The path of the saved Cannon model.")
-    train_parser.add_argument("--factr", default=10000000.0, dest="factr",
-        help="BFGS keyword argument")
-    train_parser.add_argument("--pgtol", default=1e-5, dest="pgtol",
-        help="BFGS keyword argument")
-    train_parser.add_argument("--xtol", default=1e-6, dest="xtol",
-        help="fmin_powell keyword argument")
-    train_parser.add_argument("--ftol", default=1e-6, dest="ftol",
-        help="fmin_powell keyword argument")
-    train_parser.set_defaults(func=train)
-
 
     # Fitting parser.
     fit_parser = subparsers.add_parser("fit", parents=[parent_parser],
@@ -457,8 +420,6 @@ def main():
         help="The path of a trained Cannon model.")
     fit_parser.add_argument("spectrum_filenames", nargs="+", type=str,
         help="Paths of spectra to fit.")
-    fit_parser.add_argument("--rv", dest="fit_velocity", default=False,
-        action="store_true", help="Fit radial velocity at test time.")
     fit_parser.add_argument("--parallel-chunks", dest="parallel_chunks",
         type=int, default=1000, help="The number of spectra to fit in a chunk.")
     fit_parser.add_argument("--clobber", dest="clobber", default=False,
@@ -482,10 +443,6 @@ def main():
     join_parser.add_argument("--from-filename", 
         dest="from_filename", action="store_true", default=False,
         help="Read result filenames from a file.")
-    join_parser.add_argument("--model-filename", dest="model_filename",
-        type=str, default=None,
-        help="The path of a Cannon model that was used to test the stars. "\
-             "(Note this is only required for older models.)")
     join_parser.add_argument(
         "--errors", dest="errors", default=False, action="store_true", 
         help="Include formal errors in destination table.")
