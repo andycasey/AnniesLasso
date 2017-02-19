@@ -83,7 +83,7 @@ class wrapper(object):
             self.W = 100
 
         else:
-            self.W = min(100, int(columns) - (12 + 2 * len(str(self.N))))
+            self.W = min(100, int(columns) - (12 + 21 + 2 * len(str(self.N))))
 
         self.t_init = time()
         self.message = message
@@ -113,10 +113,20 @@ class wrapper(object):
         index = _counter.value
         
         increment = max(1, int(self.N/float(self.W)))
-        t = time() if index >= self.N else None
+        
+        eta_minutes = ((time() - self.t_init) / index) * (self.N - index) / 60.0
+        
+        if index >= self.N:
+            status = "({0:.0f}s) ".format(time() - self.t_init)
 
-        status = "({0}/{1})".format(index, self.N) if t is None else \
-                 "({0:.0f}s)                      ".format(t-self.t_init)
+        elif float(index)/self.N >= 0.05 \
+        and eta_minutes > 1: # MAGIC fraction for when we can predict ETA
+            status = "({0}/{1}; ~{2:.0f}m until finished)".format(
+                        index, self.N, eta_minutes)
+
+        else:
+            status = "({0}/{1})                          ".format(index, self.N)
+
         sys.stdout.write(
             ("\r[{done: <" + str(self.W) + "}] {percent:3.0f}% {status}").format(
             done="=" * int(index/increment),
@@ -124,7 +134,7 @@ class wrapper(object):
             status=status))
         sys.stdout.flush()
 
-        if t is not None:
+        if index >= self.N:
             sys.stdout.write("\r\n")
             sys.stdout.flush()
 
