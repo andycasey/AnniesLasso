@@ -82,7 +82,7 @@ class PolynomialVectorizer(BaseVectorizer):
             for index, order in term:
                 column *= labels[:, index]**order
             columns.append(column)
-        return np.vstack(columns).T
+        return np.vstack(columns)
 
 
     def get_label_vector_derivative(self, labels):
@@ -97,36 +97,33 @@ class PolynomialVectorizer(BaseVectorizer):
             where `D` is the number of terms in the label vector description.
         """
 
-        labels = np.atleast_2d(labels)
-        N_objects, N_labels = labels.shape
-        if labels.ndim > 2:
-            raise ValueError("labels must be a 1-d or 2-d array")
+        L, T = (len(labels), len(self.terms))
 
-        assert N_objects == 1
+        slicer = np.arange(L)
+        indices_used = np.zeros(L, dtype=bool)
 
-        slices = np.arange(N_labels)
-        columns = [np.zeros((N_objects, N_labels))]
-        for term in self.terms:
-            indices_used_in_term = []
-            column = np.ones((N_objects, N_labels))
+        columns = np.ones((T + 1, L), dtype=float)
+        columns[0] = 0.0 # First theta derivative always zero.
+
+        for t, term in enumerate(self.terms, start=1):
+                
+            indices_used[:] = False
+            
             for index, order in term:
-                f = labels[:, index]**order
-                g = order * (labels[:, index]**(order - 1))
+
+                dy = order * (labels[index]**(order - 1))
+                y = labels[index]**order
 
                 # If it's the index w.r.t. it, take derivative.
-                column[:, slices == index] *= g.reshape((-1, 1))
+                columns[t, index] *= dy
+
                 # Otherwise, calculate as normal.
-                column[:, slices != index] *= f.reshape((-1, 1))
-                indices_used_in_term.append(index)
+                columns[t, slicer != index] *= y
+                indices_used[index] = True
 
-            # If labels are not in this term, the derivative w.r.t. them is zero
-            indices_missing_in_term = np.array(list(set(range(N_labels))\
-                .difference(indices_used_in_term)))
-            if indices_missing_in_term.size > 0:
-                column[:, indices_missing_in_term] = 0
-            columns.append(column)
+            columns[t, ~indices_used] = 0
 
-        return np.hstack(columns).reshape((N_objects, -1, N_labels))[0]
+        return columns
 
 
     def get_human_readable_label_vector(self, mul="*", pow="^", bracket=False):

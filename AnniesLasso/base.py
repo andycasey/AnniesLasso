@@ -316,9 +316,8 @@ class BaseCannonModel(object):
 
                 if x > y: # One warning per pair.
                     logger.warn(
-                        "Labels '{X}' and '{Y}' are highly correlated "\
-                        "(rho = {rho_xy:.2}). "\
-                        "This may cause very slow training times."\
+                        "Labels '{X}' and '{Y}' are highly correlated (rho = {rho_xy:.2})."\
+                        " This may cause very slow training times. Are both labels needed?"\
                         .format(
                             X=self.vectorizer.label_names[x],
                             Y=self.vectorizer.label_names[y],

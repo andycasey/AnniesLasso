@@ -117,7 +117,7 @@ class wrapper(object):
         eta_minutes = ((time() - self.t_init) / index) * (self.N - index) / 60.0
         
         if index >= self.N:
-            status = "({0:.0f}s) ".format(time() - self.t_init)
+            status = "({0:.0f}s)                         ".format(time() - self.t_init)
 
         elif float(index)/self.N >= 0.05 \
         and eta_minutes > 1: # MAGIC fraction for when we can predict ETA

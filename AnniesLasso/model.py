@@ -81,7 +81,7 @@ class CannonModel(BaseCannonModel):
         self._scaled_training_set_labels = (self.training_set_labels - self._fiducials)/self._scales
 
         # Create a design matrix.
-        self._design_matrix = vectorizer(self._scaled_training_set_labels)
+        self._design_matrix = vectorizer(self._scaled_training_set_labels).T
 
         # Check the regularization and censoring.
         self.regularization = regularization
@@ -118,7 +118,7 @@ class CannonModel(BaseCannonModel):
             pool = mp.Pool(threads)
             mapper = pool.map
 
-        func = utils.wrapper(_fit_pixel_fixed_scatter, None, {}, P)
+        func = utils.wrapper(_fit_pixel_fixed_scatter, None, kwargs, P)
 
         metadata = []
         theta = np.nan * np.ones((P, T))
@@ -151,7 +151,27 @@ class CannonModel(BaseCannonModel):
 
     def test(self, flux, ivar, initial_labels=None, full_output=False, 
         threads=None, **kwargs):
+        """
+        Run the test step on spectra.
 
+        :param flux:
+            The (pseudo-continuum-normalized) spectral flux.
+
+        :param ivar:
+            The inverse variance values for the spectral fluxes.
+
+        :param initial_labels: [optional]
+            The initial labels to try for each spectrum. This can be a single
+            set of initial values, or one set of initial values for each star.
+
+        :param full_output: [optional]
+            If `True`, return a three-length tuple containing the optimized
+            labels, the associated covariance matrices, and metadata.
+            Otherwise, just return the optimized labels.
+
+        :param threads: [optional]
+            The number of parallel threads to use.
+        """
 
         if threads in (1, None):
             mapper, pool = (map, None)
@@ -160,18 +180,35 @@ class CannonModel(BaseCannonModel):
             pool = mp.Pool(threads)
             mapper = pool.map
 
+        flux, ivar = (np.atleast_2d(flux), np.atleast_2d(ivar))
+        S, P = flux.shape
 
-        initial_labels = np.atleast_2d(initial_labels or self._fiducials)
+        if ivar.shape != flux.shape:
+            raise ValueError("flux and ivar arrays must be the same shape")
 
-        func = utils.wrapper(
-            _fit_spectrum, (initial_labels, self.vectorizer, self.theta, self.s2),
-            message="Fitting {} spectra".format(len(flux)))
+        if initial_labels is None:
+            initial_labels = self._fiducials
 
-        args = (np.atleast_2d(flux), np.atleast_2d(ivar))
+        initial_labels = np.atleast_2d(initial_labels)
+        if initial_labels.shape[0] != S and len(initial_labels.shape) == 2:
+            initial_labels = np.tile(initial_labels.flatten(), S)\
+                             .reshape(S, -1, len(self._fiducials))
 
-        output = mapper(func, args)
+        func = utils.wrapper(_fit_spectrum, 
+            (self.vectorizer, self.theta, self.s2, self._fiducials, self._scales),
+            kwargs, S, message="Fitting {} spectra".format(S))
 
-        raise a
+        labels, cov, meta = zip(*mapper(func, zip(*(flux, ivar, initial_labels))))
+
+        if pool is not None:
+            pool.close()
+            pool.join()
+
+        if not full_output:
+            return np.array(labels)
+
+        return (np.array(labels), np.array(cov), meta)
+
 
 
     def fit(self, *args, **kwargs):
@@ -230,7 +267,152 @@ class CannonModel(BaseCannonModel):
         return guesses
 
 
+def _fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
+    scales, dispersion=None, **kwargs):
+    """
+    Fit a single spectrum by least-squared fitting.
+    
+    :param flux:
+        The normalized flux values.
 
+    :param ivar:
+        The inverse variance array for the normalized fluxes.
+
+    :param initial_labels:
+        The point(s) to initialize optimization from.
+
+    :param vectorizer:
+        The vectorizer to use when fitting the data.
+
+    :param theta:
+        The theta coefficients (spectral derivatives) of the trained model.
+
+    :param s2:
+        The pixel scatter (s^2) array for each pixel.
+
+    :param dispersion: [optional]
+        The dispersion (e.g., wavelength) points for the normalized fluxes.
+    """
+
+    adjusted_ivar = ivar/(1. + ivar * s2)
+    adjusted_sigma = np.sqrt(1.0/adjusted_ivar)
+    
+    # Exclude non-finite points (e.g., points with zero inverse variance 
+    # or non-finite flux values, but the latter shouldn't exist anyway).
+    use = np.isfinite(adjusted_sigma * flux)
+    L = len(vectorizer.label_names)
+
+    if not np.any(use):
+        logger.warn("No information in spectrum!")
+        return (np.nan * np.ones(L), None, {
+                "fail_message": "Pixels contained no information"})
+
+    # Splice the arrays we will use most.
+    flux = flux[use]
+    weights = 1.0 / adjusted_sigma[use]
+    use_theta = theta[use]
+
+    initial_labels = np.atleast_2d(initial_labels)
+
+    # Check the vectorizer whether it has a derivative built in.
+    Dfun = kwargs.pop("Dfun", True)
+    if Dfun not in (None, False):
+        try:
+            vectorizer.get_label_vector_derivative(initial_labels[0])
+        
+        except NotImplementedError:
+            Dfun = None
+            logger.debug("No label vector derivative available!")
+            
+        except:
+            logger.exception("Exception raised when trying to calculate the "
+                             "label vector derivative at the fiducial values:")
+            raise
+
+        else:
+            # Use the label vector derivative.
+            Dfun = lambda p: weights * np.dot(use_theta,
+                vectorizer.get_label_vector_derivative(p)).T
+
+    else:
+        Dfun = None
+
+    def func(parameters):
+        return np.dot(use_theta, vectorizer(parameters))[:, 0]
+        
+    def residuals(parameters):
+        return weights * (func(parameters) - flux)
+
+    kwds = {
+        "func": residuals,
+        "Dfun": Dfun,
+        "col_deriv": True,
+
+        # These get passed through to leastsq:
+        "ftol": 7./3 - 4./3 - 1, # Machine precision.
+        "xtol": 7./3 - 4./3 - 1, # Machine precision.
+        "gtol": 0.0,
+        "maxfev": 100000, # MAGIC
+        "epsfcn": None,
+        "factor": 1.0, 
+    }
+
+    # Only update the keywords with things that op.curve_fit/op.leastsq expects.
+    for key in set(kwargs).intersection(kwds):
+        kwds[key] = kwargs[key]
+
+    results = []
+    for x0 in initial_labels:
+
+        try:
+            op_labels, cov, meta, mesg, ier = op.leastsq(
+                x0=(x0 - fiducials)/scales, full_output=True, **kwds)
+            
+        except RuntimeError:
+            logger.exception("Exception in fitting from {}".format(x0))
+            continue
+
+        meta.update(
+            dict(x0=x0, chi_sq=np.sum(meta["fvec"]**2), ier=ier, mesg=mesg))
+        results.append((op_labels, cov, meta))
+
+
+    if len(results) == 0:
+        logger.warn("No results found!")
+        return (np.nan * np.ones(L), None, dict(fail_message="No results found"))
+
+    best_result_index = np.nanargmin([m["chi_sq"] for (o, c, m) in results])
+    op_labels, cov, meta = results[best_result_index]
+
+    # De-scale the optimized labels.
+    meta["model_flux"] = func(op_labels)
+    op_labels = op_labels * scales + fiducials
+
+    if np.allclose(op_labels, meta["x0"]):
+        logger.warn(
+            "Discarding optimized result because it is exactly the same as the "
+            "initial value!")
+
+        # We are in dire straits. We should not trust the result.
+        op_labels *= np.nan
+        meta["fail_message"] = "Optimized result same as initial value."
+
+    if not np.any(np.isfinite(cov)):
+        logger.warn("Non-finite covariance matrix returned!")
+    
+    # Save additional information.
+    meta.update({
+        "method": "leastsq",
+        "label_names": vectorizer.label_names,
+        "best_result_index": best_result_index,
+        "derivatives_used": Dfun is not None,
+        "snr": np.nanmedian(flux * weights),
+        "r_chi_sq": meta["chi_sq"]/(use.sum() - L - 1),
+    })
+    for key in ("ftol", "xtol", "gtol", "maxfev", "factor", "epsfcn"):
+        meta[key] = kwds[key]
+    
+    return (op_labels, cov, meta)
 
 
 
@@ -376,7 +558,7 @@ def _fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
             #       the design matrix is already censored.
             initial_theta = initial_theta.copy()[censoring_mask]
 
-    op_kwds = dict(args=[design_matrix, flux, ivar, regularization, True], 
+    op_kwds = dict(args=(design_matrix, flux, ivar, regularization), 
         disp=False, maxfun=np.inf, maxiter=np.inf)
 
     # Allow either l_bfgs_b or powell
@@ -400,7 +582,9 @@ def _fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
 
         # Set 'False' in args so that we don't return the gradient, because fmin
         # doesn't want it.
-        op_kwds["args"][-1] = False
+        args = list(op_kwds["args"])
+        args.append(False)
+        op_kwds["args"] = tuple(args)
 
         t_init = time()
 
