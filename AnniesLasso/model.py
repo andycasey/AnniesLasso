@@ -11,24 +11,22 @@ from __future__ import (division, print_function, absolute_import,
 __all__ = ["CannonModel"]
 
 import logging
-import multiprocessing as mp
 import numpy as np
 import scipy.optimize as op
 from time import time
 
-from .base import BaseCannonModel
-from . import utils
+from . import (base, censoring, utils)
 
 logger = logging.getLogger(__name__)
 
 
-class CannonModel(BaseCannonModel):
+class CannonModel(base.BaseCannonModel):
     """
     A model for The Cannon which includes L1 regularization and censoring.
     """
 
     def __init__(self, training_set_labels, training_set_flux, training_set_ivar,
-        vectorizer, dispersion=None, regularization=None, censoring=None,
+        vectorizer, dispersion=None, regularization=None, censors=None,
         **kwargs):
         """
         Create a model for The Cannon given a training set and model description.
@@ -48,18 +46,21 @@ class CannonModel(BaseCannonModel):
             match that of `training_set_flux`.
 
         :param vectorizer:
+            A vectorizer to take input labels and produce a design matrix. This
+            should be a sub-class of `vectorizer.BaseVectorizer`.
 
         :param dispersion: [optional]
             The dispersion values corresponding to the given pixels. If provided, 
-            this should have length `num_pixels`.
+            this should have a size of `num_pixels`.
         
         :param regularization: [optional]
             The strength of the L1 regularization. This should either be `None`,
             a float-type value for single regularization strength for all pixels,
             or a float-like array of length `num_pixels`.
 
-        :param censoring: [optional]
-
+        :param censors: [optional]
+            A dictionary containing label names as keys and boolean censoring
+            masks as values.
         """
 
         # Save the vectorizer.
@@ -78,13 +79,16 @@ class CannonModel(BaseCannonModel):
         self._scales = np.ptp(
             np.percentile(self.training_set_labels, [2.5, 97.5], axis=0), axis=0)
         self._fiducials = np.percentile(self.training_set_labels, 50, axis=0)
-        self._scaled_training_set_labels = (self.training_set_labels - self._fiducials)/self._scales
 
         # Create a design matrix.
-        self._design_matrix = vectorizer(self._scaled_training_set_labels).T
+        self._design_matrix = vectorizer(
+            (self.training_set_labels - self._fiducials)/self._scales).T
 
         # Check the regularization and censoring.
         self.regularization = regularization
+        # TODO: move _verify_censoring to base.py like verify_trianing_data?
+        self._censors = censoring._verify_censoring(
+            censors, self.training_set_flux.shape[1], vectorizer.label_names)
 
         self._theta, self._s2 = (None, None)
         return None
@@ -115,7 +119,7 @@ class CannonModel(BaseCannonModel):
             mapper, pool = (map, None)
 
         else:
-            pool = mp.Pool(threads)
+            pool = utils.InterruptiblePool(threads)
             mapper = pool.map
 
         func = utils.wrapper(_fit_pixel_fixed_scatter, None, kwargs, P)
@@ -177,7 +181,7 @@ class CannonModel(BaseCannonModel):
             mapper, pool = (map, None)
 
         else:
-            pool = mp.Pool(threads)
+            pool = utils.InterruptiblePool(threads)
             mapper = pool.map
 
         flux, ivar = (np.atleast_2d(flux), np.atleast_2d(ivar))
@@ -219,7 +223,13 @@ class CannonModel(BaseCannonModel):
     def _initial_theta(self, pixel_index, **kwargs):
         """
         Return a list of guesses of the spectral coefficients for the given
-        pixel index.
+        pixel index. Initial values are sourced in the following preference
+        order: 
+
+            (1) a previously trained `theta` value for this pixel,
+            (2) an estimate of `theta` using linear algebra,
+            (3) a neighbouring pixel's `theta` value,
+            (4) the fiducial value of [1, 0, ..., 0].
 
         :param pixel_index:
             The zero-indexed integer of the pixel.
@@ -227,12 +237,6 @@ class CannonModel(BaseCannonModel):
         :returns:
             A list of initial theta guesses, and the source of each guess.
         """
-
-        # Preference:
-        # - a previously trained theta value
-        # - an estimate from linear algebra
-        # - a neighbouring pixel's value
-        # - a fiducial value
 
         guesses = []
 
@@ -295,11 +299,10 @@ def _fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
     """
 
     adjusted_ivar = ivar/(1. + ivar * s2)
-    adjusted_sigma = np.sqrt(1.0/adjusted_ivar)
     
     # Exclude non-finite points (e.g., points with zero inverse variance 
     # or non-finite flux values, but the latter shouldn't exist anyway).
-    use = np.isfinite(adjusted_sigma * flux)
+    use = np.isfinite(flux * adjusted_ivar) * (adjusted_ivar > 0)
     L = len(vectorizer.label_names)
 
     if not np.any(use):
@@ -309,7 +312,7 @@ def _fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
 
     # Splice the arrays we will use most.
     flux = flux[use]
-    weights = 1.0 / adjusted_sigma[use]
+    weights = np.sqrt(adjusted_ivar[use]) # --> 1.0 / sigma
     use_theta = theta[use]
 
     initial_labels = np.atleast_2d(initial_labels)
@@ -322,17 +325,18 @@ def _fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
         
         except NotImplementedError:
             Dfun = None
-            logger.debug("No label vector derivative available!")
+            logger.warn("No label vector derivatives available in {}!".format(
+                vectorizer))
             
         except:
-            logger.exception("Exception raised when trying to calculate the "
+            logger.exception("Exception raised when trying to calculate the "\
                              "label vector derivative at the fiducial values:")
             raise
 
         else:
             # Use the label vector derivative.
-            Dfun = lambda p: weights * np.dot(use_theta,
-                vectorizer.get_label_vector_derivative(p)).T
+            Dfun = lambda parameters: weights * np.dot(use_theta,
+                vectorizer.get_label_vector_derivative(parameters)).T
 
     else:
         Dfun = None
@@ -375,7 +379,6 @@ def _fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
         meta.update(
             dict(x0=x0, chi_sq=np.sum(meta["fvec"]**2), ier=ier, mesg=mesg))
         results.append((op_labels, cov, meta))
-
 
     if len(results) == 0:
         logger.warn("No results found!")

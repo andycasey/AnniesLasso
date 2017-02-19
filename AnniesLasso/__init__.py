@@ -54,6 +54,8 @@ def load_model(filename, **kwargs):
         raise TypeError("Cannon model factory class '{}' not recognised".format(
             class_factory))
 
+    # TODO: Convert L1RegularizedCannonModels to new classes.
+
     _class = eval(class_factory)
     has_data = (contents["metadata"]["data_attributes"][0] in contents)
     if not has_data:

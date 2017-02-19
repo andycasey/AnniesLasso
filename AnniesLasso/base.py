@@ -284,6 +284,9 @@ class BaseCannonModel(object):
                 "have the same shape as the nuber of rows in the labelled set"
                 "(N_stars, N_pixels)")
 
+        if not np.all(np.isfinite(self.training_set_labels)):
+            raise ValueError("training set labels are not all finite")
+
         if not np.all(np.isfinite(self.training_set_flux)):
             raise ValueError("training set fluxes are not all finite")
 
