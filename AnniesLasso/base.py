@@ -270,7 +270,7 @@ class BaseCannonModel(object):
         return None
 
 
-    def _verify_training_data(self):
+    def _verify_training_data(self, rho_warning=0.90):
         """
         Verify the training data for the appropriate shape and content.
         """
@@ -298,6 +298,35 @@ class BaseCannonModel(object):
                     "mis-match between the number of dispersion points and "
                     "normalised flux values ({0} != {1})".format(
                         self.training_set_flux.shape[1], dispersion.size))
+
+
+        # Look for very high correlation coefficients between labels, which
+        # could make the training time very difficult.
+        rho = np.corrcoef(self.training_set_labels.T)
+
+        # Set the diagonal indices to zero.
+        K = rho.shape[0]
+        rho[np.diag_indices(K)] = 0.0
+        indices = np.argsort(rho.flatten())[::-1]
+
+        for index in indices:
+            x, y = (index % K, int(index / K)) 
+            rho_xy = rho[x, y]
+            if rho_xy >= rho_warning: 
+
+                if x > y: # One warning per pair.
+                    logger.warn(
+                        "Labels '{X}' and '{Y}' are highly correlated "\
+                        "(rho = {rho_xy:.2}). "\
+                        "This may cause very slow training times."\
+                        .format(
+                            X=self.vectorizer.label_names[x],
+                            Y=self.vectorizer.label_names[y],
+                            rho_xy=rho_xy))
+
+            else:
+                break
+
         return None
 
 

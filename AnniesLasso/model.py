@@ -62,6 +62,9 @@ class CannonModel(BaseCannonModel):
 
         """
 
+        # Save the vectorizer.
+        self._vectorizer = vectorizer
+
         self._training_set_labels = np.array(
             [training_set_labels[ln] for ln in vectorizer.label_names]).T
         self._training_set_flux = np.atleast_2d(training_set_flux)
@@ -77,8 +80,7 @@ class CannonModel(BaseCannonModel):
         self._fiducials = np.percentile(self.training_set_labels, 50, axis=0)
         self._scaled_training_set_labels = (self.training_set_labels - self._fiducials)/self._scales
 
-        # Save the vectorizer and create a design matrix.
-        self._vectorizer = vectorizer
+        # Create a design matrix.
         self._design_matrix = vectorizer(self._scaled_training_set_labels)
 
         # Check the regularization and censoring.
