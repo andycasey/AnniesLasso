@@ -21,7 +21,7 @@ from six import string_types
 from sys import version_info
 from scipy.spatial import Delaunay
 
-from .vectorizer import BaseVectorizer
+from .vectorizer.base import BaseVectorizer
 from . import (censoring, utils, __version__)
 
 logger = logging.getLogger(__name__)
@@ -112,7 +112,7 @@ class BaseCannonModel(object):
 
         # Set useful private attributes.
         __scale_labels_function = kwargs.get("__scale_labels_function", 
-            lambda l: np.ptp(np.percentile(l, [25.5, 97.5], axis=0, axis=0)))
+            lambda l: np.ptp(np.percentile(l, [25.5, 97.5], axis=0), axis=0))
         __fiducial_labels_function = kwargs.get("__fiducial_labels_function",
             lambda l: np.percentile(l, 50, axis=0))
 
@@ -125,7 +125,9 @@ class BaseCannonModel(object):
 
         return None
 
+
     # Representations.
+
 
     def __str__(self):
         return "<{module}.{name} of {K} labels {trained}with a training set "\
