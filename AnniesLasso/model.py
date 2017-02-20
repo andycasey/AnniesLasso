@@ -13,11 +13,27 @@ __all__ = ["CannonModel"]
 import logging
 import numpy as np
 import scipy.optimize as op
+from functools import wraps
 from time import time
 
-from . import (base, censoring, fitting, utils)
+from . import (base, fitting, utils)
 
 logger = logging.getLogger(__name__)
+
+
+def requires_training(method):
+    """
+    A decorator for model methods that require training before being run.
+
+    :param method:
+        A method belonging to a sub-class of BaseCannonModel.
+    """
+    @wraps(method)
+    def wrapper(model, *args, **kwargs):
+        if not model.is_trained:
+            raise TypeError("the model requires training first")
+        return method(model, *args, **kwargs)
+    return wrapper
 
 
 class CannonModel(base.BaseCannonModel):
@@ -149,7 +165,22 @@ class CannonModel(base.BaseCannonModel):
         return (theta, s2, meta)
 
 
+    @requires_training
+    def __call__(self, labels):
+        """
+        Return spectral fluxes, given the labels.
 
+        :param labels:
+            An array of stellar labels.
+        """
+
+        # Scale and offset the labels.
+        scaled_labels = (np.atleast_2d(labels) - self._fiducials)/self._scales
+        flux = np.dot(self.theta, self.vectorizer(scaled_labels)).T
+        return flux[0] if flux.shape[0] == 1 else flux
+
+
+    @requires_training
     def test(self, flux, ivar, initial_labels=None, threads=None, **kwargs):
         """
         Run the test step on spectra.

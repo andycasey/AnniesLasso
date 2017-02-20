@@ -8,7 +8,7 @@ An abstract model class for The Cannon.
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
-__all__ = ["BaseCannonModel", "requires_training_wheels"]
+__all__ = ["BaseCannonModel"]
 
 
 import logging
@@ -16,43 +16,30 @@ import numpy as np
 from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime
-from functools import wraps
 from os import path
 from six.moves import cPickle as pickle
 from six import string_types
 from scipy.spatial import Delaunay
 
-from .vectorizer.base import BaseVectorizer
-from . import (censoring, utils, __version__ as code_version)
+from . import (censoring, )
 
 logger = logging.getLogger(__name__)
-
-
-def requires_training_wheels(method):
-    """
-    A decorator for model methods that require training before being run.
-
-    :param method:
-        A method belonging to a sub-class of BaseCannonModel.
-    """
-    @wraps(method)
-    def wrapper(model, *args, **kwargs):
-        if not model.is_trained:
-            raise TypeError("the model needs training first")
-        return method(model, *args, **kwargs)
-    return wrapper
-
 
 
 
 class BaseCannonModel(object):
     """
-    An abstract Cannon model object that implements convenience functions.
+    An abstract Cannon model object that implements convenience functions,
+    data validation, and appropriate properties.
     """
 
-    _trained_attributes = ["_s2", "_theta"]
-    _descriptive_attributes = []
-    _data_attributes = []
+    _trained_attributes = ("theta", "s2")
+    _descriptive_attributes = \
+        ("vectorizer", "censors", "regularization", "dispersion")
+    _data_attributes = 
+        ("training_set_labels", "training_set_flux", "training_set_ivar")
+
+    # Initiation:
 
     def __init__(self, *args, **kwargs):
         return None
@@ -112,6 +99,7 @@ class BaseCannonModel(object):
         return None
     """
 
+    # Representations.
 
     def __str__(self):
         return "<{module}.{name} of {K} labels {trained}with a training set "\
@@ -128,51 +116,88 @@ class BaseCannonModel(object):
         return "<{0}.{1} object at {2}>".format(self.__module__, 
             type(self).__name__, hex(id(self)))
 
+    # Model attributes that cannot be changed.
 
-    @requires_training_wheels
-    def __call__(self, labels):
+    @property
+    def training_set_labels(self):
+        """ Return the labels in the training set. """
+        return self._training_set_labels
+
+
+    @property
+    def training_set_flux(self):
+        """ Return the training set fluxes. """
+        return self._training_set_flux
+
+
+    @property
+    def training_set_ivar(self):
+        """ Return the inverse variances of the training set fluxes. """
+        return self._training_set_ivar
+
+
+    @property
+    def vectorizer(self):
+        """ Return the vectorizer for this model. """
+        return self._vectorizer
+
+
+    @property
+    def design_matrix(self):
+        """ Return the design matrix for this model. """
+        return self._design_matrix
+
+
+    @property
+    def theta(self):
+        """ Return the theta coefficients (spectral model derivatives). """
+        return self._theta
+
+
+    @property
+    def s2(self):
+        """ Return the intrinsic variance (s^2) for all pixels. """
+        return self._s2
+
+
+    # Model attributes that can be changed after initiation.
+    @property
+    def censors(self):
+        """ Return the wavelength censor masks for the labels. """
+        return self._censors
+
+
+    @censors.setter
+    def censors(self, censors):
         """
-        Return spectral fluxes, given the labels.
+        Set label censoring masks for each pixel.
 
-        :param labels:
-            An array of stellar labels.
+        :param censors:
+            A dictionary-like object with label names as keys, and boolean arrays
+            as values.
         """
 
-        # Scale and offset the labels.
-        scaled_labels = (np.atleast_2d(labels) - self._fiducials)/self._scales
-        flux = np.dot(self.theta, self.vectorizer(scaled_labels)).T
-        return flux[0] if flux.shape[0] == 1 else flux
+        censors = {} if censors is None else censors
+        if isinstance(censors, censoring.Censors):
+            # Could be a censoring dictionary from a different model,
+            # with different label names and pixels.
+            # So let's just extract what we need.
+            censors = censors.items()
+            
+        if isinstance(censors, dict):
+            self._censors = censoring.Censors(
+                self.vectorizer.label_names, self.training_set_flux.shape[1],
+                censors)
+            return None
+
+        else:
+            raise TypeError(
+                "censors must be a dictionary or a censoring.Censors object")
 
 
-
-    def _pixel_access(self, array, index, default=None):
-
-        if array is None:
-            return default
-
-        try:
-            return array[index]
-        
-        except TypeError:
-            return array
-
-
-
-    def reset(self):
-        """
-        Clear any attributes that have been trained upon.
-        """
-        for attribute in self._trained_attributes:
-            setattr(self, attribute, None)
-        return None
-
-
-    # Attributes related to the training set.
     @property
     def dispersion(self):
-        """
-        Return the dispersion points for all pixels.
-        """
+        """ Return the dispersion points for all pixels. """
         return self._dispersion
 
 
@@ -185,17 +210,12 @@ class BaseCannonModel(object):
             An array of the dispersion values.
         """
 
-        try:
-            len(dispersion)
-        except TypeError:
-            raise TypeError("dispersion provided must be an array or list-like")
-
-        if len(dispersion) != self.training_set_flux.shape[1]:
+        dispersion = np.array(dispersion).flatten()
+        if dispersion.size != self.training_set_flux.shape[1]:
             raise ValueError("dispersion provided does not match the number "
                              "of pixels per star ({0} != {1})".format(
-                                len(dispersion), self.training_set_flux.shape[1]))
+                                dispersion.size, self.training_set_flux.shape[1]))
 
-        dispersion = np.array(dispersion)
         if dispersion.dtype.kind not in "iuf":
             raise ValueError("dispersion values are not float-like")
 
@@ -207,35 +227,8 @@ class BaseCannonModel(object):
 
 
     @property
-    def training_set_labels(self):
-        """
-        Return the table of stars (as rows) in the labelled set.
-        """
-        return self._training_set_labels
-
-
-    @property
-    def training_set_flux(self):
-        """
-        Return the normalized fluxes of pixels for stars in the labelled set.
-        """ 
-        return self._training_set_flux
-
-
-    @property
-    def training_set_ivar(self):
-        """
-        Return the normalized inverse variances of pixels for stars in the
-        labelled set.
-        """
-        return self._training_set_ivar
-
-
-    @property
     def regularization(self):
-        """
-        Return the strength of the L1 regularization for this model.
-        """
+        """ Return the strength of the L1 regularization for this model. """
         return self._regularization
 
 
@@ -270,9 +263,50 @@ class BaseCannonModel(object):
         return None
 
 
+    # Functions and other properties.
+    @property
+    def is_trained(self):
+        """ Return true or false for whether the model is trained. """
+        return all(getattr(self, attr, None) is not None \
+            for attr in self._trained_attributes)
+
+
+    def reset(self):
+        """ Clear any attributes that have been trained. """
+        for attribute in self._trained_attributes:
+            setattr(self, "_{}".format(attribute), None)
+        return None
+
+
+    def _pixel_access(self, array, index, default=None):
+        """
+        Safely access a (potentially per-pixel) attribute of the model.
+        
+        :param array:
+            Either `None`, a float value, or an array the size of the dispersion
+            array.
+
+        :param index:
+            The zero-indexed pixel to attempt to access.
+
+        :param default: [optional]
+            The default value to return if `array` is None.
+        """
+
+        if array is None:
+            return default
+        try:
+            return array[index]
+        except TypeError:
+            return array
+
+
     def _verify_training_data(self, rho_warning=0.90):
         """
         Verify the training data for the appropriate shape and content.
+
+        :param rho_warning: [optional]
+            Maximum correlation value between labels before a warning is given.
         """
         if self.training_set_flux.shape != self.training_set_ivar.shape:
             raise ValueError("the training set flux and inverse variance arrays"
@@ -302,7 +336,6 @@ class BaseCannonModel(object):
                     "normalised flux values ({0} != {1})".format(
                         self.training_set_flux.shape[1], dispersion.size))
 
-
         # Look for very high correlation coefficients between labels, which
         # could make the training time very difficult.
         rho = np.corrcoef(self.training_set_labels.T)
@@ -316,95 +349,16 @@ class BaseCannonModel(object):
             x, y = (index % K, int(index / K)) 
             rho_xy = rho[x, y]
             if rho_xy >= rho_warning: 
-
-                if x > y: # One warning per pair.
-                    logger.warn(
-                        "Labels '{X}' and '{Y}' are highly correlated (rho = {rho_xy:.2})."\
-                        " This may cause very slow training times. Are both labels needed?"\
-                        .format(
+                if x > y: # One warning per correlated label pair.
+                    logger.warn("Labels '{X}' and '{Y}' are highly correlated ("\
+                        "rho = {rho_xy:.2}). This may cause very slow training "\
+                        "times. Are both labels needed?".format(
                             X=self.vectorizer.label_names[x],
                             Y=self.vectorizer.label_names[y],
                             rho_xy=rho_xy))
-
             else:
                 break
-
         return None
-
-
-    @property
-    def vectorizer(self):
-        """
-        Return the vectorizer for this Cannon model.
-        """
-        return self._vectorizer
-
-
-    @property
-    def censors(self):
-        """
-        Return the wavelength censor masks for the labels.
-        """
-        return self._censors
-
-
-    @censors.setter
-    def censors(self, censors):
-
-        censors = {} if censors is None else censors
-
-        if isinstance(censors, censoring.Censors):
-            # Could be a censoring dictionary from a different model,
-            # with different label names and pixels.
-            # So let's just extract what we need.
-            censors = censors.items()
-            
-        if isinstance(censors, dict):
-            self._censors = censoring.Censors(
-                self.vectorizer.label_names, self.training_set_flux.shape[1],
-                censors)
-        else:
-            raise TypeError(
-                "censors must be a dictionary or a censoring.Censors object")
-
-        return None
-
-
-    @property
-    def design_matrix(self):
-        return self._design_matrix
-
-
-    # Trained attributes that subclasses are likely to use.
-    @property
-    def theta(self):
-        """
-        Return the theta coefficients (spectral model derivatives).
-        """
-        return self._theta
-
-
-    @property
-    def s2(self):
-        """
-        Return the intrinsic variance (s^2) for all pixels.
-        """
-        return self._s2
-
-
-    @property
-    def is_trained(self):
-        return all(getattr(self, attr, None) is not None \
-            for attr in self._trained_attributes)
-
-
-    def train(self, *args, **kwargs):
-        raise NotImplementedError("The train method must be "
-                                  "implemented by subclasses")
-
-    def test(self, *args, **kwargs):
-        raise NotImplementedError("The fit method must be "
-                                  "implemented by subclasses")
 
 
     def in_convex_hull(self, labels):
@@ -427,18 +381,16 @@ class BaseCannonModel(object):
                 self.training_set_labels.shape[1], labels.shape[1]))
 
         hull = Delaunay(self.training_set_labels)
-
         return hull.find_simplex(labels) >= 0
 
 
-
-    def save(self, filename, include_training_data=False, overwrite=False,
+    def write(self, path, include_training_data=False, overwrite=False,
         protocol=-1):
         """
         Serialise the trained model and save it to disk. This will save all
         relevant training attributes, and optionally, the training data.
 
-        :param filename:
+        :param path:
             The path to save the model to.
 
         :param include_training_data: [optional]
@@ -456,18 +408,13 @@ class BaseCannonModel(object):
         raise IsItNeeded
 
 
-    def load(self, filename, verify_training_data=False, **kwargs):
+    @classmethod
+    def read(cls, path, **kwargs):
         """
         Load a saved model from disk.
 
-        :param filename:
+        :param path:
             The path where to load the model from.
-
-        :param verify_training_data: [optional]
-            If there is training data in the saved model, verify its contents.
-            Otherwise if no training data is saved, verify that the data used
-            to train the model is the same data provided when this model was
-            instantiated.
         """
 
         raise IsItNeeded
