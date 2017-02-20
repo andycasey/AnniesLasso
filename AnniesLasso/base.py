@@ -41,8 +41,8 @@ class BaseCannonModel(object):
 
     # Descriptive attributes are needed to train *and* test the model.
     # (These are always needed).
-    _descriptive_attributes = ("vectorizer", "censors", "regularization", 
-        "dispersion", "scales", "fiducials")
+    _descriptive_attributes = \
+        ("vectorizer", "censors", "regularization", "dispersion")
 
     # Trained attributes are set only at training time.
     # (These are always needed).
@@ -153,18 +153,6 @@ class BaseCannonModel(object):
     def design_matrix(self):
         """ Return the design matrix for this model. """
         return self._design_matrix
-
-
-    @property
-    def scales(self):
-        """ Return the label scales. """
-        return self._scales
-
-
-    @property
-    def fiducials(self):
-        """ Return the label fiducials. """
-        return self._fiducials
 
 
     @property
@@ -328,16 +316,6 @@ class BaseCannonModel(object):
             Maximum correlation value between labels before a warning is given.
         """
 
-        # Allow for the possibility that training_set_labels, training_set_flux,
-        # and training_set_ivar are all None because this model was loaded from
-        # disk and the training set data was not saved.
-        if self.training_set_labels is None \
-        and self.training_set_flux is None \
-        and self.training_set_ivar is None:
-            logger.warn("No training set provided.")
-            print("CHECK IF TRAINED ALREADY? OTHERWISE ERROR?") # TODO
-            return None
-
         if self.training_set_flux.shape != self.training_set_ivar.shape:
             raise ValueError("the training set flux and inverse variance arrays"
                              " for the labelled set must have the same shape")
@@ -406,9 +384,6 @@ class BaseCannonModel(object):
             the labelled set.
         """
 
-        if self.training_set_labels is None:
-            raise TypeError("training set labels not stored with the model")
-        
         labels = np.atleast_2d(labels)
         if labels.shape[1] != self.training_set_labels.shape[1]:
             raise ValueError("expected {} labels; got {}".format(
@@ -418,7 +393,7 @@ class BaseCannonModel(object):
         return hull.find_simplex(labels) >= 0
 
 
-    def write(self, path, include_training_data=False, overwrite=False,
+    def write(self, path, include_training_set_spectra=False, overwrite=False,
         protocol=-1):
         """
         Serialise the trained model and save it to disk. This will save all
@@ -427,7 +402,7 @@ class BaseCannonModel(object):
         :param path:
             The path to save the model to.
 
-        :param include_training_data: [optional]
+        :param include_training_set_spectra: [optional]
             Save the labelled set, normalised flux and inverse variance used to
             train the model.
 
@@ -450,12 +425,11 @@ class BaseCannonModel(object):
             logger.warn("'metadata' is a protected attribute. Ignoring.")
             attributes.remote("metadata")
 
-
         # Store up all the trained attributes and a hash of the training set.
         state = {}
-        for attr in (self._descriptive_attributes + self._trained_attributes):
+        for attribute in attributes:
 
-            value = getattr(self, attr)
+            value = getattr(self, attribute)
 
             try:
                 # If it's a vectorizer or censoring dict, etc, get the state.
@@ -463,7 +437,7 @@ class BaseCannonModel(object):
             except:
                 None
 
-            state[attr] = value
+            state[attribute] = value
 
         # Create a metadata dictionary.
         state["metadata"] = dict(
@@ -477,12 +451,12 @@ class BaseCannonModel(object):
                 getattr(self, attr) for attr in self._data_attributes),
         )
 
-        if include_training_data:
-            for attr in self._data_attributes:
-                state[attr] = getattr(self, attr)
+        if not include_training_set_spectra:
+            state.pop("training_set_flux")
+            state.pop("training_set_ivar")
 
         elif not self.is_trained:
-            logger.warn("The training set will not be trained, and this model "\
+            logger.warn("The training set spectra won't be saved, and this model"\
                         "is not already trained. The saved model will not be "\
                         "able to be trained when loaded!")
 

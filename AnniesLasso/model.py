@@ -83,25 +83,16 @@ class CannonModel(base.BaseCannonModel):
 
         # Save the vectorizer.
         self._vectorizer = vectorizer
-
         self._dispersion = dispersion
 
-        if training_set_labels is None and training_set_flux is None \
-        and training_set_ivar is None:
+        if training_set_flux is None and training_set_ivar is None:
 
-            # Must be reading in a model that does not have training set data
-            # saved. Therefore we need the scales and fiducials.
-            try:
-                self._scales = kwargs["scales"]
-                self._fiducials = kwargs["fiducials"]
-
-            except KeyError:
-                raise TypeError("the model needs a training set")
-
-            self._training_set_labels = None
+            # Must be reading in a model that does not have the training set
+            # spectra saved.
             self._training_set_flux = None
             self._training_set_ivar = None
-            self._design_matrix = None
+            
+            self._training_set_labels = training_set_labels
 
         else:
 
@@ -113,14 +104,15 @@ class CannonModel(base.BaseCannonModel):
             # Check that the flux and ivar are valid, and dispersion if given.
             self._verify_training_data()
 
-            # Offset and scale the training set labels.
-            self._scales = np.ptp(
-                np.percentile(self.training_set_labels, [2.5, 97.5], axis=0), axis=0)
-            self._fiducials = np.percentile(self.training_set_labels, 50, axis=0)
 
-            # Create a design matrix.
-            self._design_matrix = vectorizer(
-                (self.training_set_labels - self._fiducials)/self._scales).T
+        # Offset and scale the training set labels.
+        self._scales = np.ptp(
+            np.percentile(self.training_set_labels, [2.5, 97.5], axis=0), axis=0)
+        self._fiducials = np.percentile(self.training_set_labels, 50, axis=0)
+
+        # Create a design matrix.
+        self._design_matrix = vectorizer(
+            (self.training_set_labels - self._fiducials)/self._scales).T
 
         # Check the regularization and censoring.
         self.regularization = regularization
@@ -145,7 +137,8 @@ class CannonModel(base.BaseCannonModel):
         """
 
         if self.training_set_flux is None:
-            raise TypeError("cannot train: no training set saved with the model")
+            raise TypeError(
+                "cannot train: training set spectra not saved with the model")
 
         S, P = self.training_set_flux.shape
         T = self.design_matrix.shape[1]
