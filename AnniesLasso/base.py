@@ -512,5 +512,6 @@ class BaseCannonModel(object):
             return model
             
         else:
-            raise NotImplementedError("cannot read old model files yet")
-
+            raise NotImplementedError(
+                "Cannot auto-convert old model files yet; "
+                "contact Andy Casey <andrew.casey@monash.edu> if you need this")
