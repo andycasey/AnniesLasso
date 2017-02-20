@@ -8,57 +8,99 @@ Utilities to deal with wavelength censoring.
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
-__all__ = ["create_mask", "censor_design_matrix"]
+__all__ = ["Censors", "create_mask", "censor_design_matrix"]
 
 import logging
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
+from .vectorizer.base import BaseVectorizer
 
-def _verify_censoring(censoring_dict, num_pixels, label_names):
-    """
-    Verify that the censoring dictionary provided is valid.
 
-    :param censoring_dict:
-        A dictionary containing label names as keys, and boolean masks as values.
+class Censors(dict):
 
-    :param num_pixels:
-        The number of pixels per spectrum.
+    def __init__(self, label_names, num_pixels, items=None, **kwargs):
+        """
+        A dictionary sub-class that allows for label censoring masks to be
+        applied on a per-pixel basis to Cannon models.
 
-    :param label_names:
-        The label names used in the vectorizer.
+        :param label_names:
+            A list containing the label names that form the model vectorizer.
 
-    :returns:
-        A valid censoring dictionary.
-    """
+        :param num_pixels:
+            The number of pixels per star.
 
-    if censoring_dict is None:
-        return {}
+        :param items: [optional]
+            A dictionary containing the label_names as keys and masks as values.
+        """
 
-    if not isinstance(censoring_dict, dict):
-        raise TypeError("censors must be provided as a dictionary")
+        super(Censors, self).__init__(**kwargs)
+        self._label_names = tuple(label_names)
+        self._num_pixels = int(num_pixels)
+        self.update(items or {})
+        return None
 
-    valid_censoring_dict = censoring_dict.copy()
 
-    unknown_label_names = list(set(censoring_dict).difference(label_names))
-    if len(unknown_label_names) > 0:
-        logger.warn("Unkown label names provided in censoring dictionary. "
-                    "These censors will be ignored: {}".format(
-                        ", ".join(unknown_label_names)))
+    def __setitem__(self, label_name, mask):
+        """
+        Update an entry in the pixel censoring dictionary.
 
-        for unknown_label_name in unknown_label_names:
-            del valid_censoring_dict[unknown_label_name]
+        :param label_name:
+            The name of the label to apply the censoring to.
 
-    for label_name in valid_censoring_dict.keys():
-        mask = np.array(valid_censoring_dict[label_name]).flatten().astype(bool)
-        if mask.size != num_pixels:
-            raise ValueError("wrong shape for '{}' censoring mask ({} != {})"\
-                .format(label_name, mask.size, num_pixels))
+        :param mask:
+            A boolean mask with a size that equals the number of pixels per star.
+            Note that a mask value of `True` indicates the label is censored at
+            the given pixel, and therefore that label will not contribute to
+            the spectral flux at that pixel.
+        """
 
-        valid_censoring_dict[label_name] = mask
+        if label_name not in self.label_names:
+            raise ValueError(
+                "unrecognized label name '{}' for censoring".format(label_name))
 
-    return valid_censoring_dict
+        mask = np.array(mask).flatten().astype(bool)
+        if mask.size != self.num_pixels:
+            raise ValueError("'{}' censoring mask has wrong size ({} != {})"\
+                .format(label_name, mask.size, self.num_pixels))
+
+        dict.__setitem__(self, label_name, mask)
+        return None
+
+
+    def update(self, *args, **kwargs):
+        if args:
+            if len(args) > 1:
+                raise TypeError("update expected at most 1 arguments, got {}"\
+                    .format(len(args)))
+            other = dict(args[0])
+            for key in other:
+                self[key] = other[key]
+
+        for key in kwargs:
+            self[key] = kwargs[key]
+
+
+    def setdefault(self, key, value=None):
+        if key not in self:
+            self[key] = value
+        return self[key]
+
+
+    def __getstate__(self):
+        """ Return the state of the censoring mask in a serializable form. """
+        return (self.label_names, self.num_pixels, self.items())
+
+
+    @property
+    def label_names(self):
+        return self._label_names
+
+
+    @property
+    def num_pixels(self):
+        return self._num_pixels
 
 
 def create_mask(dispersion, censored_regions):
@@ -81,13 +123,17 @@ def create_mask(dispersion, censored_regions):
     return mask
 
 
-
-
-def design_matrix_mask(censors, vectorizer, num_pixels):
+def design_matrix_mask(censors, vectorizer):
     """
     Return a mask of which indices in the design matrix columns should be
     used for a given pixel. 
     """        
+
+    if not isinstance(censors, Censors):
+        raise TypeError("censors must be a Censors class")
+
+    if not isinstance(vectorizer, BaseVectorizer):
+        raise TypeError("vectorizer must be a sub-class of BaseVectorizer")
 
     # Parse all the terms once-off.
     mapper = {}
@@ -97,7 +143,7 @@ def design_matrix_mask(censors, vectorizer, num_pixels):
             # Let's map this directly to the censors that we actually have.
             try:
                 censor_index = list(censors.keys()).index(
-                    vectorizer.label_names[label_index])
+                    censors.label_names[label_index])
 
             except ValueError:
                 # Label name is not censored, so we don't care.
@@ -112,8 +158,7 @@ def design_matrix_mask(censors, vectorizer, num_pixels):
                 mapper[censor_index].append(1 + i)
 
     # We already know the number of terms from i.
-    raise CHECKTHIS_AND_WHAT_IF_NO_GOOD_CENSORS_DICT
-    mask = np.ones((pixel_masks.shape[0], 2 + i), dtype=bool)
+    mask = np.ones((censors.num_pixels, 2 + i), dtype=bool)
     for censor_index, pixel in zip(*np.where(pixel_masks)):
         mask[pixel, mapper[censor_index]] = False
 

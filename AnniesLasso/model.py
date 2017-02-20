@@ -26,8 +26,7 @@ class CannonModel(base.BaseCannonModel):
     """
 
     def __init__(self, training_set_labels, training_set_flux, training_set_ivar,
-        vectorizer, dispersion=None, regularization=None, censors=None,
-        **kwargs):
+        vectorizer, dispersion=None, regularization=None, censors=None, **kwargs):
         """
         Create a model for The Cannon given a training set and model description.
 
@@ -86,10 +85,8 @@ class CannonModel(base.BaseCannonModel):
 
         # Check the regularization and censoring.
         self.regularization = regularization
-        # TODO: move _verify_censoring to base.py like verify_trianing_data?
-        self._censors = censoring._verify_censoring(
-            censors, self.training_set_flux.shape[1], vectorizer.label_names)
-
+        self.censors = censors
+        
         self._theta, self._s2 = (None, None)
         return None
 

@@ -140,7 +140,7 @@ class BaseCannonModel(object):
 
         # Scale and offset the labels.
         scaled_labels = (np.atleast_2d(labels) - self._fiducials)/self._scales
-        flux = np.dot(self.theta, self.vectorizer(scaled_labels).T).T
+        flux = np.dot(self.theta, self.vectorizer(scaled_labels)).T
         return flux[0] if flux.shape[0] == 1 else flux
 
 
@@ -347,6 +347,29 @@ class BaseCannonModel(object):
         """
         return self._censors
 
+
+    @censors.setter
+    def censors(self, censors):
+
+        censors = {} if censors is None else censors
+
+        if isinstance(censors, censoring.Censors):
+            # Could be a censoring dictionary from a different model,
+            # with different label names and pixels.
+            # So let's just extract what we need.
+            censors = censors.items()
+            
+        if isinstance(censors, dict):
+            self._censors = censoring.Censors(
+                self.vectorizer.label_names, self.training_set_flux.shape[1],
+                censors)
+        else:
+            raise TypeError(
+                "censors must be a dictionary or a censoring.Censors object")
+
+        return None
+
+
     @property
     def design_matrix(self):
         return self._design_matrix
@@ -369,36 +392,6 @@ class BaseCannonModel(object):
         return self._s2
 
 
-    @s2.setter
-    def s2(self, s2):
-        """
-        Set the intrisic variance term for all pixels.
-
-        :param s2:
-            A 1-d array of `s^2` (intrinsic variance) values.
-        """
-
-        raise IsItNeeded
-
-        if s2 is None:
-            self._s2 = None
-            return None
-        
-        # Some sanity checks..
-        s2 = np.array(s2).flatten()
-        if s2.size == 1:
-            s2 = np.ones_like(self.dispersion) * s2[0]
-        elif s2.size != len(self.dispersion):
-            raise ValueError("number of variance values does not match "
-                             "the number of pixels ({0} != {1})".format(
-                                s2.size, len(self.dispersion)))
-        if np.any(s2 < 0):
-            raise ValueError("the intrinsic variance terms must be positive")
-
-        self._s2 = s2
-        return None
-
-
     @property
     def is_trained(self):
         return all(getattr(self, attr, None) is not None \
@@ -409,13 +402,7 @@ class BaseCannonModel(object):
         raise NotImplementedError("The train method must be "
                                   "implemented by subclasses")
 
-
-    def predict(self, *args, **kwargs):
-        raise NotImplementedError("The predict method must be "
-                                  "implemented by subclasses")
-
-
-    def fit(self, *args, **kwargs):
+    def test(self, *args, **kwargs):
         raise NotImplementedError("The fit method must be "
                                   "implemented by subclasses")
 
