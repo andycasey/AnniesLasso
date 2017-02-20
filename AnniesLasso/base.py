@@ -21,7 +21,8 @@ from six import string_types
 from sys import version_info
 from scipy.spatial import Delaunay
 
-from . import (censoring, utils, vectorizer, __version__)
+from .vectorizer import BaseVectorizer
+from . import (censoring, utils, __version__)
 
 logger = logging.getLogger(__name__)
 
@@ -29,82 +30,100 @@ logger = logging.getLogger(__name__)
 
 class BaseCannonModel(object):
     """
-    An abstract Cannon model object that implements convenience functions,
-    data validation, and appropriate properties.
+    A base Cannon model object that implements data validation, properties,
+    and convenience functions.
     """
 
-    # Data attributes are data we don't need once the model is trained.
-    # (These can be ignored when saving the model, if we do not expect to have
-    #  to re-train the model).
     _data_attributes = \
         ("training_set_labels", "training_set_flux", "training_set_ivar")
 
     # Descriptive attributes are needed to train *and* test the model.
-    # (These are always needed).
     _descriptive_attributes = \
         ("vectorizer", "censors", "regularization", "dispersion")
 
     # Trained attributes are set only at training time.
-    # (These are always needed).
     _trained_attributes = ("theta", "s2")
     
-    def __init__(self, *args, **kwargs):
-        return None
+    def __init__(self, training_set_labels, training_set_flux, training_set_ivar,
+        vectorizer, dispersion=None, regularization=None, censors=None, **kwargs):
+        """
+        Create a model for The Cannon given a training set and model description.
 
-    """
-    _trained_attributes = ["_s2", "_theta"]
-    _descriptive_attributes = ["_dispersion", "_vectorizer", "_censors"]
-    _data_attributes = ["_labelled_set", "_normalized_flux", "_normalized_ivar"]
-    
-    def __init__(self, labelled_set, normalized_flux, normalized_ivar,
-        dispersion=None, threads=1, pool=None, copy=False, verify=True):
+        :param training_set_labels:
+            A set of objects with labels known to high fidelity. This can be 
+            given as a numpy structured array, or an astropy table.
 
-        if threads == 1:
-            self.pool = None
-        else:
-            # Allow a negative to set the max number of threads.
-            threads = None if threads < 0 else threads
-            self.pool = pool or utils.InterruptiblePool(threads,
-                initializer=utils._init_pool, initargs=(utils._counter, ))
+        :param training_set_flux:
+            An array of normalised fluxes for stars in the labelled set, given 
+            as shape `(num_stars, num_pixels)`. The `num_stars` should match the
+            number of rows in `training_set_labels`.
 
-        self._metadata = { "threads": threads }
+        :param training_set_ivar:
+            An array of inverse variances on the normalized fluxes for stars in 
+            the training set. The shape of the `training_set_ivar` array should
+            match that of `training_set_flux`.
 
-        # Initialise descriptive attributes for the model and verify the data.
-        for attribute in self._descriptive_attributes:
-            setattr(self, attribute, None)
+        :param vectorizer:
+            A vectorizer to take input labels and produce a design matrix. This
+            should be a sub-class of `vectorizer.BaseVectorizer`.
 
-        # Load in the labelled set.
-        if  labelled_set is None \
-        and normalized_flux is None \
-        and normalized_ivar is None:
-            self.reset()
-            return None
-
-        # Initialize the data arrays.
-        self._init_data_attributes(
-            labelled_set, normalized_flux, normalized_ivar)
-
-        self._dispersion = np.array(dispersion).flatten() \
-            if dispersion is not None \
-            else np.arange(self._normalized_flux.shape[1], dtype=int)
-
-        # Initialise wavelength censoring.
-        self._censors = censoring.CensorsDict(self)
-
-        # Initialize a random, yet reproducible group of subsets.
-        self._metadata["q"] = np.random.randint(0, 10, len(labelled_set))
+        :param dispersion: [optional]
+            The dispersion values corresponding to the given pixels. If provided, 
+            this should have a size of `num_pixels`.
         
-        if copy:
-            self._labelled_set, self._dispersion \
-                = map(deepcopy, (self._labelled_set, self._dispersion))
-            self._normalized_flux, self._normalized_ivar, \
-                = map(deepcopy, (self._normalized_flux, self._normalized_ivar))
+        :param regularization: [optional]
+            The strength of the L1 regularization. This should either be `None`,
+            a float-type value for single regularization strength for all pixels,
+            or a float-like array of length `num_pixels`.
 
-        if verify: self._verify_training_data()
+        :param censors: [optional]
+            A dictionary containing label names as keys and boolean censoring
+            masks as values.
+        """
+
+        # Save the vectorizer.
+        if not isinstance(vectorizer, BaseVectorizer):
+            raise TypeError(
+                "vectorizer must be a sub-class of vectorizer.BaseVectorizer")
+        
+        self._vectorizer = vectorizer
+        
+        if training_set_flux is None and training_set_ivar is None:
+
+            # Must be reading in a model that does not have the training set
+            # spectra saved.
+            self._training_set_flux = None
+            self._training_set_ivar = None
+            self._training_set_labels = training_set_labels
+
+        else:
+            self._training_set_flux = np.atleast_2d(training_set_flux)
+            self._training_set_ivar = np.atleast_2d(training_set_ivar)
+            self._training_set_labels = np.array(
+                [training_set_labels[ln] for ln in vectorizer.label_names]).T
+            
+            # Check that the flux and ivar are valid.
+            self._verify_training_data(**kwargs)
+
+        # Set regularization, censoring, dispersion.
+        self.regularization = regularization
+        self.censors = censors
+        self.dispersion = dispersion
+
+        # Set useful private attributes.
+        __scale_labels_function = kwargs.get("__scale_labels_function", 
+            lambda l: np.ptp(np.percentile(l, [25.5, 97.5], axis=0, axis=0)))
+        __fiducial_labels_function = kwargs.get("__fiducial_labels_function",
+            lambda l: np.percentile(l, 50, axis=0))
+
+        self._scales = __scale_labels_function(self.training_set_labels)
+        self._fiducials = __fiducial_labels_function(self.training_set_labels)
+        self._design_matrix = vectorizer(
+            (self.training_set_labels - self._fiducials)/self._scales).T
+
         self.reset()
 
         return None
-    """
 
     # Representations.
 
@@ -123,7 +142,9 @@ class BaseCannonModel(object):
         return "<{0}.{1} object at {2}>".format(self.__module__, 
             type(self).__name__, hex(id(self)))
 
-    # Model attributes that cannot be changed.
+
+    # Model attributes that cannot (well, should not) be changed.
+
 
     @property
     def training_set_labels(self):
@@ -168,6 +189,8 @@ class BaseCannonModel(object):
 
 
     # Model attributes that can be changed after initiation.
+
+
     @property
     def censors(self):
         """ Return the wavelength censor masks for the labels. """
@@ -218,7 +241,8 @@ class BaseCannonModel(object):
         """
 
         dispersion = np.array(dispersion).flatten()
-        if dispersion.size != self.training_set_flux.shape[1]:
+        if self.training_set_flux is not None \
+        and dispersion.size != self.training_set_flux.shape[1]:
             raise ValueError("dispersion provided does not match the number "
                              "of pixels per star ({0} != {1})".format(
                                 dispersion.size, self.training_set_flux.shape[1]))
@@ -270,7 +294,9 @@ class BaseCannonModel(object):
         return None
 
 
-    # Functions and other properties.
+    # Convenient functions and properties.
+
+
     @property
     def is_trained(self):
         """ Return true or false for whether the model is trained. """
@@ -335,15 +361,6 @@ class BaseCannonModel(object):
         if not np.all(self.training_set_ivar >= 0) \
         or not np.all(np.isfinite(self.training_set_ivar)):
             raise ValueError("training set ivars are not all positive finite")
-
-        if self.dispersion is not None:
-            print("CHECK THIS NOW OR LATER IN THE DISPERSION.SETTER?") # TODO
-            dispersion = np.atleast_1d(self.dispersion).flatten()
-            if dispersion.size != self.training_set_flux.shape[1]:
-                raise ValueError(
-                    "mis-match between the number of dispersion points and "
-                    "normalised flux values ({0} != {1})".format(
-                        self.training_set_flux.shape[1], dispersion.size))
 
         # Look for very high correlation coefficients between labels, which
         # could make the training time very difficult.

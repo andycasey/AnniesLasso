@@ -38,90 +38,10 @@ def requires_training(method):
 
 
 class CannonModel(base.BaseCannonModel):
+
     """
-    A model for The Cannon which includes L1 regularization and censoring.
+    A model for The Cannon which includes L1 regularization and pixel censoring.
     """
-
-    def __init__(self, training_set_labels, training_set_flux, training_set_ivar,
-        vectorizer, dispersion=None, regularization=None, censors=None, **kwargs):
-        """
-        Create a model for The Cannon given a training set and model description.
-
-        :param training_set_labels:
-            A set of objects with labels known to high fidelity. This can be 
-            given as a numpy structured array, or an astropy table.
-
-        :param training_set_flux:
-            An array of normalised fluxes for stars in the labelled set, given 
-            as shape `(num_stars, num_pixels)`. The `num_stars` should match the
-            number of rows in `training_set_labels`.
-
-        :param training_set_ivar:
-            An array of inverse variances on the normalized fluxes for stars in 
-            the training set. The shape of the `training_set_ivar` array should
-            match that of `training_set_flux`.
-
-        :param vectorizer:
-            A vectorizer to take input labels and produce a design matrix. This
-            should be a sub-class of `vectorizer.BaseVectorizer`.
-
-        :param dispersion: [optional]
-            The dispersion values corresponding to the given pixels. If provided, 
-            this should have a size of `num_pixels`.
-        
-        :param regularization: [optional]
-            The strength of the L1 regularization. This should either be `None`,
-            a float-type value for single regularization strength for all pixels,
-            or a float-like array of length `num_pixels`.
-
-        :param censors: [optional]
-            A dictionary containing label names as keys and boolean censoring
-            masks as values.
-        """
-
-        super(CannonModel, self).__init__(**kwargs)
-
-        # Save the vectorizer.
-        self._vectorizer = vectorizer
-        self._dispersion = dispersion
-
-        if training_set_flux is None and training_set_ivar is None:
-
-            # Must be reading in a model that does not have the training set
-            # spectra saved.
-            self._training_set_flux = None
-            self._training_set_ivar = None
-            
-            self._training_set_labels = training_set_labels
-
-        else:
-
-            self._training_set_labels = np.array(
-                [training_set_labels[ln] for ln in vectorizer.label_names]).T
-            self._training_set_flux = np.atleast_2d(training_set_flux)
-            self._training_set_ivar = np.atleast_2d(training_set_ivar)
-        
-            # Check that the flux and ivar are valid, and dispersion if given.
-            self._verify_training_data()
-
-
-        # Offset and scale the training set labels.
-        self._scales = np.ptp(
-            np.percentile(self.training_set_labels, [2.5, 97.5], axis=0), axis=0)
-        self._fiducials = np.percentile(self.training_set_labels, 50, axis=0)
-
-        # Create a design matrix.
-        self._design_matrix = vectorizer(
-            (self.training_set_labels - self._fiducials)/self._scales).T
-
-        # Check the regularization and censoring.
-        self.regularization = regularization
-        self.censors = censors
-        
-        self.reset()
-
-        return None
-
 
     def train(self, threads=None, **kwargs):
         """
@@ -136,7 +56,7 @@ class CannonModel(base.BaseCannonModel):
             the training of each pixel.
         """
 
-        if self.training_set_flux is None:
+        if self.training_set_flux is None or self.training_set_ivar is None:
             raise TypeError(
                 "cannot train: training set spectra not saved with the model")
 
