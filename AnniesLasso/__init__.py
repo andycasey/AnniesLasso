@@ -13,7 +13,7 @@ from sys import version_info
 #from . import (censoring, continuum, diagnostics, utils, vectorizer)
 
 from .model import CannonModel
-from . import (utils, vectorizer)
+from . import (censoring, fitting, utils, vectorizer)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG) # TODO: Remove this when stable.

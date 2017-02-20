@@ -8,7 +8,7 @@ Continuum-normalization.
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
-__all__ = ["fit", "fit_sines_and_cosines"]
+__all__ = ["sines_and_cosines"]
 
 import numpy as np
 
@@ -38,8 +38,8 @@ def _continuum_design_matrix(dispersion, L, order):
         ])
 
 
-def fit_sines_and_cosines(dispersion, flux, ivar, continuum_pixels,
-    L=1400, order=3, regions=None, fill_value=1.0, full_output=False, **kwargs):
+def sines_and_cosines(dispersion, flux, ivar, continuum_pixels, L=1400, order=3, 
+    regions=None, fill_value=1.0, **kwargs):
     """
     Fit the flux values of pre-defined continuum pixels using a sum of sine and
     cosine functions.
@@ -82,8 +82,8 @@ def fit_sines_and_cosines(dispersion, flux, ivar, continuum_pixels,
         If set as True, then a metadata dictionary will also be returned.
 
     :returns:
-        The continuum values for all pixels, and optionally a dictionary that
-        contains metadata for the fit.
+        The continuum values for all pixels, and a dictionary that contains 
+        metadata about the fit.
     """
 
     scalar = kwargs.pop("__magic_scalar", 1e-6) # MAGIC
@@ -151,8 +151,5 @@ def fit_sines_and_cosines(dispersion, flux, ivar, continuum_pixels,
 
         metadata.append(object_metadata)
 
-    return (continuum, metadata) if full_output else continuum
-
-
-# Because this is best.
-fit = fit_sines_and_cosines
+    return (continuum, metadata) 
+    

@@ -10,10 +10,7 @@ from __future__ import (division, print_function, absolute_import,
 
 __all__ = ["Censors", "create_mask", "censor_design_matrix"]
 
-import logging
 import numpy as np
-
-logger = logging.getLogger(__name__)
 
 from .vectorizer.base import BaseVectorizer
 
@@ -32,7 +29,7 @@ class Censors(dict):
             The number of pixels per star.
 
         :param items: [optional]
-            A dictionary containing the label_names as keys and masks as values.
+            A dictionary containing label names as keys and masks as values.
         """
 
         super(Censors, self).__init__(**kwargs)
