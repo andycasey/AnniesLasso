@@ -41,16 +41,15 @@ class PolynomialVectorizer(BaseVectorizer):
         
         # Check to see if we have a terms/(label_names and order) dichotamy/
         if (terms is None and None in (label_names, order)) \
-        or (terms is not None and label_names is not None and order is not None):
-            raise ValueError(
-                "label_names and order must be None if terms are provided, "
-                "and terms must be None if label_names or order are provided")
+        or (terms is not None and order is not None):
+            raise ValueError("order must be None if terms are provided, "
+                "and terms must be None if label_names and order are provided")
 
         if terms is None:
             # Parse human-readable terms.
             terms = terminator(label_names, order, **kwargs)
 
-        else:
+        elif label_names is None:
             # Parse label names from the terms.
             label_names = get_label_names(parse_label_vector_description(terms))
 

@@ -87,7 +87,10 @@ class Censors(dict):
 
     def __getstate__(self):
         """ Return the state of the censoring mask in a serializable form. """
-        return (self.label_names, self.num_pixels, self.items())
+        return dict(
+            label_names=self.label_names,
+            num_pixels=self.num_pixels, 
+            items=dict(self.items()))
 
 
     @property

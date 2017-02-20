@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-A regularized (compressed sensing) version of The Cannon.
+The Cannon.
 """
 
 from __future__ import (division, print_function, absolute_import,
@@ -11,6 +11,7 @@ from __future__ import (division, print_function, absolute_import,
 __all__ = ["CannonModel"]
 
 import logging
+import multiprocessing as mp
 import numpy as np
 import scipy.optimize as op
 from functools import wraps
@@ -78,34 +79,56 @@ class CannonModel(base.BaseCannonModel):
             masks as values.
         """
 
+        super(CannonModel, self).__init__(**kwargs)
+
         # Save the vectorizer.
         self._vectorizer = vectorizer
 
-        self._training_set_labels = np.array(
-            [training_set_labels[ln] for ln in vectorizer.label_names]).T
-        self._training_set_flux = np.atleast_2d(training_set_flux)
-        self._training_set_ivar = np.atleast_2d(training_set_ivar)
         self._dispersion = dispersion
 
-        # Check that the flux and ivar are valid, and dispersion if given.
-        self._verify_training_data()
+        if training_set_labels is None and training_set_flux is None \
+        and training_set_ivar is None:
 
-        # Offset and scale the training set labels.
-        self._scales = np.ptp(
-            np.percentile(self.training_set_labels, [2.5, 97.5], axis=0), axis=0)
-        self._fiducials = np.percentile(self.training_set_labels, 50, axis=0)
+            # Must be reading in a model that does not have training set data
+            # saved. Therefore we need the scales and fiducials.
+            try:
+                self._scales = kwargs["scales"]
+                self._fiducials = kwargs["fiducials"]
 
-        # Create a design matrix.
-        self._design_matrix = vectorizer(
-            (self.training_set_labels - self._fiducials)/self._scales).T
+            except KeyError:
+                raise TypeError("the model needs a training set")
+
+            self._training_set_labels = None
+            self._training_set_flux = None
+            self._training_set_ivar = None
+            self._design_matrix = None
+
+        else:
+
+            self._training_set_labels = np.array(
+                [training_set_labels[ln] for ln in vectorizer.label_names]).T
+            self._training_set_flux = np.atleast_2d(training_set_flux)
+            self._training_set_ivar = np.atleast_2d(training_set_ivar)
+        
+            # Check that the flux and ivar are valid, and dispersion if given.
+            self._verify_training_data()
+
+            # Offset and scale the training set labels.
+            self._scales = np.ptp(
+                np.percentile(self.training_set_labels, [2.5, 97.5], axis=0), axis=0)
+            self._fiducials = np.percentile(self.training_set_labels, 50, axis=0)
+
+            # Create a design matrix.
+            self._design_matrix = vectorizer(
+                (self.training_set_labels - self._fiducials)/self._scales).T
 
         # Check the regularization and censoring.
         self.regularization = regularization
         self.censors = censors
         
-        self._theta, self._s2 = (None, None)
-        return None
+        self.reset()
 
+        return None
 
 
     def train(self, threads=None, **kwargs):
@@ -121,6 +144,9 @@ class CannonModel(base.BaseCannonModel):
             the training of each pixel.
         """
 
+        if self.training_set_flux is None:
+            raise TypeError("cannot train: no training set saved with the model")
+
         S, P = self.training_set_flux.shape
         T = self.design_matrix.shape[1]
 
@@ -132,7 +158,7 @@ class CannonModel(base.BaseCannonModel):
             mapper, pool = (map, None)
 
         else:
-            pool = utils.InterruptiblePool(threads)
+            pool = mp.Pool(threads)
             mapper = pool.map
 
         func = utils.wrapper(fitting.fit_pixel_fixed_scatter, None, kwargs, P)
@@ -203,7 +229,7 @@ class CannonModel(base.BaseCannonModel):
             mapper, pool = (map, None)
 
         else:
-            pool = utils.InterruptiblePool(threads)
+            pool = mp.Pool(threads)
             mapper = pool.map
 
         flux, ivar = (np.atleast_2d(flux), np.atleast_2d(ivar))

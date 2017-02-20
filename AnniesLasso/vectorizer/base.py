@@ -21,7 +21,7 @@ class BaseVectorizer(object):
     def __init__(self, label_names, terms, **kwargs):
         self._terms = terms
         self._label_names = tuple(label_names)
-        self._metadata = {}
+        self.metadata = kwargs.get("metadata", {})
         return None
 
 
@@ -39,24 +39,19 @@ class BaseVectorizer(object):
 
     # I/O (Serializable) functionality.
     def __getstate__(self):
-        """
-        Return the state of the vectorizer.
-        """
-        return (self._label_names, self._terms, self._metadata)
+        """ Return the state of the vectorizer. """
+        return (type(self).__name__, dict(
+            label_names=self.label_names, 
+            terms=self.terms,
+            metadata=self.metadata))
 
 
     def __setstate__(self, state):
-        """
-        Set the state of the vectorizer.
-
-        :param state:
-            The state of the vectorizer. This should be a four-length tuple that
-            contains the label names, fiducials, scales, and terms.
-        """
-
-        # TODO Legacy models?
-        self._label_names, self._terms, self._metadata = state
-        return None
+        """ Set the state of the vectorizer. """
+        model_name, kwds = kwds
+        self._label_names = kwds["label_names"]
+        self._terms = kwds["terms"]
+        self.metadata = kwds["metadata"]
 
 
     @property

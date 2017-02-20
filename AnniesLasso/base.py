@@ -10,18 +10,18 @@ from __future__ import (division, print_function, absolute_import,
 
 __all__ = ["BaseCannonModel"]
 
-
 import logging
 import numpy as np
+import os
+import pickle
 from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime
-from os import path
-from six.moves import cPickle as pickle
 from six import string_types
+from sys import version_info
 from scipy.spatial import Delaunay
 
-from . import (censoring, )
+from . import (censoring, utils, vectorizer, __version__)
 
 logger = logging.getLogger(__name__)
 
@@ -33,14 +33,21 @@ class BaseCannonModel(object):
     data validation, and appropriate properties.
     """
 
-    _trained_attributes = ("theta", "s2")
-    _descriptive_attributes = \
-        ("vectorizer", "censors", "regularization", "dispersion")
-    _data_attributes = 
+    # Data attributes are data we don't need once the model is trained.
+    # (These can be ignored when saving the model, if we do not expect to have
+    #  to re-train the model).
+    _data_attributes = \
         ("training_set_labels", "training_set_flux", "training_set_ivar")
 
-    # Initiation:
+    # Descriptive attributes are needed to train *and* test the model.
+    # (These are always needed).
+    _descriptive_attributes = ("vectorizer", "censors", "regularization", 
+        "dispersion", "scales", "fiducials")
 
+    # Trained attributes are set only at training time.
+    # (These are always needed).
+    _trained_attributes = ("theta", "s2")
+    
     def __init__(self, *args, **kwargs):
         return None
 
@@ -149,6 +156,18 @@ class BaseCannonModel(object):
 
 
     @property
+    def scales(self):
+        """ Return the label scales. """
+        return self._scales
+
+
+    @property
+    def fiducials(self):
+        """ Return the label fiducials. """
+        return self._fiducials
+
+
+    @property
     def theta(self):
         """ Return the theta coefficients (spectral model derivatives). """
         return self._theta
@@ -181,14 +200,14 @@ class BaseCannonModel(object):
         if isinstance(censors, censoring.Censors):
             # Could be a censoring dictionary from a different model,
             # with different label names and pixels.
-            # So let's just extract what we need.
-            censors = censors.items()
             
-        if isinstance(censors, dict):
+            # But more likely: we are loading a model from disk.
+            self._censors = censors
+
+        elif isinstance(censors, dict):
             self._censors = censoring.Censors(
                 self.vectorizer.label_names, self.training_set_flux.shape[1],
                 censors)
-            return None
 
         else:
             raise TypeError(
@@ -308,6 +327,17 @@ class BaseCannonModel(object):
         :param rho_warning: [optional]
             Maximum correlation value between labels before a warning is given.
         """
+
+        # Allow for the possibility that training_set_labels, training_set_flux,
+        # and training_set_ivar are all None because this model was loaded from
+        # disk and the training set data was not saved.
+        if self.training_set_labels is None \
+        and self.training_set_flux is None \
+        and self.training_set_ivar is None:
+            logger.warn("No training set provided.")
+            print("CHECK IF TRAINED ALREADY? OTHERWISE ERROR?") # TODO
+            return None
+
         if self.training_set_flux.shape != self.training_set_ivar.shape:
             raise ValueError("the training set flux and inverse variance arrays"
                              " for the labelled set must have the same shape")
@@ -329,6 +359,7 @@ class BaseCannonModel(object):
             raise ValueError("training set ivars are not all positive finite")
 
         if self.dispersion is not None:
+            print("CHECK THIS NOW OR LATER IN THE DISPERSION.SETTER?") # TODO
             dispersion = np.atleast_1d(self.dispersion).flatten()
             if dispersion.size != self.training_set_flux.shape[1]:
                 raise ValueError(
@@ -375,6 +406,9 @@ class BaseCannonModel(object):
             the labelled set.
         """
 
+        if self.training_set_labels is None:
+            raise TypeError("training set labels not stored with the model")
+        
         labels = np.atleast_2d(labels)
         if labels.shape[1] != self.training_set_labels.shape[1]:
             raise ValueError("expected {} labels; got {}".format(
@@ -405,16 +439,104 @@ class BaseCannonModel(object):
             previous Python releases, -1 for performance.
         """
 
-        raise IsItNeeded
+        if os.path.exists(path) and not overwrite:
+            raise IOError("path already exists: {0}".format(path))
+
+        attributes = list(self._descriptive_attributes) \
+                   + list(self._trained_attributes) \
+                   + list(self._data_attributes)
+
+        if "metadata" in attributes:
+            logger.warn("'metadata' is a protected attribute. Ignoring.")
+            attributes.remote("metadata")
+
+
+        # Store up all the trained attributes and a hash of the training set.
+        state = {}
+        for attr in (self._descriptive_attributes + self._trained_attributes):
+
+            value = getattr(self, attr)
+
+            try:
+                # If it's a vectorizer or censoring dict, etc, get the state.
+                value = value.__getstate__()
+            except:
+                None
+
+            state[attr] = value
+
+        # Create a metadata dictionary.
+        state["metadata"] = dict(
+            version=__version__,
+            model_class=type(self).__name__,
+            modified=str(datetime.now()),
+            data_attributes=self._data_attributes,
+            descriptive_attributes=self._descriptive_attributes,
+            trained_attributes=self._trained_attributes,
+            training_set_hash=utils.short_hash(
+                getattr(self, attr) for attr in self._data_attributes),
+        )
+
+        if include_training_data:
+            for attr in self._data_attributes:
+                state[attr] = getattr(self, attr)
+
+        elif not self.is_trained:
+            logger.warn("The training set will not be trained, and this model "\
+                        "is not already trained. The saved model will not be "\
+                        "able to be trained when loaded!")
+
+        with open(path, "wb") as fp:
+            pickle.dump(state, fp, protocol) 
+        return None
 
 
     @classmethod
     def read(cls, path, **kwargs):
         """
-        Load a saved model from disk.
+        Read a saved model from disk.
 
         :param path:
             The path where to load the model from.
         """
 
-        raise IsItNeeded
+        encodings = ("utf-8", "latin-1")
+        for encoding in encodings:
+            kwds = {"encoding": encoding} if version_info[0] >= 3 else {}
+            try:
+                with open(path, "rb") as fp:        
+                    state = pickle.load(fp, **kwds)
+
+            except UnicodeDecodeError:
+                if encoding == encodings:
+                    raise
+
+        # Parse the state.
+        metadata = state.get("metadata", {})
+        version_saved = metadata.get("version", "0.1.0")
+        if version_saved >= "0.2.0": # Refactor'd.
+
+            init_attributes = list(metadata["data_attributes"]) \
+                            + list(metadata["descriptive_attributes"])
+
+            kwds = dict([(a, state.get(a, None)) for a in init_attributes])
+
+            # Initiate the vectorizer.
+            vectorizer_class, vectorizer_kwds = kwds["vectorizer"]
+            klass = getattr(vectorizer, vectorizer_class)
+            kwds["vectorizer"] = klass(**vectorizer_kwds)
+
+            # Initiate the censors.
+            kwds["censors"] = censoring.Censors(**kwds["censors"])
+
+            model = cls(**kwds)
+
+            # Set training attributes.
+            for attr in metadata["trained_attributes"]:
+                setattr(model, "_{}".format(attr), state.get(attr, None))
+
+            return model
+            
+        else:
+            raise NotImplementedError("cannot read old model files yet")
+

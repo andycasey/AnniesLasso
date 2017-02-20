@@ -8,10 +8,6 @@ from numpy import RankWarning
 from warnings import simplefilter
 from sys import version_info
 
-#from .cannon import *
-#from .regularized import *
-#from . import (censoring, continuum, diagnostics, utils, vectorizer)
-
 from .model import CannonModel
 from . import (censoring, fitting, utils, vectorizer)
 
@@ -20,7 +16,7 @@ logger.setLevel(logging.DEBUG) # TODO: Remove this when stable.
 
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter(
-    "%(asctime)s [%(levelname)-8s] %(message)s"))
+    "%(asctime)s [%(levelname)s] %(message)s"))
 logger.addHandler(handler)
 
 simplefilter("ignore", RankWarning)
@@ -55,6 +51,10 @@ def load_model(filename, **kwargs):
             class_factory))
 
     # TODO: Convert L1RegularizedCannonModels to new classes.
+    raise NotImplementedError
+
+    return CannonModel.read(filename, **kwargs)
+
 
     _class = eval(class_factory)
     has_data = (contents["metadata"]["data_attributes"][0] in contents)
