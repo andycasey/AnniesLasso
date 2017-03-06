@@ -90,7 +90,9 @@ The model configuration matches what we expected, so let's train the model and m
     [====================================================================================================] 100% (147s) 
 
 
-This model took about two minutes to train on a single core. The ``.train()`` function returns the :math:`\theta` coefficients, the noise residuals :math:`s^2`, and metadata associated with the training of each pixel. The :math:`\theta` coefficients and scatter terms :math:`s^2` are also accessible through the ``.theta`` and ``.s2`` attributes, respectively.
+This model took about two minutes to train on a single core. Pixels can be trained independently, so you can parallelize the training step to as many threads as you want using the ``threads`` keyword argument. 
+
+The ``.train()`` function returns the :math:`\theta` coefficients, the noise residuals :math:`s^2`, and metadata associated with the training of each pixel. The :math:`\theta` coefficients and scatter terms :math:`s^2` are also accessible through the ``.theta`` and ``.s2`` attributes, respectively.
 
 .. code-block:: python
     :linenos:

@@ -21,19 +21,18 @@ def read(filename):
 # Get the version information.
 here = path.abspath(path.dirname(__file__))
 vre = re_compile("__version__ = \"(.*?)\"")
-version = vre.findall(read(path.join(here, "AnniesLasso", "__init__.py")))[0]
+version = vre.findall(read(path.join(here, "thecannon", "__init__.py")))[0]
 
 setup(
-    name="AnniesLasso",
+    name="the-cannon",
     version=version,
-    author="Andrew R. Casey, David W. Hogg, Melissa K. Ness",
+    author="Andrew R. Casey, David W. Hogg, Melissa Ness",
     author_email="andrew.casey@monash.edu",
-    description="The Cannon: Compressed sensing edition",
+    description="A data-driven approach to stellar spectroscopy",
     long_description=read(path.join(here, "README.md")),
     url="http://thecannon.io",
     license="MIT",
     classifiers=[
-        "Development Status :: 2 - Beta",
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
@@ -55,7 +54,7 @@ setup(
     data_files=None,
     entry_points={
         "console_scripts": [
-            "tc = AnniesLasso.__main__:main",
+            "tc = thecannon.__main__:main",
         ]
     }
 )

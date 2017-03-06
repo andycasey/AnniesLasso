@@ -27,8 +27,7 @@ To get the source for the latest development version, clone the `git <https://gi
 
     git clone https://github.com/andycasey/AnniesLasso.git
     cd AnniesLasso
-    git checkout refactor # TODO - Remove this
-
+    
 
 Then install the package by running the following command:
 
@@ -44,4 +43,4 @@ To run all the unit and integration tests, install `nose <http://nose.readthedoc
 
 ::
 
-    nosetests -v --cover-package=the-cannon
+    nosetests -v --cover-package=thecannon
