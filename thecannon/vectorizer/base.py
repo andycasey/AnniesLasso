@@ -94,9 +94,6 @@ class BaseVectorizer(object):
 
         :param labels:
             The values of the labels to calculate the label vector for.
-
-        :param d_label:
-            The name of the label to calculate the label vector with respect to.
         """
         raise NotImplementedError("the get_label_vector_derivative method "
                                   "must be specified by the sub-classes")

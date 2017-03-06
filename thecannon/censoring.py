@@ -20,7 +20,7 @@ class Censors(dict):
     """
     A dictionary sub-class that allows for label censoring masks to be
     applied on a per-pixel basis to CannonModel objects.
-    
+
     :param label_names:
         A list containing the label names that form the model vectorizer.
 
@@ -107,6 +107,17 @@ def create_mask(dispersion, censored_regions):
     """
     Return a boolean censoring mask based on a structured list of (start, end)
     regions.
+
+    :param dispersion:
+        An array of dispersion values.
+
+    :param censored_regions:
+        A list of two-length tuples containing the `(start, end)` points of a
+        censored region.
+
+    :returns:
+        A boolean mask indicating whether the pixels in the `dispersion` array
+        are masked.
     """
 
     mask = np.zeros(dispersion.size, dtype=bool)
@@ -127,6 +138,16 @@ def design_matrix_mask(censors, vectorizer):
     """
     Return a mask of which indices in the design matrix columns should be
     used for a given pixel. 
+
+    :param censors:
+        A censoring dictionary.
+
+    :param vectorizer:
+        The model vectorizer:
+
+    :returns:
+        A mask of which indices in the model design matrix should be used for a
+        given pixel.
     """        
 
     if not isinstance(censors, Censors):

@@ -252,7 +252,8 @@ def L1Norm_variation(theta):
         An array of finite values.
 
     :returns:
-        The L1 norm of theta (except the first entry), and its derivative.
+        A two-length tuple containing: the L1 norm of theta (except the first 
+        entry), and the derivative of the L1 norm of theta.
     """
 
     return (np.sum(np.abs(theta[1:])), np.hstack([0.0, np.sign(theta[1:])]))
@@ -331,11 +332,11 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
     :param censoring_mask:
         A per-label censoring mask for each pixel.
 
-    :Keyword Arguments:
-        *op_method* -- The optimization method to use.
-                       Valid options are: l_bfgs_b, powell
+    :keyword op_method:
+        The optimization method to use. Valid options are: `l_bfgs_b`, `powell`.
 
-        *op_kwds* -- Keyword arguments to provide to the optimizer.
+    :keyword op_kwds:
+        A dictionary of arguments that will be provided to the optimizer.
 
     :returns:
         The optimized theta coefficients, the noise residual `s2`, and
