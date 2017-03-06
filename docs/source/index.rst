@@ -6,7 +6,11 @@
 The Cannon
 ==========
 
-The Cannon is a data-driven approach to stellar label determination. The seminal paper describing The Cannon is `Ness et al. (2015) <http://adsabs.harvard.edu/abs/2015ApJ...808...16N>`_, and the name derives from Annie Jump-Cannon, who first arranged stellar spectra in order of temperature purely by the data, without the need for stellar models. This software package is released as part of `Casey et al. (2016) <http://adsabs.harvard.edu/abs/2016arXiv160303040C>`_ and builds on the original implementation of The Cannon by including a number of additional features:
+The Cannon is a data-driven approach to stellar label determination. 
+
+The seminal paper describing The Cannon is `Ness et al. (2015) <http://adsabs.harvard.edu/abs/2015ApJ...808...16N>`_. The name, *The Cannon*, derives from Annie Jump-Cannon, who first arranged stellar spectra in order of temperature purely by the data, without the need for stellar models. 
+
+This software package is released as part of `Casey et al. (2016) <http://adsabs.harvard.edu/abs/2016arXiv160303040C>`_ and builds on the original implementation of The Cannon by including a number of additional features:
 
  - Easily construct models with complex vectorizers (e.g., cubic polynomial models with 25 labels)
  - Analytic derivatives for blazingly-fast optimization at the training step *and* the test step
