@@ -2,3 +2,8 @@
 
 API
 ===
+
+CannonModel
+-----------
+
+.. autoclass:: thecannon.CannonModel 
