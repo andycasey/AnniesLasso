@@ -28,7 +28,6 @@ User Guide
    guide
    tutorials
    api
-   utilities
 
 
 License & Attribution

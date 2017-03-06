@@ -44,6 +44,10 @@ def fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
 
     :param dispersion: [optional]
         The dispersion (e.g., wavelength) points for the normalized fluxes.
+
+    :returns:
+        A three-length tuple containing: the optimized labels, the covariance
+        matrix, and metadata associated with the optimization.
     """
 
     adjusted_ivar = ivar/(1. + ivar * s2)

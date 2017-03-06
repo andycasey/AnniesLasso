@@ -54,7 +54,11 @@ class wrapper(object):
 
     :param size: [optional]
         The width of the progressbar in characters.
+
+    :returns:
+        A generator. 
     """
+
     def __init__(self, f, args, kwds, N, message=None, size=100):
         self.f = f
         self.args = list(args if args is not None else [])

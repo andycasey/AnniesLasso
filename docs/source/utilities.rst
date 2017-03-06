@@ -1,5 +1,0 @@
-.. _utilities:
-
-Utilities
-============
-
