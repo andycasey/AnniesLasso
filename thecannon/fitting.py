@@ -8,7 +8,8 @@ Fitting functions for use in The Cannon.
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
-__all__ = ["fit_spectrum", "fit_pixel_fixed_scatter", "fit_theta_by_linalg"]
+__all__ = ["fit_spectrum", "fit_pixel_fixed_scatter", "fit_theta_by_linalg",
+    "chi_sq", "L1Norm_variation"]
 
 import logging
 import numpy as np
@@ -170,22 +171,22 @@ def fit_theta_by_linalg(flux, ivar, s2, design_matrix):
     """
     Fit theta coefficients to a set of normalized fluxes for a single pixel.
 
-    :param normalized_flux:
+    :param flux:
         The normalized fluxes for a single pixel (across many stars).
 
-    :param normalized_ivar:
+    :param ivar:
         The inverse variance of the normalized flux values for a single pixel
         across many stars.
 
-    :param scatter:
-        The additional scatter to adopt in the pixel.
+    :param s2:
+        The noise residual (squared scatter term) to adopt in the pixel.
 
     :param design_matrix:
         The model design matrix.
 
     :returns:
-        The label vector coefficients for the pixel, the inverse variance matrix
-        and the total inverse variance.
+        The label vector coefficients for the pixel, and the inverse variance 
+        matrix.
     """
 
     adjusted_ivar = ivar/(1. + ivar * s2)
@@ -203,13 +204,34 @@ def fit_theta_by_linalg(flux, ivar, s2, design_matrix):
 
 
 
-
 # TODO: This logic should probably go somewhere else.
 
     
 def chi_sq(theta, design_matrix, flux, ivar, axis=None, gradient=True):
     """
     Calculate the chi-squared difference between the spectral model and flux.
+
+    :param theta:
+        The theta coefficients.
+
+    :param design_matrix:
+        The model design matrix.
+
+    :param flux:
+        The normalized flux values.
+
+    :param ivar:
+        The inverse variances of the normalized flux values.
+
+    :param axis: [optional]
+        The axis to sum the chi-squared values across.
+
+    :param gradient: [optional]
+        Return the chi-squared value and its derivatives (Jacobian).
+
+    :returns:
+        The chi-squared difference between the spectral model and flux, and
+        optionally, the Jacobian.
     """
     residuals = np.dot(theta, design_matrix.T) - flux
 
@@ -228,6 +250,9 @@ def L1Norm_variation(theta):
 
     :param theta:
         An array of finite values.
+
+    :returns:
+        The L1 norm of theta (except the first entry), and its derivative.
     """
 
     return (np.sum(np.abs(theta[1:])), np.hstack([0.0, np.sign(theta[1:])]))
@@ -283,6 +308,39 @@ def _scatter_objective_function(scatter, residuals_squared, ivar):
 
 def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix, 
     regularization, censoring_mask, **kwargs): 
+    """
+    Fit theta coefficients and noise residual for a single pixel, using
+    an initially fixed scatter value.
+
+    :param flux:
+        The normalized flux values.
+
+    :param ivar:
+        The inverse variance array for the normalized fluxes.
+
+    :param initial_thetas:
+        A list of initial theta values to start from, and their source. For
+        example: `[(theta_0, "guess"), (theta_1, "old_theta")]
+
+    :param design_matrix:
+        The model design matrix.
+
+    :param regularization:
+        The regularization strength to apply during optimization (Lambda).
+
+    :param censoring_mask:
+        A per-label censoring mask for each pixel.
+
+    :Keyword Arguments:
+        *op_method* -- The optimization method to use.
+                       Valid options are: l_bfgs_b, powell
+
+        *op_kwds* -- Keyword arguments to provide to the optimizer.
+
+    :returns:
+        The optimized theta coefficients, the noise residual `s2`, and
+        metadata related to the optimization process.
+    """ 
 
     if np.sum(ivar) < 1.0 * ivar.size: # MAGIC
         metadata = dict(message="No pixel information.", op_time=0.0)

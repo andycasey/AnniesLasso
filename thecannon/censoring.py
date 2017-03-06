@@ -8,7 +8,7 @@ Utilities to deal with wavelength censoring.
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 
-__all__ = ["Censors", "create_mask", "censor_design_matrix"]
+__all__ = ["Censors", "create_mask", "design_matrix_mask"]
 
 import numpy as np
 
@@ -17,21 +17,21 @@ from .vectorizer.base import BaseVectorizer
 
 class Censors(dict):
 
+    """
+    A dictionary sub-class that allows for label censoring masks to be
+    applied on a per-pixel basis to CannonModel objects.
+    
+    :param label_names:
+        A list containing the label names that form the model vectorizer.
+
+    :param num_pixels:
+        The number of pixels per star.
+
+    :param items: [optional]
+        A dictionary containing label names as keys and masks as values.
+    """
+
     def __init__(self, label_names, num_pixels, items=None, **kwargs):
-        """
-        A dictionary sub-class that allows for label censoring masks to be
-        applied on a per-pixel basis to Cannon models.
-
-        :param label_names:
-            A list containing the label names that form the model vectorizer.
-
-        :param num_pixels:
-            The number of pixels per star.
-
-        :param items: [optional]
-            A dictionary containing label names as keys and masks as values.
-        """
-
         super(Censors, self).__init__(**kwargs)
         self._label_names = tuple(label_names)
         self._num_pixels = int(num_pixels)

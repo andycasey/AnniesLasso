@@ -41,6 +41,37 @@ class CannonModel(base.BaseCannonModel):
 
     """
     A model for The Cannon which includes L1 regularization and pixel censoring.
+
+    :param training_set_labels:
+        A set of objects with labels known to high fidelity. This can be 
+        given as a numpy structured array, or an astropy table.
+
+    :param training_set_flux:
+        An array of normalised fluxes for stars in the labelled set, given 
+        as shape `(num_stars, num_pixels)`. The `num_stars` should match the
+        number of rows in `training_set_labels`.
+
+    :param training_set_ivar:
+        An array of inverse variances on the normalized fluxes for stars in 
+        the training set. The shape of the `training_set_ivar` array should
+        match that of `training_set_flux`.
+
+    :param vectorizer:
+        A vectorizer to take input labels and produce a design matrix. This
+        should be a sub-class of `vectorizer.BaseVectorizer`.
+
+    :param dispersion: [optional]
+        The dispersion values corresponding to the given pixels. If provided, 
+        this should have a size of `num_pixels`.
+    
+    :param regularization: [optional]
+        The strength of the L1 regularization. This should either be `None`,
+        a float-type value for single regularization strength for all pixels,
+        or a float-like array of length `num_pixels`.
+
+    :param censors: [optional]
+        A dictionary containing label names as keys and boolean censoring
+        masks as values.
     """
 
     def train(self, threads=None, **kwargs):
