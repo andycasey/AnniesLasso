@@ -17,6 +17,7 @@ This will install any of the prerequisites (e.g., `numpy <https://pypi.python.or
 
     pip install the-cannon
 
+.. note:: Make sure you include the ``-`` in ``the-cannon`` in the command above, otherwise you will install `Anna Ho's version of The Cannon <https://annayqho.github.io/TheCannon/>`_, which is excellent, but does not include analytic derivatives, regularization, or censoring.
 
 Development Version
 -------------------
