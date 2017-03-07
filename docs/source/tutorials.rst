@@ -13,6 +13,38 @@ Continuum normalization
 Censoring
 ---------
 
+Censoring allows for labels to be prevented from contributing to the flux at specific pixels.
+
+For example, given a four-label model (:math:`T_{\rm eff}`, :math:`\log{g}`, :math:`[{\rm Fe}/{\rm H}]`, :math:`[{\rm Al}/{\rm H}]`), where one label only contributes to a few pixels (e.g., there are few Al lines in this spectrum, so :math:`[{\rm Al}/{\rm H}]` should only contribute to a few pixels), we can use censoring masks to prevent the :math:`[{\rm Al}/{\rm H}]` label from contributing to the stellar flux *except* for around the known Al transition. 
+
+Censoring masks can be provided for any label. By default, ``CannonModel`` objects have no censoring masks. Models can be trained with or without censoring, and can be re-trained after a change in the censoring masks.
+
+.. code-block:: python
+
+    import thecannon as tc
+
+    model = tc.CannonModel.read("apogee-dr12.model")
+
+    uncensored_theta = model.theta
+
+    print(model.censors)
+    >>> None
+
+    print(model.is_trained)
+    >>> True
+
+    # Censor [Al/H] everywhere except around the Al line at X Angstroms
+    # todo
+    model.censors["AL_H"] = tc.censoring.create_mask(
+        model.dispersion, [
+            [ ],
+            [ ],
+        ])
+
+    # Re-train the model.
+    censored_theta, censored_s2, censored_metadata = model.train()     
+
+
 Regularization
 --------------
 
