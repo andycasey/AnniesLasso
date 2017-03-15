@@ -201,15 +201,15 @@ By default the training set spectra are not saved because they can add considera
 .. code-block:: python
  
     >>> ls -lh *.model
-    -rw-rw-r-- 1 arc arc 1.9G Mar  6 15:58 apogee-dr14-giants-full.model
-    -rw-rw-r-- 1 arc arc 2.3M Mar  6 15:58 apogee-dr14-giants.model
+    -rw-rw-r-- 1 arc arc 214M Mar  6 15:58 apogee-dr14-giants-full.model
+    -rw-rw-r-- 1 arc arc 1.1M Mar  6 15:58 apogee-dr14-giants.model
 
 
 Any saved models can be loaded from disk using the ``.read()`` function:
 
 .. code-block:: python
 
-    >>> new_model = tc.CannonModel.read("apogee-dr14.model")
+    >>> new_model = tc.CannonModel.read("apogee-dr14-giants.model")
     >>> new_model.is_trained
     True
 

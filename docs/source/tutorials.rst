@@ -6,9 +6,39 @@ Tutorials
 Constructing the training set
 -----------------------------
 
+You'll want a balanced training set. #TODO
+
 
 Continuum normalization
 -----------------------
+
+*Continuum normalization* is the process of removing the black body and instrumental effects of the spectrograph, such that the flux values are normalized between 0 and 1. 
+
+There are a lot of aspects to continuum normalization, which are beyond the scope of this (or any?) tutorial. The crucial aspects are to ensure that the normalization procedure is a linear operation (e.g., not a high-order polynomial), and that the normalization procedure is invariant with respect to both the labels and the spectrum S/N. For example, a normalization procedure that is based on smoothing nearby pixels will give different continuum normalization for low- and high-S/N spectra of the same star, and will yield a different continuum normalization for metal-rich and metal-poor stars.  If the continuum normalization procedure is dependent on the S/N of the spectra then the (high S/N) training set will have a different continuum normalization to the (lower S/N) test set.
+
+One example of a (pseudo) continuum normalization procedure that meets these constraints is by fitting the continuum with a sum of sine and cosine functions. This requires a list of continuum pixels to be specified in advance. However in principle, these *"continuum pixels"* can be chosen at random, as long as the same pixels are used for the continuum normalization of the training set *and* the test set.
+
+.. code-block:: python
+
+    import thecannon as tc
+
+    # The dispersion and flux arrays refer to the wavelength and flux values for 
+    # a single spectrum, and the ivar array refers to the inverse variance of those
+    # flux values.
+
+    # Here the continuum_pixels is a boolean array the same size as the dispersion
+    # array, indicating whether each entry is a continuum pixel
+
+    # The regions parameter can be used to specify -- for example -- separate CCDs
+    # Continuum will be fit separately to each region
+
+    continuum, metadata = tc.continuum.sines_and_cosines(dispersion, flux, ivar,
+        continuum_pixels, L=1400, order=3, regions=[
+            [15090, 15822],
+            [15823, 16451],
+            [16452, 16971]
+        ])
+
 
 Censoring
 ---------

@@ -12,10 +12,15 @@ __all__ = ["theta", "scatter", "one_to_one"]
 
 import logging
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
 
 logger = logging.getLogger(__name__)
+
+try:
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import MaxNLocator
+
+except ImportError:
+    logger.warn("Could not import matplotlib; plotting functionality disabled")    
 
 
 def theta(model, indices=None, label_terms=None, show_label_terms=True,

@@ -78,7 +78,8 @@ fig_comparison = tc.plot.one_to_one(
     ])
 fig_comparison.savefig("docs/source/one-to-one.png", dpi=300)
 
-model.write("apogee-dr14-giants.model", overwrite=True)
+model.write("apogee-dr14-giants.model", 
+    include_training_set_spectra=False, overwrite=True)
 model.write("apogee-dr14-giants-full.model", 
     include_training_set_spectra=True, overwrite=True)
 
