@@ -28,6 +28,7 @@ To get the source for the latest development version, clone the `git <https://gi
 
     git clone https://github.com/andycasey/AnniesLasso.git
     cd AnniesLasso
+    git checkout refactor # TODO
     
 
 Then install the package by running the following command:
