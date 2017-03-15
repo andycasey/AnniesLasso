@@ -26,7 +26,7 @@ from scipy.spatial import Delaunay
 from time import time
 
 from .vectorizer.base import BaseVectorizer
-from . import (censoring, fitting, utils, __version__)
+from . import (censoring, fitting, utils, vectorizer as vectorizer_module, __version__)
 
 
 logger = logging.getLogger(__name__)
@@ -114,8 +114,15 @@ class CannonModel(object):
         else:
             self._training_set_flux = np.atleast_2d(training_set_flux)
             self._training_set_ivar = np.atleast_2d(training_set_ivar)
-            self._training_set_labels = np.array(
-                [training_set_labels[ln] for ln in vectorizer.label_names]).T
+            
+            if isinstance(training_set_labels, np.ndarray) \
+            and training_set_labels.shape[0] == self._training_set_flux.shape[0] \
+            and training_set_labels.shape[1] == len(vectorizer.label_names):
+                # A valid array was given as the training set labels, not a table.
+                self._training_set_labels = training_set_labels
+            else: 
+                self._training_set_labels = np.array(
+                    [training_set_labels[ln] for ln in vectorizer.label_names]).T
             
             # Check that the flux and ivar are valid.
             self._verify_training_data(**kwargs)
@@ -256,6 +263,9 @@ class CannonModel(object):
         :param dispersion:
             An array of the dispersion values.
         """
+        if dispersion is None:
+            self._dispersion = None
+            return None
 
         dispersion = np.array(dispersion).flatten()
         if self.training_set_flux is not None \
@@ -531,7 +541,7 @@ class CannonModel(object):
 
             # Initiate the vectorizer.
             vectorizer_class, vectorizer_kwds = kwds["vectorizer"]
-            klass = getattr(vectorizer, vectorizer_class)
+            klass = getattr(vectorizer_module, vectorizer_class)
             kwds["vectorizer"] = klass(**vectorizer_kwds)
 
             # Initiate the censors.
@@ -669,7 +679,7 @@ class CannonModel(object):
 
         func = utils.wrapper(fitting.fit_spectrum, 
             (self.vectorizer, self.theta, self.s2, self._fiducials, self._scales),
-            kwargs, S, message="Fitting {} spectra".format(S))
+            kwargs, S, message="Running test step on {} spectra".format(S))
 
         labels, cov, meta = zip(*mapper(func, zip(*(flux, ivar, initial_labels))))
 

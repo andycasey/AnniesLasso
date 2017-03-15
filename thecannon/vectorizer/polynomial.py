@@ -155,6 +155,28 @@ class PolynomialVectorizer(BaseVectorizer):
         return self.get_human_readable_label_vector()
 
 
+    def get_human_readable_label_term(self, term_index, label_names=None,
+        **kwargs):
+        """
+        Return a human-readable form of a single term in the label vector.
+
+        :param term_index:
+            The term in the label vector to return.
+
+        :param label_names: [optional]
+            The label names to use. For example, these could be LaTeX 
+            representations of the label names.
+
+        :returns:
+            A human-readable string representing a single term in the label vector.
+        """
+
+        if term_index == 0: return "1"
+        else:
+            return human_readable_label_term(self.terms[term_index - 1],
+                label_names=label_names or self.label_names, **kwargs)
+
+
 def _is_structured_label_vector(label_vector):
     """
     Return whether the provided label vector is structured as a polynomial
@@ -265,6 +287,49 @@ def parse_label_vector_description(description, label_names=None, **kwargs):
     return label_vector
 
 
+def human_readable_label_term(term, label_names=None, mul="*", pow="^",
+    bracket=False):
+    """
+    Return a human-readable form of a single term in the label vector.
+
+    :param term:
+        A structured term.
+
+    :param label_names: [optional]
+        The names for each label in the label vector.
+
+    :param mul: [optional]
+        String to use to represent a multiplication operator. For example,
+        if giving LaTeX label definitions one may want to use '\cdot' for
+        the `mul` term.
+
+    :param pow: [optional]
+        String to use to represent a power operator.
+
+    :param bracket: [optional]
+        Show brackets around each term.
+
+    :returns:
+        A human-readable string representing the label vector.
+    """
+    ct = []
+    for i, o in term:
+        if isinstance(i, int) and label_names is not None:
+            label_name = label_names[i]
+        else:
+            label_name = i
+        if o > 1:
+            d = (0, 1)[o - int(o) > 0]
+            ct.append("{0}{1}{2:.{3}f}".format(label_name, pow, o, d))
+        else:
+            ct.append(label_name)
+
+    if bracket and len(ct) > 1:
+        return "({})".format(mul.join(ct))
+    else:
+        return mul.join(ct)
+
+
 def human_readable_label_vector(terms, label_names=None, mul="*", pow="^",
     bracket=False):
     """
@@ -295,22 +360,8 @@ def human_readable_label_vector(terms, label_names=None, mul="*", pow="^",
 
     human_terms = ["1"]
     for term in terms:
-        ct = []
-        for i, o in term:
-            if isinstance(i, int) and label_names is not None:
-                label_name = label_names[i]
-            else:
-                label_name = i
-            if o > 1:
-                d = (0, 1)[o - int(o) > 0]
-                ct.append("{0}{1}{2:.{3}f}".format(label_name, pow, o, d))
-            else:
-                ct.append(label_name)
-
-        if bracket and len(ct) > 1:
-            human_terms.append("({})".format(mul.join(ct)))
-        else:
-            human_terms.append(mul.join(ct))
+        human_terms.append(human_readable_label_term(
+            term, label_names=label_names, mul=mul, pow=pow))
     return " + ".join(human_terms)
 
 
