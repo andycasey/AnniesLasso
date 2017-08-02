@@ -1,4 +1,3 @@
-#! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import sys
@@ -43,7 +42,7 @@ setup(
     ],
     keywords="The Cannon",
     packages=find_packages(exclude=["documents", "tests"]),
-    install_requires=["numpy", "scipy", "six", "sharedmem"],
+    install_requires=["numpy", "scipy", "six"],
     extras_require={
         "test": ["coverage"]
     },
