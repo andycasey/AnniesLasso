@@ -1,4 +1,3 @@
-#! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import sys
@@ -21,29 +20,27 @@ def read(filename):
 # Get the version information.
 here = path.abspath(path.dirname(__file__))
 vre = re_compile("__version__ = \"(.*?)\"")
-version = vre.findall(read(path.join(here, "AnniesLasso", "__init__.py")))[0]
-
+version = vre.findall(read(path.join(here, "thecannon", "__init__.py")))[0]
 
 setup(
-    name="AnniesLasso",
+    name="the-cannon",
     version=version,
-    #author="",
-    #author_email="",  # <-- Direct complaints to this address.
-    description="The Cannon 2: Compressed sensing edition",
+    author="Andrew R. Casey, David W. Hogg, Melissa Ness",
+    author_email="andrew.casey@monash.edu",
+    description="A data-driven approach to stellar spectroscopy",
     long_description=read(path.join(here, "README.md")),
-    url="https://github.com/davidwhogg/AnniesLasso",
+    url="http://thecannon.io",
     license="MIT",
     classifiers=[
-        "Development Status :: 3 - Alpha",
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 2.7",
-        "Programming Language :: Python :: 3.4",
+        "Programming Language :: Python :: 3.6",
         "Topic :: Scientific/Engineering :: Astronomy",
         "Topic :: Scientific/Engineering :: Physics"
     ],
-    keywords="Cannon Annies Lasso",
+    keywords="The Cannon",
     packages=find_packages(exclude=["documents", "tests"]),
     install_requires=["numpy", "scipy", "six"],
     extras_require={
@@ -54,5 +51,9 @@ setup(
     },
     include_package_data=True,
     data_files=None,
-    entry_points=None
+    entry_points={
+        "console_scripts": [
+            "tc = thecannon.__main__:main",
+        ]
+    }
 )
