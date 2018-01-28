@@ -1,0 +1,486 @@
+Dear Dr. Robitaille,
+
+Please find below the response to our referee report on manuscript AAS00008.
+We have addressed all of the issues raised by the referee, and included some
+additional changes that have improved the paper.
+
+Our responses to the Reviewer's comments are marked below. We have also 
+uploaded a PDF which highlights the changes between the current version and 
+the original manuscript.
+
+----
+
+
+With interest, I read your manuscript AAS00008, "The Cannon 2: A data-driven
+model of stellar spectra for detailed chemical abundance analyses". Your paper
+treats a very important topic: how to deal with the extreme growth in volume and 
+complexity of data sets in astronomy. Data-driven approaches will play an 
+important role in mining the knowledge embedded in these sets.
+
+Unfortunately, your publication could not convince me that the Cannon is an 
+appropriate tool for this task. I have several severe concerns and therefore 
+recommended that the editor request a major revision of your manuscript. You 
+will find my comments attached below. Please feel free to contact the editor in 
+case you need more detailed comments, remarks or explanations. As the topic is
+very interesting and important for the scientific community, I would be more 
+than happy to constructively assist you.
+
+0. [General] The paper needs an extensive rewriting to improve its readability,
+not only because of misused or missing technical terms.
+
+    - In general mathematical descriptions should be more precise and correct.
+      E.g. scalars should be lower case. When defining your output parameters 
+      you could state something like "$\theta \in \R^17$" with 
+      "\newcommand{\R}{{\sf I\hspace*{-0.05cm}R}}". Pseudo code or diagrams 
+      would help to understand what you are doing and improve readability of the 
+      publication.
+
+            Author's response:
+
+            We have added an Appendix that includes a mathematical expansion
+            of v(l) and example code to demonstrate our work. We are happy to
+            include additional pseudo code or diagrams for any specific items
+            that are not clear.
+
+            Regarding lower case scalars: The mathematical nomenclature that we
+            have adopted is consistent throughout the manuscript and complies 
+            with all of the AAS guidelines on manuscript preparation. 
+
+            Unfortunately in the absence of a more specific request from the 
+            Reviewer that explains why the current nomenclature should be changed,
+            we have chosen not to update the nomenclature.
+
+    - The presented method is not unconventional, it is a data-driven approach 
+      instead of the common physical model based solution. Clearly state these
+      differences.
+
+            Author's response:
+
+            Text updated.
+
+    - Instead of quantitatively discussing results, terms like "striking 
+      differences", "striking comparison", "are similar, with correlations in 
+      the same direction", "significantly different", or "are in satisfactory 
+      agreement with the literature" are currently used. Please try to use 
+      measures instead of words to enable the reader to make own decisions about 
+      the quality. Measures enable other scientists to compare their results 
+      with yours.
+
+      % TODO
+
+    - You should not generalize your statements on machine learning, especially 
+      because most statements are not correct. You talk about standard machine 
+      learning techniques. This is like talking about standard observation 
+      techniques, even though we know that there is no standard and every 
+      instrument has its specialties. This is the same for machine learning. I 
+      would recommend reading "The Elements of Statistical Learning" or "Pattern
+      Recognition and Machine Learning" to get a deeper introduction to machine
+      learning.
+
+      % TODO: Discuss with others.
+
+    - You describe your approach like you are solving a classification task with
+      discrete class labels, even though you are solving a regression problem. 
+      This must be clearly stated throughout the whole publication. Use features
+      for input data and regression values, output values or estimated values 
+      for your model outputs.
+
+      % TODO: Discuss with others.
+
+    - You use the word "seek" when you determine, derive or calculate a value. 
+      Seeking is something that is appropriate for ,e.g. a harddisk but not in 
+      this context.
+
+          Author's response:
+
+          We have updated the text accordingly.
+
+1. [abstract p1] You mention compressed sensing in the abstract, without 
+referring to it in the document. In my opinion you are confusing this with 
+sparsity which is something different.
+
+    Author's response:
+
+    We have removed the reference to compressed sensing and clarified the
+    abstract.
+
+2. [introduction p3] Great footnote on Annie, but I would also mention that she
+was one of Pickerings's computers which would make a nice connection to computer
+driven research.
+
+    Author's response:
+
+    We have updated the footnote to include this suggestion.
+
+3. [introduction p4] In the introduction you roughly describe the Cannon and how
+it decomposes a spectrum into components with different coefficients for the 
+abundance parameters. This is very hard to understand without Equation 1.
+
+    Author's response:
+
+    We agree! However we wanted to introduce the relevant terminology and detail
+    all of our assumptions before formally introducing the model. We have
+    updated the text in Section 1 to include a reference to Equation 1 and
+    signpost the next Section, so that the reader can jump between these
+    sections if necessary.
+
+4. [method p5] You should separate the method from the data section. Please use 
+train, test, and validation data-set as it is common in literature. Specify the 
+correlations you find in the values derived through the ASPCAP software and 
+discuss the biases you create in the output data space by selecting a subset. 
+Preprocessing of the data should be also part of this section.
+
+    Author's response:
+
+    The method section (Section 2) is separate from the data section (Section 3)
+    -- could the Reviewer clarify what aspect of Section 2 should be separated?
+    Similarly, if the preprocessing of the data should be in this Section,
+    could the Reviewer clarify how the data preprocessing should be described
+    before the data?
+
+
+    Could the Reviewer clarify which instances (or definitions) of train, test,
+    and validation data-sets are incompatible with the literature? We have
+    chosen to use the words test, train, and validate, in order to be consistent
+    with the (machine-learning) literature. Therefore if there is a discrepancy
+    in definition, we wish to correct it!
+
+    %% Andy: include a figure showing correlations in the validation labels from
+    %        the repeat visits # TODO
+
+5. [method p5] I do not understand your statement concerning smoothness. Do you 
+mean something like the fractal dimensionality of the spectrum or do you refer 
+to the function v(l) that appears on page 6. In this context I do not get the
+point.
+
+    Author's response:
+
+    We are referring to (something like) the fractal dimensionality of the
+    spectrum with respect to the labels. To clarify, the intent of describing
+    this assumption is to emphasize that by adopting a quadratic model we are
+    implicitly assuming that the spectra change smoothly with a quadratic
+    combination of the labels, otherwise our model would not represent the data
+    well.
+
+    We have updated the text to clarify this assumption.
+
+6. [method p5] The term ground truth is always referred to when defining a 
+reference set as it is used to train the model. It makes no sense in combination
+with your model predictions.
+
+    Author's response:
+
+    We intended to emphasize that The Cannon is building a model from stars with
+    labels known to high-fidelity, and without that training set, The Cannon
+    cannot generate data the same way a physics-based model can generate data
+    without a training set requirement.
+
+    We have clarified this assumption in the text.
+
+7. [method p6] When describing the model, you do not give all required 
+information. You do not describe exactly how v(l) is constructed or optimized. 
+A more detailed mathematical description would improve the readability. The 
+publication does not describe the applied model in a format that enables the
+reader to reproduce the results or allows to apply/modify the presented approach
+to their own data. Providing the source code is excellent [consider registering
+it at the ASCL for more visibility] but a detailed description of the method is
+mandatory, at least to understand the extensions you made with respect to the 
+first publication.
+
+    Author's response:
+
+    We have added an Appendix that further describes v(l), which should resolve
+    this (and other) issues. We have included both a full mathematical expansion and
+    example code in this Appendix so that it is clear to the reader.
+
+    The code will be registered with the ASCL upon acceptance of this paper such
+    that the abstracts (via AAS and ASCL) are the same.
+
+8. [method p6] You mention a probabilistic model with a PDF. Where do the 
+probabilities get lost. There are no probabilities specified with your results.
+There are no correct measures mentioned, when comparing values with predicted 
+PDF.
+
+    Author's response:
+
+    ARC to ask DWH: Is it sufficient just to say that we include uncertainties
+    with our results? Or should we clarify the terminology here about defining
+    the model as being a probabilistic model for y? % TODO: Discuss with DWH
+
+9. [method p6] You specify a likelihood without motivating how you derived it.
+You should show that this equation is a real likelihood, especially as some
+terms are not explained at all.
+
+    Author's response:
+
+    ARC to DWH: What do we need to do to 'prove' that this is a 'real likelihood'? # TODO
+
+    All the terms in the equation (Equation 2, if that is the one the reviewer
+    is referring to) are defined. I think if v(l) is outlined in the Appendix
+    then the Reviewer will be convinced that all terms are explained. #TODO
+
+10. [method p7] You state that the optimization of Equation 3 is not convex. 
+Even though no details on v(l) are given I would think that this Equation is 
+convex in theta and therefore optimization should not be a problem when 
+predicting a set of regression values.
+
+    Author's response:
+
+    The Reviewer is correct that the Equation 3 is convex in \theta, but it is
+    not convex in l (i.e., at test time) because v(l) includes second-order 
+    terms. This issue is a consequence of Point 7 raised by the referee. 
+
+    In the text we have tried to clarify this directly after Equation 3. With
+    the updated text and new Appendix, we hope that it is clear to the reader.
+
+11. [method p8] In Equation 5 you exclude the first component of theta from your
+calculation without mentioning that this is the temperature and therefore it 
+should not be suppressed through your selected penalty function. Please state 
+how theta is composed in more details and in a distinct place.
+
+    Author's response:
+
+    This issue is also a consequence of Point 7 raised by the Reviewer: the
+    first component of \theta is actually a constant value.
+
+12. [data p8] By selecting a subset of the available data you choose certain
+criteria. Please motivate the chosen values and explain what biases this is 
+introducing. What is your visual inspection referring to? Is it a certain 
+correlation between abundances? Adding a simple threshold seems like you are
+tweaking your data. Why do you do so. You mention the use of PDFs. Why didn't 
+you model abundance uncertainties which would enable you to deal with the 
+missing features. Requiring all 15 abundance values to be present, limits the
+expressiveness of your trained model and adds extra biases.
+
+    Author's response:
+
+    We have included a figure showing the motivation for the [V/H] cut and
+    included explanatory text regarding this and other cuts.
+
+    In practice requiring all 15 abundance values is very similar to requiring 
+    a very high S/N ratio. As the S/N ratio drops, fewer abundances are reported.
+    While modelling the abundance uncertainties would be a useful extension of
+    this work, there were sufficient stars (>~10%) that met all of our strict
+    quality criteria, and those stars covered the full extent of label space.
+
+    % TODO: Include [V/H] plot and description.
+
+13. [data p8] You describe how you split your reference data into a fixed subset
+for training and testing (it is not validation). You could consider having an 
+extra validation set, too. It would be more appropriate to use at least a simple
+N-fold cross-validation technique.
+
+    Author's response:
+
+    % TODO: at same time as bootstrapping the training set.
+
+14. [data p8/p9] The data preprocessing steps are not describe accordingly. 
+Consider using a mathematic description of the applied operations or sketch the
+processing scheme.
+
+    Author's response:
+
+    % TODO: make a figure showing the pre-processing steps.
+
+
+15. [data p9/p10] As you describe, the uncertainty of the measurements is not 
+taking into account all aspects that affect the measurement. The presented 
+solution seems arbitrary to me, as the additional penalty term is based on
+manually tuned constants. These constants make sure that the values are somehow 
+in the expected order even though their motivation is not convincing. Assuming 
+y tilde is the median (it is not stated; is it the median of all, or just one 
+spectrum?), the chosen term is heavily dominated by the number of flagged 
+pixels. On average a 0.1 seems to correct this. What does the distribution of y
+look like? Would the mean value be better than median? What is the distribution
+of number of flagged values per spectrum looking like? These are all important 
+questions before motivation such a penalty function. Modeling the uncertainties
+with respect to the flags would be more accordingly instead of pure number 
+counting.
+
+    Author's response:
+
+    We have updated the text to clarify that y tilde is the median of one
+    spectrum. We found the median to be better because the mean was more
+    susceptible to cosmic ray spikes, which is one of the extreme flagged
+    situations (example A in the text) where the pixel inverse variance 
+    was underestimated.
+
+    We have also emphasized the text before Equation 6 to state that the
+    inverse variance array adjustments are only made to flagged pixels. Thus
+    while our conservatism constants are arbitrary (or at best, informed by
+    our experience with the data), the adjustments only affect pixels for which
+    there is already information that those pixels are likely to have
+    underestimated errors.
+
+16. [data p10/p11] Why do other approaches for continuum fitting fail? Why do 
+you use the per pixel variances only for stacking the individual spectra and 
+not for fitting the continuum? Is the difference between your approach and the 
+ASPCAP approach purely based on the continuum fit? Why does a standard continuum
+method like spline fitting or Gaussian decomposition do not work? Side effects 
+towards the edged of the spectrum could be minimized by using weights. All these
+questions arose when reading this section. It would be necessary to get an 
+answer to understand the impact of the continuum fitting and preprocessing on 
+the final results. A comparison of the results with different preprocessing 
+methods would definitively help.
+
+    Author's response:
+
+    We did use the per pixel variances for fitting the continuum, but this was
+    not correctly represented in the text. We have fixed this.
+
+    It is unlikely that the difference between our approach and ASPCAP are
+    purely based on the continuum fit, principally because ASPCAP uses extensive
+    masks to exclude regions that it cannot accurately model, presumably due in
+    part to incomplete or incorrect line lists. As a consequence The Cannon is 
+    using more pixels than ASPCAP when comparing to data, and therefore is 
+    likely to perform better at the same S/N. 
+
+    % TODO: Address the continuum question RE Gaussain decomposition or spline fitting
+
+
+17. [experiments p12] The two parameters lambda and f span a plane and therefore
+should be presented as such. You advocate for having a sparse version of theta.
+What level of sparsity do you aim for? You state numbers that would produces 
+the sparsest model. Following your equations this is not correct, as the tilted
+pseudo plane would create a nearly empty model for extreme values of lambda and
+f. Therefore I do not agree on the reasoning about the chosen values.
+
+    Author's response:
+
+    The text states that for any \Lambda \gtrsim 10^3, a scale factor of
+    f \approx 20 produces the sparsest model. This was unclear and has been
+    updated to state that for any \Lambda \gtrsim 10^3, a scale factor of
+    f \approx 20 produces the sparsest model at the given \Lambda.
+
+    We have updated the text to clarify our position on \Lambda and f.
+    Specifically we seek a sparse model that accurately models stellar spectra
+    and yields precise stellar labels.
+
+
+    % TODO: Reproduce Figure 2 as a plane.
+
+
+18. [experiments p12] You use the median absolute deviation (MAD) [not median
+absolute difference as in Figure 3] as a measure of consistency for your 
+results. The MAD is a robust measure not sensitive to outliers. Having outliers
+in the low S/N regime on the other hand is something you do not want to have. 
+Hence this measure is not appropriate for this kind of consistency check.
+
+    % TODO: MAD or the other thing?
+
+19. [experiments p12] When calculating the chi square difference between the 
+generated and the observed spectra, you should take the variance into account. 
+When comparing the generated spectra of ASPCAP and the Cannon with the real 
+spectra you should show the chi square distribution over all spectra instead of
+just showing a single spectrum and stating that the Cannon is better.
+
+    Author's response:
+
+    We do take the variance into account when calculating chi square values.
+
+    Figure 8 has been updated to also show the reduced chi square difference for 
+    all ASPCAP results.
+
+    % TODO: Update Figure 8
+
+20. [validation p13] The validation of the performance must be done in a 
+quantitative way. "Shows good agreement with the ASPCAP labels" has no meaning. 
+Measure the prediction error / deviation between both approaches and present 
+numerical results. Root mean square error / standard deviation / MAD ... and 
+compare this with the baseline performance when just using the mean abundance 
+value per abundance or another simple regression method.
+
+% TODO
+
+21. [validation p13] The [V/H] abundance values seem to be problematic. Perhaps 
+the uncertainty of the abundance values should be considered when training the 
+model. Simple sampling techniques could help. What does mean that the [V/H] 
+value precision is worse than other abundance parameters? What do you use to 
+measure the precision if you do not have a "ground truth" for training?
+
+    Author's response:
+
+    On page 13 (Section 4.3) we discuss that the [V/H] precision is compared to
+    other labels by evaluating the label precision from repeat observations of
+    the same star, at different S/N values. At moderate S/N ratios the precision
+    in most abundance labels is comparable, however it is poorer for [V/H]:
+    the (internal) spread is 0.16 dex, compared to ~0.01 dex for [Fe/H].
+
+    These comparisons do not require a "ground truth" for training: we are
+    evaluating our internal consistency as a function of S/N, after verifying
+    that the model can reproduce stellar labels for stars in the test set
+    (formerly called validation set: the subset of the labelled set that was
+    not used for training).
+
+    % TODO: Re-read this and make sure I am not too snarky.
+
+22. [label recovery p14] You are not recovering class labels. You are estimating
+continuous values and therefore you should change the section name and the 
+discussion. The reason for the higher precision (whatever this refers to) is 
+very likely related to subtle effects / correlations that are not just 
+resented in the few pixels considered by physical models. This should be easy 
+to prove by comparing the number of considered pixels. In Figure 7 it is again
+the median absolute deviation (not difference) that needs a more detailed 
+consideration.
+
+    Author's response.
+
+    The header of Section 4.3 has been renamed. 
+
+    % TODO: Consider updating Figure 7
+
+23. [results p15/p16] The results need to be discussed more qualitatively. I do 
+not find Figure 11 striking! For me it just looks like a smoothing effect 
+introduced by your model. The most "striking" argument for rethinking the 
+publication is: When using the ASPCAP labels as ground truth for training, how 
+can you state that your model is performing better than ASPCAP? Where is the 
+comparison between the performance on spectra between the Cannon and ASPCAP as 
+a function of S/N? You are not able to compare performance without having a 
+second independent method to ASPCAP or a ground truth data set. To be able to 
+transfer knowledge from one data set to another you have to show that you are 
+not just post-processing the results. You might be able to find inconsistencies 
+in the ASPCAP results with the presented approach and you might be even able to 
+perform better on low S/N data. To convince me you have to have a meaningful 
+measure of performance and you have to have an acceptable reference data set. 
+Just stating you are better than ASPCAP while being based on ASPCAP data is not 
+enough. I could state that ASPCAP is better than your approach by just turning 
+around your arguments. This is not the right way of presenting the results of 
+your overall really clever approach. Performance wise, a simple nearest 
+neighbors regression model would probably beat the Cannon with respect to the 
+ASPCAP values. As long as the correlations between the abundances are not 
+analyzed, the discussion of the resulting abundance values is not meaningful.
+
+    Author's response:
+
+
+    % TODO: discuss de-noising and update Figure 7 to show ASPCAP results.
+
+24. [discussion p17] When a regression model is trained accordingly with output 
+values in a certain range, it is obvious that the predicted values should be in 
+a similar range. Therefore the resulting values will always be in "satisfactory
+agreement with the literature" when the training values are already in 
+agreement. Please try to be more precise.
+
+    Author's response:
+
+    We have updated the text.
+
+25. [discussion p19] There needs to be a comparison between your approach and 
+other more simple methods, like multi layer perceptrons or random forests. There
+are several ways to define a generative model, so at least one simple method 
+should be used for performance comparison in the result or discussion section.
+
+    Author's response:
+
+    This is out of scope.
+
+26. [discussion p20] In general the discussion is considering subtle differences 
+that could purely be related to differences in preprocessing the data or 
+over-fitting the model to not analyzed abundance correlations. Hence, I mistrust
+the scientific interpretation done in the discussion.
+
+    Author's response:
+
+    % Update with numbers based on how big the ASCPAP GC spreads are in CNO
+
+    

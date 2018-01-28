@@ -1,12 +1,9 @@
 # The Cannon
 
-[![Build Status](https://img.shields.io/travis/andycasey/AnniesLasso/refactor.svg)](https://travis-ci.org/andycasey/AnniesLasso)
-[![Coverage Status](https://img.shields.io/coveralls/andycasey/AnniesLasso/refactor.svg)](https://coveralls.io/github/andycasey/AnniesLasso?branch=refactor)
-[![Scrutinizer](https://img.shields.io/scrutinizer/g/andycasey/AnniesLasso.svg?b=refactor)](https://scrutinizer-ci.com/g/andycasey/AnniesLasso/?branch=refactor)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/andycasey/AnniesLasso/blob/refactor/LICENSE)
-
-
-[See the documentation.](#)
+[![Build Status](https://img.shields.io/travis/andycasey/AnniesLasso/master.svg)](https://travis-ci.org/andycasey/AnniesLasso)
+[![Coverage Status](https://img.shields.io/coveralls/andycasey/AnniesLasso/master.svg)](https://coveralls.io/github/andycasey/AnniesLasso?branch=master)
+[![Scrutinizer](https://img.shields.io/scrutinizer/g/andycasey/AnniesLasso.svg?b=master)](https://scrutinizer-ci.com/g/andycasey/AnniesLasso/?branch=master)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/andycasey/AnniesLasso/blob/master/LICENSE)
 
 ## Authors
 - **Andy Casey** (Cambridge) (Monash)
@@ -17,18 +14,10 @@
 - **Gerry Gilmore** (Cambridge)
 
 
-## License
-**Copyright 2017 the authors**.
-The code in this repository is released under the open-source **MIT License**.
-See the file `LICENSE` for more details.
-
-
 ## Installation
 
-To install:
-
 ``
-pip install https://github.com/andycasey/AnniesLasso/archive/refactor.zip
+pip install https://github.com/andycasey/AnniesLasso/archive/master.zip
 ``
 
 
@@ -77,3 +66,9 @@ model.train()
 ````
 
 You can follow this example further in the complete [Getting Started](#) tutorial.
+
+
+## License
+**Copyright 2017 the authors**.
+The code in this repository is released under the open-source **MIT License**.
+See the file `LICENSE` for more details.

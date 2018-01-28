@@ -1,0 +1,67 @@
+\documentclass[12pt, preprint]{aastex}
+
+\newcommand{\acronym}[1]{{\small{#1}}}
+\newcommand{\project}[1]{\textsl{#1}}
+\newcommand{\tc}{\project{The~Cannon}}
+\newcommand{\apogee}{\project{\acronym{APOGEE}}}
+
+\begin{document}
+
+\title{How to train and use \tc\ when the line spread function, rotation, or microturbulence is varying from star to star}
+\author{DWH}
+
+\section{Introduction}
+
+\tc\ has amazing successes, which could be listed and cited here.
+
+\tc\ makes the fundamental assumption that stars with the same labels
+(atmospheric parameters and chemical abundances) labels will have the
+same spectra (up to Gaussian noise).
+This isn't always true:
+There can be important parameters (for example, rotational velocity
+amplitude $v\,\sin i$) that are not among the label set used for
+training.
+There can also be instrumental issues that make different stars with
+identical properties appear different.
+For example, in the \apogee\ spectrographs, different fibers have
+slightly different line spread functions (\acronym{LSF}s), which lead
+to different line widths for the absorption lines.
+
+The nice thing is that a subset of instrumental and stellar-physical
+effects are expected to only (to first order) affect the line shapes,
+and not their locations or relative equivalent widths.
+From here on, we are going to treat all of these effects as
+contributing to a single ``effective \acronym{LSF}'' (usually we will
+just call this the ``\acronym{LSF}''), which is different (in
+principle) for every star.
+Here we propose a method for training \tc\ with a training set of
+stars that are subject to different effective \acronym{LSF}s, and using \tc\ on
+new unlabeled stars that also all have different effective \acronym{LSF}s.
+
+The \emph{Right Thing To Do} in this case is to build a model of the
+stellar spectra at a high resolution, but smooth or convolve it to
+lower resolution with the appropriate individual-star effective
+\acronym{LSF} before comparing with any data (or computing any
+log-likelihood for inference or optimization).
+That, it turns out, is computationally expensive for the scale of
+\tc\ operating on \apogee\ data:
+The model has 1.4~million free parameters and can only be optimized
+with a wavelength-seperability trick employed in all current
+implementations (CITE).
+That is, we can't afford to do the \acronym{RTTD} in the training
+step.
+
+Here we propose a method that permits training of \tc\ without the pain.
+It is an approximation to the \acronym{RTTD} that is good to first order
+in the convolutions and their inverses (yes, convolutions have inverses).
+This can be used to train and test with \tc\ under small \acronym{LSF}
+variations, but will not work in the extremes.
+
+\section{Method}
+
+First some reminders about linear algebra and convolutions and
+correlations:
+
+...
+
+\end{document}
