@@ -357,7 +357,7 @@ class CannonModel(object):
             return default
         try:
             return array[index]
-        except TypeError:
+        except (IndexError, TypeError):
             return array
 
 
