@@ -139,7 +139,9 @@ def sines_and_cosines(dispersion, flux, ivar, continuum_pixels, L=1400, order=3,
             logging.warn("Some pixels in spectrum index {0} have measured flux "
                          "values (e.g., ivar > 0) but are not included in any "
                          "specified continuum region. These pixels won't be "
-                         "continuum-normalised: {1}".format(i, segments))
+                         "continuum-normalised: {1}. Instead the continuum will"
+                         " be set as the fill_value of {2}".format(
+                            i, segments, fill_value))
 
             
         # Get the flux and inverse variance for this object.
