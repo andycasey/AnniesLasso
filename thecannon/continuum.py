@@ -226,7 +226,9 @@ def normalize(dispersion, flux, ivar, continuum_pixels, L=1400, order=3,
         The continuum values for all pixels, and a dictionary that contains 
         metadata about the fit.
     """
-    continuum, metadata = sines_and_cosines(dispersion, flux, ivar, **kwargs)
+    continuum, metadata = sines_and_cosines(dispersion, flux, ivar, 
+        continuum_pixels, L=1400, order=3, regions=None, fill_value=1.0,
+        **kwargs)
 
     normalized_flux = flux/continuum
     normalized_ivar = continuum * ivar * continuum
