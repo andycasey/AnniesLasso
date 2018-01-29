@@ -105,7 +105,7 @@ class RestrictedCannonModel(CannonModel):
                 else:
                     if len(bounds) != 2:
                         raise ValueError("bounds must be a two-length tuple")
-                    if bounds[1] < bounds[0]:
+                    if None not in bounds and bounds[1] < bounds[0]:
                         raise ValueError("bounds must be in (min, max) order")
         else:
             raise TypeError("theta_bounds must be a dictionary-like object")
