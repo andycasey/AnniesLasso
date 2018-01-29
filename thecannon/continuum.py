@@ -139,10 +139,7 @@ def sines_and_cosines(dispersion, flux, ivar, continuum_pixels, L=1400, order=3,
             logging.warn("Some pixels in spectrum index {0} have measured flux "
                          "values (e.g., ivar > 0) but are not included in any "
                          "specified continuum region. These pixels won't be "
-                         "continuum-normalised: {1}. Instead the continuum will"
-                         " be set as the fill_value of {2}".format(
-                            i, segments, fill_value))
-
+                         "continuum-normalised: {1}".format(i, segments))
             
         # Get the flux and inverse variance for this object.
         object_metadata = []
@@ -229,8 +226,8 @@ def normalize(dispersion, flux, ivar, continuum_pixels, L=1400, order=3,
         metadata about the fit.
     """
     continuum, metadata = sines_and_cosines(dispersion, flux, ivar, 
-        continuum_pixels, L=1400, order=3, regions=None, fill_value=1.0,
-        **kwargs)
+        continuum_pixels, L=L, order=order, regions=regions,
+        fill_value=fill_value, **kwargs)
 
     normalized_flux = flux/continuum
     normalized_ivar = continuum * ivar * continuum
