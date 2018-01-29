@@ -234,6 +234,10 @@ def normalize(dispersion, flux, ivar, continuum_pixels, L=1400, order=3,
     normalized_ivar = continuum * ivar * continuum
     normalized_flux[normalized_ivar == 0] = 1.0
     
+    non_finite_pixels = ~np.isfinite(normalized_flux)
+    normalized_flux[non_finite_pixels] = 1.0
+    normalized_ivar[non_finite_pixels] = 0.0
+
     return (normalized_flux, normalized_ivar, continuum, metadata)
 
 
