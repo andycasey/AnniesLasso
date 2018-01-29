@@ -10,6 +10,7 @@ from __future__ import (division, print_function, absolute_import,
 
 __all__ = ["sines_and_cosines"]
 
+import logging
 import numpy as np
 
 
@@ -96,12 +97,15 @@ def sines_and_cosines(dispersion, flux, ivar, continuum_pixels, L=1400, order=3,
     region_matrices = []
     continuum_masks = []
     continuum_matrices = []
+    pixel_included_in_regions = np.zeros_like(flux).astype(int)
     for start, end in regions:
 
         # Build the masks for this region.
         si, ei = np.searchsorted(dispersion, (start, end))
-        region_masks.append(
-            (end >= dispersion) * (dispersion >= start))
+        region_mask = (end >= dispersion) * (dispersion >= start)
+        region_masks.append(region_mask)
+        pixel_included_in_regions[:, region_mask] += 1
+
         continuum_masks.append(continuum_pixels[
             (ei >= continuum_pixels) * (continuum_pixels >= si)])
 
@@ -113,10 +117,31 @@ def sines_and_cosines(dispersion, flux, ivar, continuum_pixels, L=1400, order=3,
 
         # TODO: ISSUE: Check for overlapping regions and raise an warning.
 
+    # Check for non-zero pixels (e.g. ivar > 0) that are not included in a
+    # region. We should warn about this very loudly!
+    warn_on_pixels = (pixel_included_in_regions == 0) * (ivar > 0)
+
     metadata = []
     continuum = np.ones_like(flux) * fill_value
     for i in range(flux.shape[0]):
 
+        warn_indices = np.where(warn_on_pixels[i])[0]
+        if any(warn_indices):
+            # Split by deltas so that we give useful warning messages.
+            segment_indices = np.where(np.diff(warn_indices) > 1)[0]
+            segment_indices = np.sort(np.hstack(
+                [0, segment_indices, segment_indices + 1, len(warn_indices)]))
+            segment_indices = segment_indices.reshape(-1, 2)
+
+            segments = ", ".join(["{:.1f} to {:.1f} ({:d} pixels)".format(
+                dispersion[s], dispersion[e], e-s) for s, e in segment_indices])
+
+            logging.warn("Some pixels in spectrum index {0} have measured flux "
+                         "values (e.g., ivar > 0) but are not included in any "
+                         "specified continuum region. These pixels won't be "
+                         "continuum-normalised: {1}".format(i, segments))
+
+            
         # Get the flux and inverse variance for this object.
         object_metadata = []
         object_flux, object_ivar = (flux[i], ivar[i])
