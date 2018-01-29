@@ -97,7 +97,11 @@ class RestrictedCannonModel(CannonModel):
             
             label_vector = self.vectorizer.human_readable_label_vector
             terms = label_vector.split(" + ")
-            for term, bounds in theta_bounds.items():
+            checked_bounds = {}
+            for term in theta_bounds.keys():
+                bounds = theta_bounds[term]
+                term = str(term)
+                
                 if term not in terms:
                     logging.warn("Boundary on term '{}' ignored because it is "
                                  "not in the label vector: {}".format(
@@ -108,8 +112,10 @@ class RestrictedCannonModel(CannonModel):
                     if None not in bounds and bounds[1] < bounds[0]:
                         raise ValueError("bounds must be in (min, max) order")
 
-            self._theta_bounds = theta_bounds
-            
+                    checked_bounds[term] = bounds
+
+            self._theta_bounds = checked_bounds
+
         else:
             raise TypeError("theta_bounds must be a dictionary-like object")
 
@@ -129,10 +135,11 @@ class RestrictedCannonModel(CannonModel):
 
         # Generate the optimization bounds based on self.theta_bounds.
         op_bounds = [self.theta_bounds.get(term, (None, None)) \
-            for term in self.vectorizer.human_readable_label_vector]
+            for term in self.vectorizer.human_readable_label_vector.split(" + ")]
 
         kwds = kwargs.copy()
+        kwds["op_method"] = "l_bfgs_b" 
         kwds.setdefault("op_kwds", {})
-        kwds["op_kwds"].update(op_method="l_bfgs_b", bounds=op_bounds)
+        kwds["op_kwds"].update(bounds=op_bounds)
 
         return super(RestrictedCannonModel, self).train(threads=threads, **kwds)
