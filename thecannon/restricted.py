@@ -137,9 +137,12 @@ class RestrictedCannonModel(CannonModel):
         op_bounds = [self.theta_bounds.get(term, (None, None)) \
             for term in self.vectorizer.human_readable_label_vector.split(" + ")]
 
-        kwds = kwargs.copy()
-        kwds["op_method"] = "l_bfgs_b" 
-        kwds.setdefault("op_kwds", {})
+        kwds = {}
+        kwds.update(kwargs)
+        kwds["op_kwds"] = {}
+        kwds["op_kwds"].update(kwargs.get("op_kwds", {}))
         kwds["op_kwds"].update(bounds=op_bounds)
 
+        kwds["op_method"] = "l_bfgs_b" 
+        
         return super(RestrictedCannonModel, self).train(threads=threads, **kwds)
