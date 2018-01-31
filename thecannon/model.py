@@ -216,7 +216,7 @@ class CannonModel(object):
 
         if not self.censors or self.censors is None \
         or len(set(self.censors).intersection(self.vectorizer.label_names)) == 0:
-            return design_matrix
+            return self.design_matrix
 
         data = (self.training_set_labels.copy() - self._fiducials)/self._scales
         for i, label_name in enumerate(self.vectorizer.label_names):
