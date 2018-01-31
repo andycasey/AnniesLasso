@@ -200,24 +200,41 @@ class CannonModel(object):
         return self._design_matrix
 
 
-    @property
-    def censored_design_matrix(self):
-        """ Return a censored design matrix. """
-        if not self.censors or self.censors is None:
-            return self.design_matrix
+    def censored_design_matrix(self, pixel_index):
+        """
+        Return a censored design matrix for the given pixel index, and a mask of
+        which theta values to ignore when fitting.
+    
+        :param pixel_index:
+            The zero-indexed pixel.
+
+        :returns:
+            A two-length tuple containing the censored design mask for this
+            pixel, and a boolean mask of values to exclude when fitting for
+            the spectral derivatives.
+        """
+        L = len(self.vectorizer.label_names)
+
+        if not self.censors or self.censors is None: return design_matrix
+        #return (self.design_matrix, np.ones(L, dtype=bool))
 
         data = self.training_set_labels.copy()
         for i, label_name in enumerate(self.vectorizer.label_names):
             try:
-                use = self.censors[label_name]
+                use = self.censors[label_name][pixel_index]
 
             except KeyError:
                 continue
 
             else:
-                data[~use, i] = np.nan
+                if not use:
+                    data[:, i] = np.nan
 
-        return self.vectorizer(data.T)
+        design_matrix = self.vectorizer(data.T)
+        return design_matrix
+
+        #design_matrix[~np.isfinite(design_matrix)] = 0
+
 
 
     @property
@@ -618,15 +635,13 @@ class CannonModel(object):
         theta = np.nan * np.ones((P, T))
         s2 = np.nan * np.ones(P)
 
-        design_matrix = self.censored_design_matrix
-
         for pixel, (flux, ivar) \
         in enumerate(zip(self.training_set_flux.T, self.training_set_ivar.T)):
 
             args = (
                 flux, ivar, 
                 self._initial_theta(pixel),
-                design_matrix,
+                self.censored_design_matrix(pixel),
                 self._pixel_access(self.regularization, pixel, 0.0),
                 None
             )
