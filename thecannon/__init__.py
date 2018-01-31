@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-__version__ = "0.2.7"
+__version__ = "0.2.8"
 
 import logging
 from numpy import RankWarning

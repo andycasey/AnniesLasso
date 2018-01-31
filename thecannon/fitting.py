@@ -352,6 +352,11 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
         fiducial = np.hstack([1.0, np.zeros(design_matrix.shape[1] - 1)])
         return (fiducial, np.inf, metadata) # MAGIC
 
+    # Determine if any theta coefficients will be censored.
+    censored_theta = ~np.any(np.isfinite(design_matrix), axis=0)
+    # Make the design matrix safe to use.
+    design_matrix[:, censored_theta] = 0
+
     feval = []
     for initial_theta, initial_theta_source in initial_thetas:
         feval.append(_pixel_objective_function_fixed_scatter(
@@ -359,24 +364,18 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
 
     initial_theta, initial_theta_source = initial_thetas[np.nanargmin(feval)]
 
-    # If the initial_theta is the same size as the censored_mask, but different
-    # to the design_matrix, then we need to censor the initial theta so that we
-    # don't bother solving for those parameters.
-    if not np.all(np.isfinite(design_matrix)):
-        raise a
-    if censoring_mask is not None:
-        raise NotImplementedError
-
-        if initial_theta.size == censoring_mask.size \
-        and initial_theta.size != censoring_mask.sum():
-            # Censor the initial theta.
-            # Note: the fiducial theta (below) will have the correct size because
-            #       the design matrix is already censored.
-            initial_theta = initial_theta.copy()[censoring_mask]
-
-    op_kwds = dict(args=(design_matrix, flux, ivar, regularization), 
+    op_kwds = dict(x0=initial_theta,
+        args=(design_matrix, flux, ivar, regularization), 
         disp=False, maxfun=np.inf, maxiter=np.inf)
 
+    if any(censored_theta):
+        # If the initial_theta is the same size as the censored_mask, but different
+        # to the design_matrix, then we need to censor the initial theta so that we
+        # don't bother solving for those parameters.
+        op_kwds["x0"] = np.array(op_kwds["x0"])[~censored_theta]
+        op_kwds["args"] = (design_matrix[:, ~censored_theta], flux, ivar,
+            regularization)
+        
     # Allow either l_bfgs_b or powell
     t_init = time()
     op_method = kwargs.get("op_method", "l_bfgs_b").lower()
@@ -386,7 +385,7 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
         op_kwds.update(kwargs.get("op_kwds", {}))
 
         op_params, fopt, metadata = op.fmin_l_bfgs_b(
-            _pixel_objective_function_fixed_scatter, initial_theta, 
+            _pixel_objective_function_fixed_scatter, 
             fprime=None, approx_grad=None, **op_kwds)
 
         metadata.update(dict(fopt=fopt))
@@ -405,8 +404,7 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
         t_init = time()
 
         op_params, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
-            _pixel_objective_function_fixed_scatter, initial_theta,
-            full_output=True, **op_kwds)
+            _pixel_objective_function_fixed_scatter,full_output=True, **op_kwds)
 
         metadata = dict(fopt=fopt, direc=direc, n_iter=n_iter, n_funcs=n_funcs,
             warnflag=warnflag)
@@ -420,9 +418,9 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
         initial_theta=initial_theta, initial_theta_source=initial_theta_source))
 
     # De-censor the optimized parameters.
-    if censoring_mask is not None:
-        theta = np.zeros(censoring_mask.size)
-        theta[censoring_mask] = op_params
+    if any(censored_theta):
+        theta = np.zeros(censored_theta.size)
+        theta[~censored_theta] = op_params
 
     else:
         theta = op_params

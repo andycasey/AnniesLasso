@@ -200,7 +200,7 @@ class CannonModel(object):
         return self._design_matrix
 
 
-    def censored_design_matrix(self, pixel_index):
+    def _censored_design_matrix(self, pixel_index, fill_value=np.nan):
         """
         Return a censored design matrix for the given pixel index, and a mask of
         which theta values to ignore when fitting.
@@ -213,12 +213,12 @@ class CannonModel(object):
             pixel, and a boolean mask of values to exclude when fitting for
             the spectral derivatives.
         """
-        L = len(self.vectorizer.label_names)
 
-        if not self.censors or self.censors is None: return design_matrix
-        #return (self.design_matrix, np.ones(L, dtype=bool))
+        if not self.censors or self.censors is None \
+        or len(set(self.censors).intersection(self.vectorizer.label_names)) == 0:
+            return design_matrix
 
-        data = self.training_set_labels.copy()
+        data = (self.training_set_labels.copy() - self._fiducials)/self._scales
         for i, label_name in enumerate(self.vectorizer.label_names):
             try:
                 use = self.censors[label_name][pixel_index]
@@ -226,15 +226,10 @@ class CannonModel(object):
             except KeyError:
                 continue
 
-            else:
-                if not use:
-                    data[:, i] = np.nan
+            if not use:
+                data[:, i] = fill_value
 
-        design_matrix = self.vectorizer(data.T)
-        return design_matrix
-
-        #design_matrix[~np.isfinite(design_matrix)] = 0
-
+        return self.vectorizer(data).T
 
 
     @property
@@ -641,7 +636,7 @@ class CannonModel(object):
             args = (
                 flux, ivar, 
                 self._initial_theta(pixel),
-                self.censored_design_matrix(pixel),
+                self._censored_design_matrix(pixel),
                 self._pixel_access(self.regularization, pixel, 0.0),
                 None
             )
