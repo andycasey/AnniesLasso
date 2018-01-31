@@ -384,6 +384,13 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
         op_kwds.update(m=design_matrix.shape[1], factr=10.0, pgtol=1e-6)
         op_kwds.update(kwargs.get("op_kwds", {}))
 
+        # If op_bounds are given and we are censoring some theta terms, then we
+        # will need to adjust which op_bounds we provide.
+        if "bounds" in op_kwds and any(censored_theta):
+            op_kwds["bounds"] = \
+                [b for b, is_censored in zip(op_kwds["bounds"], censored_theta) \
+                                      if not is_censored]
+ 
         op_params, fopt, metadata = op.fmin_l_bfgs_b(
             _pixel_objective_function_fixed_scatter, 
             fprime=None, approx_grad=None, **op_kwds)
