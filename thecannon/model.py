@@ -201,6 +201,34 @@ class CannonModel(object):
 
 
     @property
+    def censored_design_matrix(self):
+        """ Return a censored design matrix. """
+        if not self.censors or self.censors is None:
+            return self.design_matrix
+
+        columns = []
+        for label_name in self.vectorizer.label_names:
+            column = self.training_set_labels[label_name].copy()
+            
+            try:
+                use = self.censors[label_name]
+
+            except KeyError:
+                None
+
+            else:
+                # When the pixel mask is False, set the data as NaN
+                column[~use] = np.nan
+
+            columns.append(column)
+
+        design_matrix = self.vectorizer(np.vstack(censored).T)
+        #design_matrix[~np.isfinite(design_matrix)] = 0
+
+        return design_matrix
+
+
+    @property
     def theta(self):
         """ Return the theta coefficients (spectral model derivatives). """
         return self._theta

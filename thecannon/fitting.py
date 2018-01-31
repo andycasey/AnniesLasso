@@ -360,7 +360,10 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
     initial_theta, initial_theta_source = initial_thetas[np.nanargmin(feval)]
 
     # If the initial_theta is the same size as the censored_mask, but different
-    # to the design_matrix, then we need to censor the initial theta.
+    # to the design_matrix, then we need to censor the initial theta so that we
+    # don't bother solving for those parameters.
+    if not np.all(np.isfinite(design_matrix)):
+        raise a
     if censoring_mask is not None:
         raise NotImplementedError
 
