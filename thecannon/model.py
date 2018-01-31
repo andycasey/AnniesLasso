@@ -206,26 +206,18 @@ class CannonModel(object):
         if not self.censors or self.censors is None:
             return self.design_matrix
 
-        columns = []
-        for label_name in self.vectorizer.label_names:
-            column = self.training_set_labels[label_name].copy()
-            
+        data = self.training_set_labels.copy()
+        for i, label_name in enumerate(self.vectorizer.label_names):
             try:
                 use = self.censors[label_name]
 
             except KeyError:
-                None
+                continue
 
             else:
-                # When the pixel mask is False, set the data as NaN
-                column[~use] = np.nan
+                data[~use, i] = np.nan
 
-            columns.append(column)
-
-        design_matrix = self.vectorizer(np.vstack(censored).T)
-        #design_matrix[~np.isfinite(design_matrix)] = 0
-
-        return design_matrix
+        return self.vectorizer(data.T)
 
 
     @property
@@ -626,13 +618,15 @@ class CannonModel(object):
         theta = np.nan * np.ones((P, T))
         s2 = np.nan * np.ones(P)
 
+        design_matrix = self.censored_design_matrix
+
         for pixel, (flux, ivar) \
         in enumerate(zip(self.training_set_flux.T, self.training_set_ivar.T)):
 
             args = (
                 flux, ivar, 
                 self._initial_theta(pixel),
-                self.design_matrix,
+                design_matrix,
                 self._pixel_access(self.regularization, pixel, 0.0),
                 None
             )
