@@ -23,7 +23,7 @@ def fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
     scales, dispersion=None, **kwargs):
     """
     Fit a single spectrum by least-squared fitting.
-    
+
     :param flux:
         The normalized flux values.
 
@@ -51,8 +51,8 @@ def fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
     """
 
     adjusted_ivar = ivar/(1. + ivar * s2)
-    
-    # Exclude non-finite points (e.g., points with zero inverse variance 
+
+    # Exclude non-finite points (e.g., points with zero inverse variance
     # or non-finite flux values, but the latter shouldn't exist anyway).
     use = np.isfinite(flux * adjusted_ivar) * (adjusted_ivar > 0)
     L = len(vectorizer.label_names)
@@ -74,12 +74,12 @@ def fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
     if Dfun not in (None, False):
         try:
             vectorizer.get_label_vector_derivative(initial_labels[0])
-        
+
         except NotImplementedError:
             Dfun = None
             logger.warn("No label vector derivatives available in {}!".format(
                 vectorizer))
-            
+
         except:
             logger.exception("Exception raised when trying to calculate the "\
                              "label vector derivative at the fiducial values:")
@@ -95,7 +95,7 @@ def fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
 
     def func(parameters):
         return np.dot(use_theta, vectorizer(parameters))[:, 0]
-        
+
     def residuals(parameters):
         return weights * (func(parameters) - flux)
 
@@ -110,7 +110,7 @@ def fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
         "gtol": 0.0,
         "maxfev": 100000, # MAGIC
         "epsfcn": None,
-        "factor": 1.0, 
+        "factor": 1.0,
     }
 
     # Only update the keywords with things that op.curve_fit/op.leastsq expects.
@@ -123,7 +123,7 @@ def fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
         try:
             op_labels, cov, meta, mesg, ier = op.leastsq(
                 x0=(x0 - fiducials)/scales, full_output=True, **kwds)
-            
+
         except RuntimeError:
             logger.exception("Exception in fitting from {}".format(x0))
             continue
@@ -152,9 +152,12 @@ def fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
         op_labels *= np.nan
         meta["fail_message"] = "Optimized result same as initial value."
 
+    if cov is None:
+        cov = np.ones((len(op_labels), len(op_labels)))
+
     if not np.any(np.isfinite(cov)):
         logger.warn("Non-finite covariance matrix returned!")
-    
+
     # Save additional information.
     meta.update({
         "method": "leastsq",
@@ -166,7 +169,7 @@ def fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
     })
     for key in ("ftol", "xtol", "gtol", "maxfev", "factor", "epsfcn"):
         meta[key] = kwds[key]
-    
+
     return (op_labels, cov, meta)
 
 
@@ -189,7 +192,7 @@ def fit_theta_by_linalg(flux, ivar, s2, design_matrix):
         The model design matrix.
 
     :returns:
-        The label vector coefficients for the pixel, and the inverse variance 
+        The label vector coefficients for the pixel, and the inverse variance
         matrix.
     """
 
@@ -210,7 +213,7 @@ def fit_theta_by_linalg(flux, ivar, s2, design_matrix):
 
 # TODO: This logic should probably go somewhere else.
 
-    
+
 def chi_sq(theta, design_matrix, flux, ivar, axis=None, gradient=True):
     """
     Calculate the chi-squared difference between the spectral model and flux.
@@ -256,14 +259,14 @@ def L1Norm_variation(theta):
         An array of finite values.
 
     :returns:
-        A two-length tuple containing: the L1 norm of theta (except the first 
+        A two-length tuple containing: the L1 norm of theta (except the first
         entry), and the derivative of the L1 norm of theta.
     """
 
     return (np.sum(np.abs(theta[1:])), np.hstack([0.0, np.sign(theta[1:])]))
 
 
-def _pixel_objective_function_fixed_scatter(theta, design_matrix, flux, ivar, 
+def _pixel_objective_function_fixed_scatter(theta, design_matrix, flux, ivar,
     regularization, gradient=True):
     """
     The objective function for a single regularized pixel with fixed scatter.
@@ -275,7 +278,7 @@ def _pixel_objective_function_fixed_scatter(theta, design_matrix, flux, ivar,
         The normalized flux values for a single pixel across many stars.
 
     :param adjusted_ivar:
-        The adjusted inverse variance of the normalized flux values for a single 
+        The adjusted inverse variance of the normalized flux values for a single
         pixel across many stars. This adjusted inverse variance array should
         already have the scatter included.
 
@@ -295,7 +298,7 @@ def _pixel_objective_function_fixed_scatter(theta, design_matrix, flux, ivar,
 
         f = csq + regularization * L1
         g = d_csq + regularization * d_L1
-        
+
         return (f, g)
 
     else:
@@ -309,10 +312,10 @@ def _scatter_objective_function(scatter, residuals_squared, ivar):
     adjusted_ivar = ivar/(1.0 + ivar * scatter**2)
     chi_sq = residuals_squared * adjusted_ivar
     return (np.mean(chi_sq) - 1.0)**2
-    
 
-def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix, 
-    regularization, censoring_mask, **kwargs): 
+
+def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
+    regularization, censoring_mask, **kwargs):
     """
     Fit theta coefficients and noise residual for a single pixel, using
     an initially fixed scatter value.
@@ -345,7 +348,7 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
     :returns:
         The optimized theta coefficients, the noise residual `s2`, and
         metadata related to the optimization process.
-    """ 
+    """
 
     if np.sum(ivar) < 1.0 * ivar.size: # MAGIC
         metadata = dict(message="No pixel information.", op_time=0.0)
@@ -365,7 +368,7 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
     initial_theta, initial_theta_source = initial_thetas[np.nanargmin(feval)]
 
     op_kwds = dict(x0=initial_theta,
-        args=(design_matrix, flux, ivar, regularization), 
+        args=(design_matrix, flux, ivar, regularization),
         disp=False, maxfun=np.inf, maxiter=np.inf)
 
     if any(censored_theta):
@@ -375,7 +378,7 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
         op_kwds["x0"] = np.array(op_kwds["x0"])[~censored_theta]
         op_kwds["args"] = (design_matrix[:, ~censored_theta], flux, ivar,
             regularization)
-        
+
     # Allow either l_bfgs_b or powell
     t_init = time()
     op_method = kwargs.get("op_method", "l_bfgs_b").lower()
@@ -390,15 +393,15 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
             op_kwds["bounds"] = \
                 [b for b, is_censored in zip(op_kwds["bounds"], censored_theta) \
                                       if not is_censored]
- 
+
         op_params, fopt, metadata = op.fmin_l_bfgs_b(
-            _pixel_objective_function_fixed_scatter, 
+            _pixel_objective_function_fixed_scatter,
             fprime=None, approx_grad=None, **op_kwds)
 
         metadata.update(dict(fopt=fopt))
 
     elif op_method == "powell":
-        
+
         op_kwds.update(xtol=1e-6, ftol=1e-6)
         op_kwds.update(kwargs.get("op_kwds", {}))
 
