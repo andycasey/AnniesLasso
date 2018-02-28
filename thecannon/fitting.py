@@ -417,7 +417,8 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
 
     while True:
         if op_method == "l_bfgs_b":
-            op_kwds = base_op_kwds.copy()
+            op_kwds = dict()
+            op_kwds.update(base_op_kwds)
             op_kwds.update(m=design_matrix.shape[1], factr=10.0, pgtol=1e-6)
             op_kwds.update((kwargs.get("op_kwds", {}) or {}))
 
@@ -450,7 +451,8 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
                 break
 
         elif op_method == "powell":
-            op_kwds = base_op_kwds.copy()
+            op_kwds = dict()
+            op_kwds.update(base_op_kwds)
             op_kwds.update(xtol=1e-6, ftol=1e-6)
             op_kwds.update((kwargs.get("op_kwds", {}) or {}))
 
