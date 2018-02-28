@@ -692,6 +692,9 @@ class CannonModel(object):
             The number of parallel threads to use.
         """
 
+        if flux is None or ivar is None:
+            raise ValueError("flux and ivar must not be None")
+
         if threads in (1, None):
             mapper, pool = (map, None)
 
