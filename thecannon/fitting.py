@@ -410,8 +410,8 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
                 logger.warn("Optimization warning (l_bfgs_b): {}".format(reason))
 
                 # Do optimization again.
-                base_op_kwds["x0"].update(op_method="powell", x0=op_params)
-                
+                base_op_kwds.update(op_method="powell", x0=op_params)
+
             else:
                 break
 
