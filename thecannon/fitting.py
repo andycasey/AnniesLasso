@@ -428,7 +428,7 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
                 op_kwds["bounds"] = [b for b, is_censored in \
                     zip(op_kwds["bounds"], censored_theta) if not is_censored]
 
-            # Only include allowable keywords.
+            # Just-in-time to remove forbidden keywords.
             _remove_forbidden_op_kwds(op_method, op_kwds)
 
             op_params, fopt, metadata = op.fmin_l_bfgs_b(
@@ -456,9 +456,6 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
             op_kwds.update(xtol=1e-6, ftol=1e-6)
             op_kwds.update((kwargs.get("op_kwds", {}) or {}))
 
-            # Only include allowable keywords.
-            _remove_forbidden_op_kwds(op_method, op_kwds)
-
             # Set 'False' in args so that we don't return the gradient, 
             # because fmin doesn't want it.
             args = list(op_kwds["args"])
@@ -466,6 +463,9 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
             op_kwds["args"] = tuple(args)
 
             t_init = time()
+
+            # Just-in-time to remove forbidden keywords.
+            _remove_forbidden_op_kwds(op_method, op_kwds)
 
             op_params, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
                 _pixel_objective_function_fixed_scatter, 
