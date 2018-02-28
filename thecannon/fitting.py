@@ -385,46 +385,60 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
     op_method = kwargs.get("op_method", default_op_method) or default_op_method
     op_method = op_method.lower()
 
-    if op_method == "l_bfgs_b":
+    while True:
+        if op_method == "l_bfgs_b":
+            op_kwds.update(m=design_matrix.shape[1], factr=10.0, pgtol=1e-6)
+            op_kwds.update((kwargs.get("op_kwds", {}) or {}))
 
-        op_kwds.update(m=design_matrix.shape[1], factr=10.0, pgtol=1e-6)
-        op_kwds.update((kwargs.get("op_kwds", {}) or {}))
+            # If op_bounds are given and we are censoring some theta terms, then we
+            # will need to adjust which op_bounds we provide.
+            if "bounds" in op_kwds and any(censored_theta):
+                op_kwds["bounds"] = [b for b, is_censored in \
+                    zip(op_kwds["bounds"], censored_theta) if not is_censored]
 
-        # If op_bounds are given and we are censoring some theta terms, then we
-        # will need to adjust which op_bounds we provide.
-        if "bounds" in op_kwds and any(censored_theta):
-            op_kwds["bounds"] = \
-                [b for b, is_censored in zip(op_kwds["bounds"], censored_theta) \
-                                      if not is_censored]
+            op_params, fopt, metadata = op.fmin_l_bfgs_b(
+                _pixel_objective_function_fixed_scatter,
+                fprime=None, approx_grad=None, **op_kwds)
 
-        op_params, fopt, metadata = op.fmin_l_bfgs_b(
-            _pixel_objective_function_fixed_scatter,
-            fprime=None, approx_grad=None, **op_kwds)
+            metadata.update(dict(fopt=fopt))
 
-        metadata.update(dict(fopt=fopt))
+            warnflag = metadata.get("warnflag", -1)
+            if warnflag > 0:
+                reason = "too many function evaluations or too many iterations" \
+                         if warnflag == 1 else metadata["task"]
+                logger.warn("Optimization warning (l_bfgs_b): {}".format(reason))
 
-    elif op_method == "powell":
+                # Do optimization again.
+                op_kwds["x0"] = op_params
+                op_method = "powell"
 
-        op_kwds.update(xtol=1e-6, ftol=1e-6)
-        op_kwds.update((kwargs.get("op_kwds", {}) or {}))
+            else:
+                break
 
-        # Set 'False' in args so that we don't return the gradient, because fmin
-        # doesn't want it.
-        args = list(op_kwds["args"])
-        args.append(False)
-        op_kwds["args"] = tuple(args)
+        elif op_method == "powell":
 
-        t_init = time()
+            op_kwds.update(xtol=1e-6, ftol=1e-6)
+            op_kwds.update((kwargs.get("op_kwds", {}) or {}))
 
-        op_params, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
-            _pixel_objective_function_fixed_scatter,full_output=True, **op_kwds)
+            # Set 'False' in args so that we don't return the gradient, 
+            # because fmin doesn't want it.
+            args = list(op_kwds["args"])
+            args.append(False)
+            op_kwds["args"] = tuple(args)
 
-        metadata = dict(fopt=fopt, direc=direc, n_iter=n_iter, n_funcs=n_funcs,
-            warnflag=warnflag)
+            t_init = time()
 
-    else:
-        raise ValueError("unknown optimization method '{}' -- "
-                         "powell or l_bfgs_b are available".format(op_method))
+            op_params, fopt, direc, n_iter, n_funcs, warnflag = op.fmin_powell(
+                _pixel_objective_function_fixed_scatter, 
+                full_output=True, **op_kwds)
+
+            metadata = dict(fopt=fopt, direc=direc, n_iter=n_iter, 
+                n_funcs=n_funcs, warnflag=warnflag)
+            break
+
+        else:
+            raise ValueError("unknown optimization method '{}' -- "
+                             "powell or l_bfgs_b are available".format(op_method))
 
     # Additional metadata common to both optimizers.
     metadata.update(dict(op_method=op_method, op_time=time() - t_init,
