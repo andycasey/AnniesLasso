@@ -381,11 +381,14 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
 
     # Allow either l_bfgs_b or powell
     t_init = time()
-    op_method = kwargs.get("op_method", "l_bfgs_b").lower()
+    default_op_method = "l_bfgs_b"
+    op_method = kwargs.get("op_method", default_op_method) or default_op_method
+    op_method = op_method.lower()
+
     if op_method == "l_bfgs_b":
 
         op_kwds.update(m=design_matrix.shape[1], factr=10.0, pgtol=1e-6)
-        op_kwds.update(kwargs.get("op_kwds", {}))
+        op_kwds.update((kwargs.get("op_kwds", {}) or {}))
 
         # If op_bounds are given and we are censoring some theta terms, then we
         # will need to adjust which op_bounds we provide.
@@ -403,7 +406,7 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
     elif op_method == "powell":
 
         op_kwds.update(xtol=1e-6, ftol=1e-6)
-        op_kwds.update(kwargs.get("op_kwds", {}))
+        op_kwds.update((kwargs.get("op_kwds", {}) or {}))
 
         # Set 'False' in args so that we don't return the gradient, because fmin
         # doesn't want it.

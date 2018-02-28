@@ -15,15 +15,10 @@ import multiprocessing as mp
 import numpy as np
 import os
 import pickle
-import scipy.optimize as op
-from collections import OrderedDict
-from copy import deepcopy
 from datetime import datetime
 from functools import wraps
-from six import string_types
 from sys import version_info
 from scipy.spatial import Delaunay
-from time import time
 
 from .vectorizer.base import BaseVectorizer
 from . import (censoring, fitting, utils, vectorizer as vectorizer_module, __version__)
@@ -593,18 +588,27 @@ class CannonModel(object):
                 "contact Andy Casey <andrew.casey@monash.edu> if you need this")
 
 
-    def train(self, threads=None, **kwargs):
+    def train(self, threads=None, op_method=None, op_kwds=None):
         """
         Train the model.
 
         :param threads: [optional]
             The number of parallel threads to use.
 
+        :param op_method: [optional]
+            The optimization algorithm to use: l_bfgs_b (default) and powell
+            are available.
+
+        :param op_kwds:
+            Keyword arguments to provide directly to the optimization function.
+
         :returns:
             A three-length tuple containing the spectral coefficients `theta`,
             the squared scatter term at each pixel `s2`, and metadata related to
             the training of each pixel.
         """
+
+        kwds = dict(op_method=op_method, op_kwds=op_kwds)
 
         if self.training_set_flux is None or self.training_set_ivar is None:
             raise TypeError(
@@ -624,7 +628,7 @@ class CannonModel(object):
             pool = mp.Pool(threads)
             mapper = pool.map
 
-        func = utils.wrapper(fitting.fit_pixel_fixed_scatter, None, kwargs, P)
+        func = utils.wrapper(fitting.fit_pixel_fixed_scatter, None, kwds, P)
 
         meta = []
         theta = np.nan * np.ones((P, T))

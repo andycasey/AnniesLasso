@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-__version__ = "0.2.91"
+__version__ = "0.2.92"
 
 import logging
 from numpy import RankWarning
 from warnings import simplefilter
-from sys import version_info
 
 from .model import CannonModel
 from . import (censoring, fitting, plot, utils, vectorizer)

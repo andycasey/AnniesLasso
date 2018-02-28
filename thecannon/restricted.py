@@ -120,12 +120,16 @@ class RestrictedCannonModel(CannonModel):
             raise TypeError("theta_bounds must be a dictionary-like object")
 
 
-    def train(self, threads=None, **kwargs):
+
+    def train(self, threads=None, op_kwds=None):
         """
         Train the model.
 
         :param threads: [optional]
             The number of parallel threads to use.
+
+        :param op_kwds:
+            Keyword arguments to provide directly to the optimization function.
 
         :returns:
             A three-length tuple containing the spectral coefficients `theta`,
@@ -137,12 +141,7 @@ class RestrictedCannonModel(CannonModel):
         op_bounds = [self.theta_bounds.get(term, (None, None)) \
             for term in self.vectorizer.human_readable_label_vector.split(" + ")]
 
-        kwds = {}
-        kwds.update(kwargs)
-        kwds["op_kwds"] = {}
-        kwds["op_kwds"].update(kwargs.get("op_kwds", {}))
+        kwds = dict(op_method="l_bfgs_b", op_kwds=(op_kwds or {}))
         kwds["op_kwds"].update(bounds=op_bounds)
-
-        kwds["op_method"] = "l_bfgs_b" 
         
         return super(RestrictedCannonModel, self).train(threads=threads, **kwds)
