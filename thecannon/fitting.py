@@ -367,7 +367,7 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
 
     initial_theta, initial_theta_source = initial_thetas[np.nanargmin(feval)]
 
-    op_kwds = dict(x0=initial_theta,
+    base_op_kwds = dict(x0=initial_theta,
         args=(design_matrix, flux, ivar, regularization),
         disp=False, maxfun=np.inf, maxiter=np.inf)
 
@@ -375,8 +375,8 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
         # If the initial_theta is the same size as the censored_mask, but different
         # to the design_matrix, then we need to censor the initial theta so that we
         # don't bother solving for those parameters.
-        op_kwds["x0"] = np.array(op_kwds["x0"])[~censored_theta]
-        op_kwds["args"] = (design_matrix[:, ~censored_theta], flux, ivar,
+        base_op_kwds["x0"] = np.array(base_op_kwds["x0"])[~censored_theta]
+        base_op_kwds["args"] = (design_matrix[:, ~censored_theta], flux, ivar,
             regularization)
 
     # Allow either l_bfgs_b or powell
@@ -387,6 +387,7 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
 
     while True:
         if op_method == "l_bfgs_b":
+            op_kwds = base_op_kwds.copy()
             op_kwds.update(m=design_matrix.shape[1], factr=10.0, pgtol=1e-6)
             op_kwds.update((kwargs.get("op_kwds", {}) or {}))
 
@@ -409,14 +410,13 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
                 logger.warn("Optimization warning (l_bfgs_b): {}".format(reason))
 
                 # Do optimization again.
-                op_kwds["x0"] = op_params
-                op_method = "powell"
-
+                base_op_kwds["x0"].update(op_method="powell", x0=op_params)
+                
             else:
                 break
 
         elif op_method == "powell":
-
+            op_kwds = base_op_kwds.copy()
             op_kwds.update(xtol=1e-6, ftol=1e-6)
             op_kwds.update((kwargs.get("op_kwds", {}) or {}))
 
