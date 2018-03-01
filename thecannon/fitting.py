@@ -311,7 +311,7 @@ def _pixel_objective_function_fixed_scatter(theta, design_matrix, flux, ivar,
 def _scatter_objective_function(scatter, residuals_squared, ivar):
     adjusted_ivar = ivar/(1.0 + ivar * scatter**2)
     chi_sq = residuals_squared * adjusted_ivar
-    return (np.mean(chi_sq) - 1.0)**2
+    return (np.median(chi_sq) - 1.0)**2
 
 
 def _remove_forbidden_op_kwds(op_method, op_kwds):
@@ -415,11 +415,14 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
     op_method = kwargs.get("op_method", default_op_method) or default_op_method
     op_method = op_method.lower()
 
+    op_strict = kwargs.get("op_strict", True)
+
     while True:
         if op_method == "l_bfgs_b":
             op_kwds = dict()
             op_kwds.update(base_op_kwds)
-            op_kwds.update(m=design_matrix.shape[1], factr=10.0, pgtol=1e-6)
+            op_kwds.update(
+                m=design_matrix.shape[1], maxls=20, factr=10.0, pgtol=1e-6)
             op_kwds.update((kwargs.get("op_kwds", {}) or {}))
 
             # If op_bounds are given and we are censoring some theta terms, then we
@@ -443,9 +446,12 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
                          if warnflag == 1 else metadata["task"]
                 logger.warn("Optimization warning (l_bfgs_b): {}".format(reason))
 
-                # Do optimization again.
-                op_method = "powell" 
-                base_op_kwds.update(x0=op_params)
+                if op_strict:
+                    # Do optimization again.
+                    op_method = "powell" 
+                    base_op_kwds.update(x0=op_params)
+                else:
+                    break
 
             else:
                 break
@@ -495,6 +501,7 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
     op_fmin_kwds = dict(disp=False, maxiter=np.inf, maxfun=np.inf)
     op_fmin_kwds.update(
         xtol=op_kwds.get("xtol", 1e-8), ftol=op_kwds.get("ftol", 1e-8))
+
     residuals_squared = (flux - np.dot(theta, design_matrix.T))**2
     scatter = op.fmin(_scatter_objective_function, 0.0,
         args=(residuals_squared, ivar), disp=False)
