@@ -696,11 +696,12 @@ class CannonModel(object):
             The number of parallel threads to use.
 
         :param use_derivatives: [optional]
-            Use analytic derivatives provided by the vectorizer, or specify
-            your own function to calculate derivatives.
+            Boolean `True` indicating to use analytic derivatives provided by 
+            the vectorizer, `None` to calculate on the fly, or a callable
+            function to calculate your own derivatives.
 
         :param op_kwds: [optional]
-            Optimization keywords that will get passed to `scipy.optimize.leastsq`.
+            Optimization keywords that get passed to `scipy.optimize.leastsq`.
         """
 
         if flux is None or ivar is None:
