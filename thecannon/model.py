@@ -588,7 +588,8 @@ class CannonModel(object):
                 "contact Andy Casey <andrew.casey@monash.edu> if you need this")
 
 
-    def train(self, threads=None, op_method=None, op_strict=True, op_kwds=None):
+    def train(self, threads=None, op_method=None, op_strict=True, op_kwds=None,
+        **kwargs):
         """
         Train the model.
 
@@ -612,6 +613,7 @@ class CannonModel(object):
         """
 
         kwds = dict(op_method=op_method, op_strict=op_strict, op_kwds=op_kwds)
+        kwds.update(kwargs)
 
         if self.training_set_flux is None or self.training_set_ivar is None:
             raise TypeError(

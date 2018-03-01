@@ -409,6 +409,19 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
         args=(design_matrix, flux, ivar, regularization),
         disp=False, maxfun=np.inf, maxiter=np.inf)
 
+    theta_0 = kwargs.get("__theta_0", None)
+    if theta_0 is not None:
+        logger.warn("FIXING theta_0. HIGHLY EXPERIMENTAL.")
+
+        # Subtract from flux.
+        # Set design matrix entry to zero.
+        # Update to theta later on.
+        new_flux = flux - theta_0
+        new_design_matrix = np.copy(design_matrix)
+        new_design_matrix[:, 0] = 0.0
+
+        base_op_kwds["args"] = (new_design_matrix, new_flux, ivar, regularization)
+
     if any(censored_theta):
         # If the initial_theta is the same size as the censored_mask, but different
         # to the design_matrix, then we need to censor the initial theta so that we
@@ -504,6 +517,9 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
 
     else:
         theta = op_params
+
+    if theta_0 is not None:
+        theta[0] = theta_0
 
     # Fit the scatter.
     op_fmin_kwds = dict(disp=False, maxiter=np.inf, maxfun=np.inf)
