@@ -588,7 +588,7 @@ class CannonModel(object):
                 "contact Andy Casey <andrew.casey@monash.edu> if you need this")
 
 
-    def train(self, threads=None, op_method=None, op_kwds=None):
+    def train(self, threads=None, op_method=None, op_strict=True, op_kwds=None):
         """
         Train the model.
 
@@ -599,6 +599,9 @@ class CannonModel(object):
             The optimization algorithm to use: l_bfgs_b (default) and powell
             are available.
 
+        :param op_strict: [optional]
+            Default to Powell's optimization method if BFGS fails.
+
         :param op_kwds:
             Keyword arguments to provide directly to the optimization function.
 
@@ -608,7 +611,7 @@ class CannonModel(object):
             the training of each pixel.
         """
 
-        kwds = dict(op_method=op_method, op_kwds=op_kwds)
+        kwds = dict(op_method=op_method, op_strict=op_strict, op_kwds=op_kwds)
 
         if self.training_set_flux is None or self.training_set_ivar is None:
             raise TypeError(
