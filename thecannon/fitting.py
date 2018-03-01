@@ -328,10 +328,10 @@ def _remove_forbidden_op_kwds(op_method, op_kwds):
         `None`. The dictionary of `op_kwds` will be updated.
     """
     all_allowed_keys = dict(
-        l_bfgs_b=("bounds", "m", "factr", "pgtol", "epsilon", "iprint", 
-            "maxfun", "maxiter", "disp", "callback", "maxls"),
-        powell=("xtol", "ftol", "maxiter", "maxfun", "full_output", "disp",
-            "retall", "callback", "initial_simplex"))
+        l_bfgs_b=("x0", "args", "bounds", "m", "factr", "pgtol", "epsilon", 
+            "iprint", "maxfun", "maxiter", "disp", "callback", "maxls"),
+        powell=("x0", "args", "xtol", "ftol", "maxiter", "maxfun", 
+            "full_output", "disp", "retall", "callback", "initial_simplex"))
 
     forbidden_keys = set(op_kwds).difference(all_allowed_keys[op_method])
     if forbidden_keys:
@@ -492,6 +492,9 @@ def fit_pixel_fixed_scatter(flux, ivar, initial_thetas, design_matrix,
         theta = op_params
 
     # Fit the scatter.
+    op_fmin_kwds = dict(disp=False, maxiter=np.inf, maxfun=np.inf)
+    op_fmin_kwds.update(
+        xtol=op_kwds.get("xtol", 1e-8), ftol=op_kwds.get("ftol", 1e-8))
     residuals_squared = (flux - np.dot(theta, design_matrix.T))**2
     scatter = op.fmin(_scatter_objective_function, 0.0,
         args=(residuals_squared, ivar), disp=False)
