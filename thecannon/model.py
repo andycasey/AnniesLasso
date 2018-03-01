@@ -677,7 +677,8 @@ class CannonModel(object):
 
 
     @requires_training
-    def test(self, flux, ivar, initial_labels=None, threads=None, **kwargs):
+    def test(self, flux, ivar, initial_labels=None, threads=None, 
+        use_derivatives=True, op_kwds=None):
         """
         Run the test step on spectra.
 
@@ -693,10 +694,20 @@ class CannonModel(object):
 
         :param threads: [optional]
             The number of parallel threads to use.
+
+        :param use_derivatives: [optional]
+            Use analytic derivatives provided by the vectorizer, or specify
+            your own function to calculate derivatives.
+
+        :param op_kwds: [optional]
+            Optimization keywords that will get passed to `scipy.optimize.leastsq`.
         """
 
         if flux is None or ivar is None:
             raise ValueError("flux and ivar must not be None")
+
+        if op_kwds is None:
+            op_kwds = dict()
 
         if threads in (1, None):
             mapper, pool = (map, None)
@@ -719,9 +730,12 @@ class CannonModel(object):
             initial_labels = np.tile(initial_labels.flatten(), S)\
                              .reshape(S, -1, len(self._fiducials))
 
-        func = utils.wrapper(fitting.fit_spectrum, 
-            (self.vectorizer, self.theta, self.s2, self._fiducials, self._scales),
-            kwargs, S, message="Running test step on {} spectra".format(S))
+        args = (self.vectorizer, self.theta, self.s2, self._fiducials, 
+            self._scales)
+        kwargs = dict(use_derivatives=use_derivatives, op_kwds=op_kwds)
+
+        func = utils.wrapper(fitting.fit_spectrum, args, kwargs, S,
+            message="Running test step on {} spectra".format(S))
 
         labels, cov, meta = zip(*mapper(func, zip(*(flux, ivar, initial_labels))))
 

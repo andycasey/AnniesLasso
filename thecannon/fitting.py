@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
-    scales, dispersion=None, **kwargs):
+    scales, dispersion=None, use_derivatives=True, op_kwds=None):
     """
     Fit a single spectrum by least-squared fitting.
 
@@ -44,6 +44,14 @@ def fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
 
     :param dispersion: [optional]
         The dispersion (e.g., wavelength) points for the normalized fluxes.
+
+    :param use_derivatives: [optional]
+        Boolean `True` indicating to use analytic derivatives provided by 
+        the vectorizer, `None` to calculate on the fly, or a callable
+        function to calculate your own derivatives.
+
+    :param op_kwds: [optional]
+        Optimization keywords that get passed to `scipy.optimize.leastsq`.
 
     :returns:
         A three-length tuple containing: the optimized labels, the covariance
@@ -70,8 +78,7 @@ def fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
     initial_labels = np.atleast_2d(initial_labels)
 
     # Check the vectorizer whether it has a derivative built in.
-    Dfun = kwargs.pop("Dfun", True)
-    if Dfun not in (None, False):
+    if use_derivatives not in (None, False):
         try:
             vectorizer.get_label_vector_derivative(initial_labels[0])
 
@@ -114,8 +121,9 @@ def fit_spectrum(flux, ivar, initial_labels, vectorizer, theta, s2, fiducials,
     }
 
     # Only update the keywords with things that op.curve_fit/op.leastsq expects.
-    for key in set(kwargs).intersection(kwds):
-        kwds[key] = kwargs[key]
+    if op_kwds is not None:
+        for key in set(op_kwds).intersection(kwds):
+            kwds[key] = op_kwds[key]
 
     results = []
     for x0 in initial_labels:
