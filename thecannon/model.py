@@ -129,7 +129,7 @@ class CannonModel(object):
 
         # Set useful private attributes.
         __scale_labels_function = kwargs.get("__scale_labels_function", 
-            lambda l: np.ptp(np.percentile(l, [25.5, 97.5], axis=0), axis=0))
+            lambda l: np.ptp(np.percentile(l, [2.5, 97.5], axis=0), axis=0))
         __fiducial_labels_function = kwargs.get("__fiducial_labels_function",
             lambda l: np.percentile(l, 50, axis=0))
 
