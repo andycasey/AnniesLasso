@@ -53,13 +53,12 @@ normalized_ivar = np.array([np.loadtxt(star["ivar_filename"]) for star in traini
 # Providing the dispersion to the model is optional, but handy later on.
 dispersion = np.loadtxt("common_wavelengths.txt")
 
+# Create a vectorizer that defines our model form.
+vectorizer = tc.vectorizer.PolynomialVectorizer(("TEFF", "LOGG", "FEH"), 2)
+
 # Create the model that will run in parallel using all available cores.
 model = tc.CannonModel(training_set, normalized_flux, normalized_ivar,
-    dispersion=dispersion, threads=-1)
-
-# Specify the complexity of the model:
-model.vectorizer = tc.vectorizer.NormalizedPolynomialVectorizer(labelled_set,
-    tc.vectorizer.polynomial.terminator(("TEFF", "LOGG", "FEH"), 2))
+                       vectorizer=vectorizer, dispersion=dispersion, threads=-1)
 
 # Train the model!
 model.train()
